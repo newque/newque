@@ -1,0 +1,14 @@
+{
+  "logLevel": "debug", // debug, info, notice, warning, error, fatal
+  "listeners": [
+    {
+      "protocol": "HTTP",
+      "name": "http9000",
+      "host": "0.0.0.0",
+      "port": 9000,
+      "settings": {
+        "timeout": 3
+      }
+    }
+  ]
+}

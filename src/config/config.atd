@@ -1,0 +1,36 @@
+type log_level = [
+  | Debug <json name="debug">
+  | Info <json name="info">
+  | Notice <json name="notice">
+  | Warning <json name="warning">
+  | Error <json name="error">
+  | Fatal <json name="fatal">
+] <ocaml repr="classic">
+
+type http_settings = {
+  timeout: int;
+}
+type zmq_settings = {
+  something: string;
+}
+
+type ext_proto = [
+  | HTTP <json name="HTTP"> of http_settings
+  | ZMQ <json name="ZMQ"> of zmq_settings
+] <ocaml repr="classic">
+
+type ext_listener = {
+  name: string;
+  host: string;
+  port: int;
+  settings <json tag_field="protocol">: ext_proto;
+}
+
+type channel = {
+  endpoints: string list;
+}
+
+type config = {
+  logLevel: log_level;
+  listeners: ext_listener list;
+}

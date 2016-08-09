@@ -1,0 +1,38 @@
+#use "topfind"
+#thread
+
+#require "core"
+open Core.Std
+
+#require "lwt"
+#require "lwt.unix"
+#require "lwt.ppx"
+open Lwt
+
+#require "cohttp"
+#require "cohttp.lwt"
+open Cohttp
+open Cohttp_lwt_unix
+
+#require "conduit"
+#require "conduit.lwt"
+#require "conduit.lwt-unix"
+
+#require "ZMQ"
+#require "lwt-zmq"
+
+#require "atd"
+#require "atdgen"
+
+#mod_use "src/fs.ml"
+#mod_use "src/log.ml"
+#mod_use "src/config/config_t.ml"
+#mod_use "src/config/config_j.ml"
+#mod_use "src/config/config.ml"
+#mod_use "src/protocols/http.ml"
+
+#directory "_build/src"
+
+let () = Lwt_log.add_rule "*" Lwt_log.Debug
+
+open Config_j

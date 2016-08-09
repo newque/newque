@@ -1,0 +1,30 @@
+Name: newque
+Version: 0.0.1
+Synopsis: Reliable task and message broker.
+Authors: Simon Grondin <github@simongrondin.name>
+License: MIT
+
+Description: In development.
+Homepage: https://github.com/SGrondin/newque
+
+OASISFormat: 0.4
+BuildTools: ocamlbuild
+Plugins: META (0.4), DevFiles (0.4)
+
+PreBuildCommand: rm -rf tmp && rm -f src/config/config_*.ml* && mkdir tmp && find src -name "*.ml*" | xargs ocp-indent -i && atdgen -t ./src/config/config.atd && atdgen -j ./src/config/config.atd && find src -name '*.ml*' | xargs -J% cp % ./tmp
+
+PreCleanCommand: rm -rf tmp src/config/config_*.ml* logs
+
+Executable "newque"
+  Path: tmp
+  MainIs: main.ml
+  BuildDepends:
+    core,
+    threads,
+    lwt,
+    lwt.unix,
+    lwt.ppx,
+    cohttp,
+    cohttp.lwt,
+    atd,
+    atdgen

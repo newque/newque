@@ -1,0 +1,1 @@
+let log_path name = Fs.conf_chan_dir ^ name
