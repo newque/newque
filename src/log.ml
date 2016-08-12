@@ -4,7 +4,6 @@ open Lwt
 let outlog = Fs.log_dir ^ "out.log"
 let errlog = Fs.log_dir ^ "err.log"
 
-let close () = Lwt.return_unit
 let stdout_logger = Lwt_log.channel ~close_mode:`Keep ~channel:Lwt_io.stdout ()
 let stderr_logger = Lwt_log.channel ~close_mode:`Keep ~channel:Lwt_io.stderr ()
 let stdout level str = Lwt_log.log ~logger:stdout_logger ~level str

@@ -9,6 +9,7 @@ let () = Lwt.async_exception_hook := fun ex -> print_endline ("UNCAUGHT EXCEPTIO
 let () = Lwt_log.add_rule "*" Lwt_log.Debug
 
 let start config_path =
+  let%lwt () = Log.stdout Lwt_log.Info "Starting Newque" in
   (* Make directories for logs and channels *)
   let check_directory path =
     let dir = Fs.is_directory ~create:true path in
@@ -21,27 +22,18 @@ let start config_path =
   let module Logger = Log.Make (struct let path = Log.outlog end) in
 
   (* Load main config *)
-  let%lwt () = Logger.info ("Starting Newque") in
   let%lwt () = Logger.info ("Loading " ^ config_path) in
   let%lwt config = Config.parse_main config_path in
-  (* let watcher = Watcher.create () in *)
-  Config.apply_main config;
+  let watcher = Watcher.create () in
+  let%lwt () = Config.apply_main config watcher in
 
   (* Load channel config files *)
   let%lwt channels = Config.parse_channels Fs.conf_chan_dir in
-  let generic = config.listeners |> List.hd_exn in
-  let (Config_j.HTTP http) = generic.settings in
-  let%lwt server = Http.start generic http in
-  print_endline "started";
-  let%lwt () = Lwt_unix.sleep 5. in
-  print_endline "closing";
-  let%lwt () = Http.stop server in
-  print_endline "closed";
-  let%lwt () = Lwt_unix.sleep 5. in
-  print_endline "reopening";
-  let%lwt server = Http.start generic http in
-  print_endline "reopened!!!!!";
-  let%lwt () = Lwt_unix.sleep 5. in
+  let%lwt () = Lwt_unix.sleep 2. in
+
+  let%lwt () = Watcher.welp watcher in
+
+  let%lwt () = Lwt_unix.sleep 10. in
   return_unit
 
 let _ =

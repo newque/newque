@@ -8,15 +8,15 @@ type log_level = [
 ] <ocaml repr="classic">
 
 type http_settings = {
-  timeout: int;
+  ~backlog <ocaml default="20">: int;
 }
 type zmq_settings = {
   something: string;
 }
 
 type ext_proto = [
-  | HTTP <json name="HTTP"> of http_settings
-  | ZMQ <json name="ZMQ"> of zmq_settings
+  | Http_proto <json name="HTTP"> of http_settings
+  | Zmq_proto <json name="ZMQ"> of zmq_settings
 ] <ocaml repr="classic">
 
 type ext_listener = {
@@ -27,10 +27,10 @@ type ext_listener = {
 }
 
 type channel = {
-  endpoints: string list;
+  endpoint_names <json name="listeners">: string list;
 }
 
 type config = {
-  logLevel: log_level;
-  listeners: ext_listener list;
+  log_level <json name="logLevel">: log_level;
+  endpoints <json name="listeners">: ext_listener list;
 }

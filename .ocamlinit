@@ -28,8 +28,9 @@ open Cohttp_lwt_unix
 #mod_use "src/log.ml"
 #mod_use "src/config/config_t.ml"
 #mod_use "src/config/config_j.ml"
-#mod_use "src/config/config.ml"
 #mod_use "src/protocols/http.ml"
+#mod_use "src/watcher.ml"
+#mod_use "src/config/config.ml"
 
 #directory "_build/src"
 

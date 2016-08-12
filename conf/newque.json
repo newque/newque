@@ -7,7 +7,7 @@
       "host": "0.0.0.0",
       "port": 9000,
       "settings": {
-        "timeout": 3
+        "backlog": 20 // Optional. Default 20. "backlog" for the listen(2) syscall
       }
     }
   ]

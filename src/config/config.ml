@@ -16,7 +16,7 @@ let parse_main path =
 let apply_main config watcher =
   (* Set global log level *)
   Lwt_log.reset_rules ();
-  begin match config.logLevel with
+  begin match config.log_level with
     | Debug -> Lwt_log.Debug
     | Info -> Lwt_log.Info
     | Notice -> Lwt_log.Notice
@@ -24,9 +24,9 @@ let apply_main config watcher =
     | Error -> Lwt_log.Error
     | Fatal -> Lwt_log.Fatal end
   |> Lwt_log.add_rule "*";
-  (* Listeners to create: *)
-  ()
-(* TODO: dedup host+port, and names *)
+  (* Start listeners *)
+  Watcher.add_listeners watcher config
+(* TODO: dedup port and names *)
 
 (* TODO: dedup endpoints *)
 let parse_channels path =

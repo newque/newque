@@ -9,7 +9,7 @@ let conf_chan_dir = "./conf/channels/"
 
 (* | Unix.Unix_error (c, n, p) -> return (Error (Logger.format_unix_exn c n p)) *)
 let format_unix_exn code name param =
-  Printf.sprintf "%s {syscall: %s(%s)}" (String.uppercase (Unix.error_message code)) name param
+  Printf.sprintf "%s {call: %s(%s)}" (String.uppercase (Unix.error_message code)) name param
 
 let is_directory ?(create = false) path =
   try%lwt
