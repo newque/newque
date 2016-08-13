@@ -23,12 +23,12 @@ module type Settings = sig
 end
 
 module Make (Settings: Settings) : S = struct
-  let path_logger = Lwt_log.file ~mode:`Append ~perm:Fs.default_perm ~file_name:Settings.path ()
+  let path_logger = lazy (Lwt_log.file ~mode:`Append ~perm:Fs.default_perm ~file_name:Settings.path ())
   let path_and_out level str =
-    let%lwt logger = path_logger in
+    let%lwt logger = Lazy.force path_logger in
     Lwt_log.log ~level ~logger str <&> stdout level str
   let path_and_err level str =
-    let%lwt logger = path_logger in
+    let%lwt logger = Lazy.force path_logger in
     Lwt_log.log ~level ~logger str <&> stderr level str
 
   let debug = path_and_out Lwt_log.Debug

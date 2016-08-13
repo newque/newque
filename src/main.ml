@@ -29,11 +29,7 @@ let start config_path =
 
   (* Load channel config files *)
   let%lwt channels = Config.parse_channels Fs.conf_chan_dir in
-  let%lwt () = Lwt_unix.sleep 2. in
-
-  let%lwt () = Watcher.welp watcher in
-
-  let%lwt () = Lwt_unix.sleep 10. in
+  let%lwt () = Lwt_unix.sleep 60. in
   return_unit
 
 let _ =

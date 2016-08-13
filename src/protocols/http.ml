@@ -47,8 +47,10 @@ let start generic specific =
   in
   let%lwt sock = match Int.Table.find_and_remove open_sockets generic.port with
     | Some s ->
-      (* TODO Check socket health, just in case *)
-      return s
+      begin match%lwt healthy_socket s with
+        | true -> return s
+        | false -> make_socket ~backlog:specific.backlog generic.host generic.port
+      end
     | None -> make_socket ~backlog:specific.backlog generic.host generic.port
   in
   let%lwt ctx = Conduit_lwt_unix.init () in

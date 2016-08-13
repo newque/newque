@@ -24,7 +24,6 @@ let apply_main config watcher =
     | Error -> Lwt_log.Error
     | Fatal -> Lwt_log.Fatal end
   |> Lwt_log.add_rule "*";
-  (* Start listeners *)
   Watcher.add_listeners watcher config
 (* TODO: dedup port and names *)
 
