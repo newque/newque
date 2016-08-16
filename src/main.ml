@@ -25,10 +25,14 @@ let start config_path =
   let%lwt () = Logger.info ("Loading " ^ config_path) in
   let%lwt config = Config.parse_main config_path in
   let watcher = Watcher.create () in
-  let%lwt () = Config.apply_main config watcher in
+  let%lwt listeners = Config.apply_main config watcher in
 
   (* Load channel config files *)
+  let router = Router.create listeners in
   let%lwt channels = Config.parse_channels Fs.conf_chan_dir in
+  (* Router.register_channel router  *)
+
+
   let%lwt () = Lwt_unix.sleep 60. in
   return_unit
 

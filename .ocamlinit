@@ -30,9 +30,11 @@ open Cohttp_lwt_unix
 #mod_use "src/config/config_j.ml"
 #mod_use "src/protocols/http.ml"
 #mod_use "src/watcher.ml"
+#mod_use "src/channel.ml"
+#mod_use "src/router.ml"
 #mod_use "src/config/config.ml"
 
-#directory "_build/src"
+(* #directory "_build/src" *)
 
 let () = Lwt_log.add_rule "*" Lwt_log.Debug
 

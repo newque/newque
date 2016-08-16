@@ -24,11 +24,12 @@ let apply_main config watcher =
     | Error -> Lwt_log.Error
     | Fatal -> Lwt_log.Fatal end
   |> Lwt_log.add_rule "*";
-  Watcher.add_listeners watcher config
-(* TODO: dedup port and names *)
+  (* TODO: dedup port and names *)
+  Watcher.add_listeners watcher config.endpoints
 
 (* TODO: dedup endpoints *)
 let parse_channels path =
+  let open Channel in
   let%lwt files = Fs.list_files path in
   Lwt_list.map_p (fun filename ->
       let fragments = String.split ~on:'.' filename in
@@ -36,8 +37,9 @@ let parse_channels path =
           failwith (Printf.sprintf "Channel file %s must end in .json" filename) in
 
       let name = List.slice fragments 0 (-1) |> String.concat ~sep:"." in
-      let%lwt contents = Lwt_io.chars_of_file (path ^ filename)
-                         |> Lwt_stream.to_string in
-
-      return (name, channel_of_string contents)
+      let%lwt contents =
+        Lwt_io.chars_of_file (path ^ filename)
+        |> Lwt_stream.to_string
+      in
+      return {name; endpoint_names=(channel_of_string contents).endpoint_names;}
     ) files
