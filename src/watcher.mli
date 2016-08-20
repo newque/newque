@@ -1,15 +1,12 @@
 open Core.Std
 
-type server =
-  | HTTP of Http.t * unit Lwt.u
-  | ZMQ of unit * unit Lwt.u
+type t = {
+  router: Router.t;
+  listeners : Listener.t Int.Table.t;
+}
 
-type listener = { id : string; server : server; }
+val create : Router.t -> t
 
-type t = { listeners : listener Int.Table.t; }
+val monitor : t -> Listener.t -> unit Conduit_lwt_unix.io
 
-val create : unit -> t
-
-val monitor : listener -> unit Conduit_lwt_unix.io
-
-val add_listeners : t -> Config_j.ext_listener list -> listener list Conduit_lwt_unix.io
+val create_listeners : t -> Config_t.config_listener list -> Listener.t list Conduit_lwt_unix.io

@@ -1,6 +1,6 @@
 Name: newque
 Version: 0.0.1
-Synopsis: Reliable task and message broker.
+Synopsis: Reliable declarative message broker.
 Authors: Simon Grondin <github@simongrondin.name>
 License: MIT
 
@@ -24,6 +24,7 @@ Executable "newque"
     lwt,
     lwt.unix,
     lwt.ppx,
+    ppx_sexp_conv,
     cohttp,
     cohttp.lwt,
     atd,

@@ -1,4 +1,4 @@
-type log_level = [
+type config_log_level = [
   | Debug <json name="debug">
   | Info <json name="info">
   | Notice <json name="notice">
@@ -7,30 +7,44 @@ type log_level = [
   | Fatal <json name="fatal">
 ] <ocaml repr="classic">
 
-type http_settings = {
+type config_http_settings = {
   ~backlog <ocaml default="20">: int;
 }
-type zmq_settings = {
+type config_zmq_settings = {
   something: string;
 }
 
-type ext_proto = [
-  | Http_proto <json name="HTTP"> of http_settings
-  | Zmq_proto <json name="ZMQ"> of zmq_settings
+type config_proto = [
+  | Http_proto <json name="HTTP"> of config_http_settings
+  | Zmq_proto <json name="ZMQ"> of config_zmq_settings
 ] <ocaml repr="classic">
 
-type ext_listener = {
+type config_listener = {
   name: string;
   host: string;
   port: int;
-  settings <json tag_field="protocol">: ext_proto;
+  settings <json tag_field="protocol">: config_proto;
 }
 
-type channel = {
+type config_durability = [
+  | Memory <json name="memory">
+  | Disk <json name="disk">
+  | Synced <json name="synced">
+] <ocaml repr="classic">
+
+type config_acknowledgement = [
+  | Instant <json name="none">
+  | Saved <json name="saved">
+  | Read <json name="read">
+] <ocaml repr="classic">
+
+type config_channel = {
   endpoint_names <json name="listeners">: string list;
+  durability: config_durability;
+  acknowledgement: config_acknowledgement;
 }
 
-type config = {
-  log_level <json name="logLevel">: log_level;
-  endpoints <json name="listeners">: ext_listener list;
+type config_newque = {
+  log_level <json name="logLevel">: config_log_level;
+  endpoints <json name="listeners">: config_listener list;
 }

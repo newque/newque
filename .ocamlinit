@@ -1,8 +1,10 @@
 #use "topfind"
 #thread
 
-#require "core"
+#require "core.top";;
 open Core.Std
+
+#require "ppx_sexp_conv";;
 
 #require "lwt"
 #require "lwt.unix"
@@ -29,13 +31,8 @@ open Cohttp_lwt_unix
 #mod_use "src/config/config_t.ml"
 #mod_use "src/config/config_j.ml"
 #mod_use "src/protocols/http.ml"
-#mod_use "src/watcher.ml"
 #mod_use "src/channel.ml"
+#mod_use "src/listener.ml"
 #mod_use "src/router.ml"
-#mod_use "src/config/config.ml"
-
-(* #directory "_build/src" *)
-
-let () = Lwt_log.add_rule "*" Lwt_log.Debug
-
-open Config_j
+#mod_use "src/watcher.ml"
+#mod_use "src/config/configtools.ml"

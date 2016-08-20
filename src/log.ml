@@ -9,6 +9,9 @@ let stderr_logger = Lwt_log.channel ~close_mode:`Keep ~channel:Lwt_io.stderr ()
 let stdout level str = Lwt_log.log ~logger:stdout_logger ~level str
 let stderr level str = Lwt_log.log ~logger:stdout_logger ~level str
 
+let pretty_sexp sexp =
+  Sexp.to_string sexp
+
 module type S = sig
   val debug : string -> unit t
   val info : string -> unit t

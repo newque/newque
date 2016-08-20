@@ -1,13 +1,13 @@
 open Core.Std
 open Lwt
-open Config_j
+open Config_t
 
 module Logger = Log.Make (struct let path = Log.outlog end)
 
 let parse_main path =
   try%lwt
     let%lwt contents = Lwt_io.chars_of_file path |> Lwt_stream.to_string in
-    return (config_of_string contents)
+    return (Config_j.config_newque_of_string contents)
   with
   | Ag_oj_run.Error str ->
     let%lwt _ = Log.stdout Lwt_log.Info str in
@@ -25,7 +25,7 @@ let apply_main config watcher =
     | Fatal -> Lwt_log.Fatal end
   |> Lwt_log.add_rule "*";
   (* TODO: dedup port and names *)
-  Watcher.add_listeners watcher config.endpoints
+  Watcher.create_listeners watcher config.endpoints
 
 (* TODO: dedup endpoints *)
 let parse_channels path =
@@ -41,5 +41,11 @@ let parse_channels path =
         Lwt_io.chars_of_file (path ^ filename)
         |> Lwt_stream.to_string
       in
-      return {name; endpoint_names=(channel_of_string contents).endpoint_names;}
+      return {name; endpoint_names=(Config_j.config_channel_of_string contents).endpoint_names;}
     ) files
+
+let apply_channels channels listeners router =
+  let open Result.Monad_infix in
+  Router.register_listeners router listeners
+  >>= fun () ->
+  Router.register_channels router channels

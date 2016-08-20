@@ -6,15 +6,30 @@ open Cohttp_lwt_unix
 module Logger = Log.Make (struct let path = Log.outlog end)
 
 type t = {
-  generic: Config_j.ext_listener;
-  specific: Config_j.http_settings;
+  generic: Config_t.config_listener;
+  specific: Config_t.config_http_settings;
   sock: Lwt_unix.file_descr;
+  mutable filter: (Server.conn -> Request.t -> Cohttp_lwt_body.t -> (unit, string) Result.t Lwt.t);
   close: unit Lwt.u;
   ctx: Cohttp_lwt_unix_net.ctx;
   thread: unit Lwt.t;
 }
 
-let open_sockets : Lwt_unix.file_descr Int.Table.t = Int.Table.create ~size:5 ()
+let default_filter _ _ _ = return (Error "Listener not ready")
+
+let callback http route_single route_batch ((ch, _) as conn) req body =
+  let%lwt http = http in
+  match%lwt http.filter conn req body with
+  | Error str ->
+    let body = str in
+    let status = Code.status_of_code 400 in
+    Server.respond_string ~status ~body ()
+  | Ok () ->
+    let%lwt body = Cohttp_lwt_body.to_string body in
+    let status = Code.status_of_code 200 in
+    Server.respond_string ~status ~body ()
+
+let open_sockets = Int.Table.create ~size:5 ()
 
 let healthy_socket sock =
   try%lwt
@@ -39,12 +54,8 @@ let make_socket ~backlog host port =
   Lwt_unix.set_close_on_exec sock;
   return sock
 
-let start generic specific =
-  let open Config_j in
-  let callback conn req body =
-    let status = Code.status_of_code 201 in
-    Server.respond_string ~status ~body:"Hello world!!" ()
-  in
+let start generic specific route_single route_batch =
+  let open Config_t in
   let%lwt sock = match Int.Table.find_and_remove open_sockets generic.port with
     | Some s ->
       begin match%lwt healthy_socket s with
@@ -56,20 +67,23 @@ let start generic specific =
   let%lwt ctx = Conduit_lwt_unix.init () in
   let ctx = Cohttp_lwt_unix_net.init ~ctx () in
   let mode = `TCP (`Socket sock) in
-  let conf = Server.make ~callback () in
+  let (instance_t, instance_w) = wait () in
+  let conf = Server.make ~callback:(callback instance_t route_single route_batch) () in
   let (stop, close) = wait () in
   let thread = Server.create ~stop ~ctx ~mode conf in
-  return {generic; specific; sock; close; ctx; thread;}
+  let instance = {generic; specific; sock; filter=default_filter; close; ctx; thread;} in
+  wakeup instance_w instance;
+  return instance
 
 let stop http =
-  let open Config_j in
+  let open Config_t in
   wakeup http.close ();
   let%lwt () = waiter_of_wakener http.close in
   Int.Table.add_exn open_sockets ~key:http.generic.port ~data:http.sock;
   return_unit
 
 let close http =
-  let open Config_j in
+  let open Config_t in
   let%lwt () = stop http in
   match Int.Table.find_and_remove open_sockets http.generic.port with
   | Some s -> Lwt_unix.close s

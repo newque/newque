@@ -1,8 +1,12 @@
+open Core.Std
+
 val outlog : string
 val errlog : string
 
 val stdout : Lwt_log_core.level -> string -> unit Lwt.t
 val stderr : Lwt_log_core.level -> string -> unit Lwt.t
+
+val pretty_sexp : Sexp.t -> string
 
 module type S =
 sig

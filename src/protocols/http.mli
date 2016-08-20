@@ -1,14 +1,25 @@
+open Core.Std
+
 type t = {
-  generic : Config_j.ext_listener;
-  specific : Config_j.http_settings;
+  generic : Config_t.config_listener;
+  specific : Config_t.config_http_settings;
   sock : Lwt_unix.file_descr;
+  mutable filter :
+    Cohttp_lwt_unix.Server.conn ->
+    Cohttp_lwt_unix.Request.t ->
+    Cohttp_lwt_body.t ->
+    (unit, string) Result.t Lwt.t;
   close : unit Lwt.u;
   ctx : Cohttp_lwt_unix_net.ctx;
-  thread : unit Conduit_lwt_unix.io;
+  thread : unit Lwt.t;
 }
 
-val start : Config_j.ext_listener -> Config_j.http_settings -> t Conduit_lwt_unix.io
+val start : Config_t.config_listener ->
+  Config_t.config_http_settings ->
+  (string -> Message.t -> ('a, 'b) Result.t Lwt.t) ->
+  (string -> Message.t -> ('a, 'b) Core.Std.Result.t Lwt.t) ->
+  t Lwt.t
 
-val stop : t -> unit Conduit_lwt_unix.io
+val stop : t -> unit Lwt.t
 
-val close : t -> unit Conduit_lwt_unix.io
+val close : t -> unit Lwt.t
