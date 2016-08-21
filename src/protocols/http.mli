@@ -1,4 +1,5 @@
 open Core.Std
+open Sexplib.Conv
 
 type t = {
   generic : Config_t.config_listener;
@@ -12,7 +13,7 @@ type t = {
   close : unit Lwt.u;
   ctx : Cohttp_lwt_unix_net.ctx;
   thread : unit Lwt.t;
-}
+} [@@deriving sexp_of]
 
 val start : Config_t.config_listener ->
   Config_t.config_http_settings ->

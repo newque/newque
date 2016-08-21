@@ -2,7 +2,7 @@ open Core.Std
 open Lwt
 open Sexplib.Conv
 
-module Logger = Log.Make (struct let path = Log.outlog end)
+module Logger = Log.Make (struct let path = Log.outlog let section = "Router" end)
 
 type t = {
   table: Channel.t list String.Table.t; (* Channels by listener.id *)

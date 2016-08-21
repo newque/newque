@@ -21,7 +21,7 @@ let start config_path =
   let%lwt () = Lwt_list.iter_s check_directory [Fs.log_dir; Fs.log_chan_dir; Fs.conf_dir; Fs.conf_chan_dir] in
 
   (* Make logger *)
-  let module Logger = Log.Make (struct let path = Log.outlog end) in
+  let module Logger = Log.Make (struct let path = Log.outlog let section = "Main" end) in
 
   (* Load main config *)
   let%lwt () = Logger.info ("Loading " ^ config_path) in

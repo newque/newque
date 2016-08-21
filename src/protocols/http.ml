@@ -3,7 +3,7 @@ open Lwt
 open Cohttp
 open Cohttp_lwt_unix
 
-module Logger = Log.Make (struct let path = Log.outlog end)
+module Logger = Log.Make (struct let path = Log.outlog let section = "Http" end)
 
 type t = {
   generic: Config_t.config_listener;
@@ -14,6 +14,18 @@ type t = {
   ctx: Cohttp_lwt_unix_net.ctx;
   thread: unit Lwt.t;
 }
+let sexp_of_t http =
+  let open Config_t in
+  Sexp.List [
+    Sexp.List [
+      Sexp.Atom http.generic.name;
+      Sexp.Atom http.generic.host;
+      Sexp.Atom (Int.to_string http.generic.port)
+    ];
+    Sexp.List [
+      Sexp.Atom (Int.to_string http.specific.backlog);
+    ]
+  ]
 
 let default_filter _ _ _ = return (Error "Listener not ready")
 
@@ -36,10 +48,11 @@ let healthy_socket sock =
     Lwt_unix.check_descriptor sock;
     return_true
   with
-  | ex -> return_false
+  | _ -> return_false
 
 let make_socket ~backlog host port =
   let open Lwt_unix in
+  let%lwt () = Logger.notice (Printf.sprintf "Creating a new TCP socket on %s:%d" host port) in
   let%lwt info = Lwt_unix.getaddrinfo host "0" [AI_PASSIVE; AI_SOCKTYPE SOCK_STREAM] in
   let sockaddr, ip = match List.hd info with
     | Some {ai_addr = (ADDR_UNIX _)} -> failwith "Cant listen to TCP on a domain socket"
@@ -56,13 +69,14 @@ let make_socket ~backlog host port =
 
 let start generic specific route_single route_batch =
   let open Config_t in
+  let thunk () = make_socket ~backlog:specific.backlog generic.host generic.port in
   let%lwt sock = match Int.Table.find_and_remove open_sockets generic.port with
     | Some s ->
       begin match%lwt healthy_socket s with
         | true -> return s
-        | false -> make_socket ~backlog:specific.backlog generic.host generic.port
+        | false -> thunk ()
       end
-    | None -> make_socket ~backlog:specific.backlog generic.host generic.port
+    | None -> thunk ()
   in
   let%lwt ctx = Conduit_lwt_unix.init () in
   let ctx = Cohttp_lwt_unix_net.init ~ctx () in

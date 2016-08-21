@@ -2,7 +2,7 @@ open Core.Std
 open Lwt
 open Config_t
 
-module Logger = Log.Make (struct let path = Log.outlog end)
+module Logger = Log.Make (struct let path = Log.outlog let section = "Configtools" end)
 
 let parse_main path =
   try%lwt

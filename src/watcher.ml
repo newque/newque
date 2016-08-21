@@ -2,7 +2,7 @@ open Core.Std
 open Lwt
 open Listener
 
-module Logger = Log.Make (struct let path = Log.outlog end)
+module Logger = Log.Make (struct let path = Log.outlog let section = "Watcher" end)
 
 type t = {
   router: Router.t;

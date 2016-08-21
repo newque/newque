@@ -3,8 +3,8 @@ open Core.Std
 val outlog : string
 val errlog : string
 
-val stdout : Lwt_log_core.level -> string -> unit Lwt.t
-val stderr : Lwt_log_core.level -> string -> unit Lwt.t
+val stdout : ?section:Lwt_log.section -> Lwt_log.level -> string -> unit Lwt.t
+val stderr : ?section:Lwt_log.section -> Lwt_log.level -> string -> unit Lwt.t
 
 val pretty_sexp : Sexp.t -> string
 
@@ -18,6 +18,10 @@ sig
   val fatal : string -> unit Lwt.t
 end
 
-module type Settings = sig val path : string end
+module type Settings =
+sig
+  val path : string
+  val section : string
+end
 
 module Make : functor (Settings : Settings) -> S
