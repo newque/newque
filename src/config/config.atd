@@ -42,6 +42,7 @@ type config_channel = {
   endpoint_names <json name="listeners">: string list;
   durability: config_durability;
   acknowledgement: config_acknowledgement;
+  ~separator <ocaml default="\"\n\"">: string;
 }
 
 type config_newque = {

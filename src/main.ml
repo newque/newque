@@ -35,7 +35,7 @@ let start config_path =
   let chain = Configtools.apply_channels channels listeners router in
   let%lwt () = match chain with
     | Ok () ->
-      Printf.sprintf "Current router state: %s" (Router.sexp_of_t router |> Log.pretty_sexp)
+      Printf.sprintf "Current router state: %s" (Router.sexp_of_t router |> Log.str_of_sexp)
       |> Logger.info
     | Error ll ->
       String.concat ~sep:", " ll

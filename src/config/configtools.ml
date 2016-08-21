@@ -41,7 +41,13 @@ let parse_channels path =
         Lwt_io.chars_of_file (path ^ filename)
         |> Lwt_stream.to_string
       in
-      return {name; endpoint_names=(Config_j.config_channel_of_string contents).endpoint_names;}
+      let parsed = Config_j.config_channel_of_string contents in
+      return {
+        name;
+        endpoint_names=parsed.endpoint_names;
+        durability=parsed.durability;
+        acknowledgement=parsed.acknowledgement;
+      }
     ) files
 
 let apply_channels channels listeners router =

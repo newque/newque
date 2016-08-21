@@ -10,7 +10,28 @@ let stderr_logger = Lwt_log.channel ~close_mode:`Keep ~channel:Lwt_io.stderr ()
 let stdout ?(section=default_section) level str = Lwt_log.log ~section ~logger:stdout_logger ~level str
 let stderr ?(section=default_section) level str = Lwt_log.log ~section ~logger:stdout_logger ~level str
 
-let pretty_sexp sexp = Sexp.to_string sexp
+let str_of_sexp ?(pretty=true) sexp =
+  let is_assoc sexp =
+    match sexp with
+    | Sexp.List [(Sexp.Atom _); _] -> true
+    | _ -> false
+  in
+  let rec traverse sexp : Yojson.Basic.json =
+    match sexp with
+    | Sexp.List ll when List.for_all ll ~f:is_assoc ->
+      `Assoc (List.map ll ~f:(function
+          | Sexp.List [Sexp.Atom head; tail] -> (head, (traverse tail))
+          | _ -> failwith "Unreachable"
+        ))
+    | Sexp.List ll -> `List (List.map ~f:traverse ll)
+    | Sexp.Atom x ->
+      try
+        let f = Float.of_string x in
+        `Float f
+      with _ -> `String x
+  in
+  if pretty then Yojson.Basic.pretty_to_string (traverse sexp)
+  else Yojson.Basic.to_string (traverse sexp)
 
 module type S = sig
   val debug : string -> unit t

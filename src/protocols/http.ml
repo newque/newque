@@ -29,7 +29,7 @@ let sexp_of_t http =
 
 let default_filter _ _ _ = return (Error "Listener not ready")
 
-let callback http route_single route_batch ((ch, _) as conn) req body =
+let callback http route_single route_atomic ((ch, _) as conn) req body =
   let%lwt http = http in
   match%lwt http.filter conn req body with
   | Error str ->
@@ -67,7 +67,7 @@ let make_socket ~backlog host port =
   Lwt_unix.set_close_on_exec sock;
   return sock
 
-let start generic specific route_single route_batch =
+let start generic specific route_single route_atomic =
   let open Config_t in
   let thunk () = make_socket ~backlog:specific.backlog generic.host generic.port in
   let%lwt sock = match Int.Table.find_and_remove open_sockets generic.port with
@@ -82,7 +82,7 @@ let start generic specific route_single route_batch =
   let ctx = Cohttp_lwt_unix_net.init ~ctx () in
   let mode = `TCP (`Socket sock) in
   let (instance_t, instance_w) = wait () in
-  let conf = Server.make ~callback:(callback instance_t route_single route_batch) () in
+  let conf = Server.make ~callback:(callback instance_t route_single route_atomic) () in
   let (stop, close) = wait () in
   let thread = Server.create ~stop ~ctx ~mode conf in
   let instance = {generic; specific; sock; filter=default_filter; close; ctx; thread;} in

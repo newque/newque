@@ -6,7 +6,7 @@ val errlog : string
 val stdout : ?section:Lwt_log.section -> Lwt_log.level -> string -> unit Lwt.t
 val stderr : ?section:Lwt_log.section -> Lwt_log.level -> string -> unit Lwt.t
 
-val pretty_sexp : Sexp.t -> string
+val str_of_sexp : ?pretty:bool -> Sexp.t -> string
 
 module type S =
 sig

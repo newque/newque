@@ -18,7 +18,7 @@ type t = {
 val start : Config_t.config_listener ->
   Config_t.config_http_settings ->
   (string -> Message.t -> ('a, 'b) Result.t Lwt.t) ->
-  (string -> Message.t -> ('a, 'b) Core.Std.Result.t Lwt.t) ->
+  (string -> Message.t list -> ('a, 'b) Core.Std.Result.t Lwt.t) ->
   t Lwt.t
 
 val stop : t -> unit Lwt.t
