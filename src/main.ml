@@ -26,16 +26,16 @@ let start config_path =
   (* Load main config *)
   let%lwt () = Logger.info ("Loading " ^ config_path) in
   let%lwt config = Configtools.parse_main config_path in
-  let router = Router.create () in
-  let watcher = Watcher.create router in
-  let%lwt listeners = Configtools.apply_main config watcher in
+  let watcher = Watcher.create () in
+  let%lwt () = Configtools.apply_main config watcher in
 
   (* Load channel config files *)
   let%lwt channels = Configtools.parse_channels Fs.conf_chan_dir in
-  let chain = Configtools.apply_channels channels listeners router in
-  let%lwt () = match chain with
+  let result = Configtools.apply_channels watcher channels in
+  let%lwt () = match result with
     | Ok () ->
-      Printf.sprintf "Current router state: %s" (Router.sexp_of_t router |> Log.str_of_sexp)
+      Printf.sprintf "Current router state: %s"
+        (Watcher.router watcher |> Router.sexp_of_t |> Log.str_of_sexp)
       |> Logger.info
     | Error ll ->
       String.concat ~sep:", " ll

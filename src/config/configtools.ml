@@ -6,6 +6,7 @@ module Logger = Log.Make (struct let path = Log.outlog let section = "Configtool
 
 let parse_main path =
   try%lwt
+    (* TODO: make more efficient? *)
     let%lwt contents = Lwt_io.chars_of_file path |> Lwt_stream.to_string in
     return (Config_j.config_newque_of_string contents)
   with
@@ -42,16 +43,11 @@ let parse_channels path =
         |> Lwt_stream.to_string
       in
       let parsed = Config_j.config_channel_of_string contents in
-      return {
-        name;
-        endpoint_names=parsed.endpoint_names;
-        durability=parsed.durability;
-        acknowledgement=parsed.acknowledgement;
-      }
+      return (Channel.create name parsed)
     ) files
 
-let apply_channels channels listeners router =
+let apply_channels w channels =
   let open Result.Monad_infix in
-  Router.register_listeners router listeners
+  Router.register_listeners (Watcher.router w) (Watcher.listeners w)
   >>= fun () ->
-  Router.register_channels router channels
+  Router.register_channels (Watcher.router w) channels

@@ -1,12 +1,12 @@
 open Core.Std
 
-type t = {
-  router: Router.t;
-  listeners : Listener.t Int.Table.t;
-}
+type t
 
-val create : Router.t -> t
+val create : unit -> t
 
-val monitor : t -> Listener.t -> unit Conduit_lwt_unix.io
+val router : t -> Router.t
+val listeners : t -> Listener.t list
 
-val create_listeners : t -> Config_t.config_listener list -> Listener.t list Conduit_lwt_unix.io
+val monitor : t -> Listener.t -> unit Lwt.t
+
+val create_listeners : t -> Config_t.config_listener list -> unit Lwt.t

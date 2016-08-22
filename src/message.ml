@@ -11,6 +11,15 @@ type t = {
    | 0 -> Some "Message separator cannot be empty"
    | x -> None *)
 
+let of_stream ~buffer_size ?(init=None) stream =
+  let buffer = Bigbuffer.create buffer_size in
+  Option.iter init ~f:(Bigbuffer.add_string buffer);
+  let%lwt () = Lwt_stream.iter_s
+      (fun chunk -> Bigbuffer.add_string buffer chunk; return_unit)
+      stream
+  in
+  return {raw=(Bigbuffer.contents buffer);}
+
 let list_of_stream ~sep ?(init=None) stream =
   let delim = Str.regexp_string sep in
   let%lwt (msgs, last) = Lwt_stream.fold_s (fun read (acc, leftover) ->
@@ -24,3 +33,5 @@ let list_of_stream ~sep ?(init=None) stream =
   in
   Option.value_map last ~default:msgs ~f:(fun raw -> {raw}::msgs)
   |> return
+
+let contents msg = msg.raw

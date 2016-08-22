@@ -5,7 +5,7 @@ open Sexplib.Conv
 module Logger = Log.Make (struct let path = Log.outlog let section = "Router" end)
 
 type t = {
-  table: Channel.t list String.Table.t; (* Channels by listener.id *)
+  table: Channel.t String.Table.t String.Table.t; (* Channels (accessed by name) by listener.id *)
 } [@@deriving sexp]
 
 let create () =
@@ -15,7 +15,8 @@ let create () =
 let register_listeners router listeners =
   let open Listener in
   List.filter_map listeners ~f:(fun listen ->
-      match String.Table.add router.table ~key:listen.id ~data:[] with
+      let entry = String.Table.create ~size:5 () in
+      match String.Table.add router.table ~key:listen.id ~data:entry with
       | `Ok -> None
       | `Duplicate -> Some (Printf.sprintf "Cannot register listener %s because it already exists" listen.id)
     )
@@ -25,26 +26,47 @@ let register_listeners router listeners =
 let register_channels router channels =
   let open Channel in
   List.concat_map channels ~f:(fun chan ->
-      List.filter_map chan.endpoint_names ~f:(fun endp ->
-          match String.Table.find router.table endp with
-          | Some chan_list ->
-            let register data = String.Table.set router.table ~key:endp ~data in
-            begin match List.partition_tf chan_list ~f:(fun a -> a.name = chan.name) with
-              | (((_::_) as dup), rest) ->
-                register (chan::rest);
-                Some (
+      List.filter_map chan.endpoint_names ~f:(fun listen_name ->
+          match String.Table.find router.table listen_name with
+          | Some chan_table ->
+            begin match String.Table.add chan_table ~key:chan.name ~data:chan with
+              | `Ok -> None
+              | `Duplicate -> Some (
                   Printf.sprintf
-                    "Registered channel %s with listener %s but the following channel(s) with the same name were replaced: %s"
-                    chan.name endp (List.sexp_of_t Channel.sexp_of_t dup |> Sexp.to_string)
+                    "Registered channel %s with listener %s but another channel with the same name already existed"
+                    chan.name listen_name
                 )
-              | ([], rest) -> register (chan::rest); None
             end
-          | None -> Some (Printf.sprintf "Cannot add channel %s to %s. Does that listener exist?" chan.name endp)
+          | None -> Some (Printf.sprintf "Cannot add channel %s to %s. Does that listener exist?" chan.name listen_name)
         ))
   |> function
   | [] -> Ok ()
   | errors -> Error errors
 
-let route_msg router chan_name msg = return (Ok ())
+let return_ok_one = return (Ok 1)
+let route router ~listen_name ~chan_name ~mode stream =
+  match String.Table.find router.table listen_name with
+  | None -> return (Error (Printf.sprintf "Unknown listener \'%s\'" listen_name))
+  | Some chan_table ->
+    begin match String.Table.find chan_table chan_name with
+      | None -> return (Error (Printf.sprintf "No channel \'%s\' associated with listener \'%s\'" chan_name listen_name))
+      | Some chan ->
+        let open Channel in
+        begin match mode with
+          | `Single ->
+            let%lwt msg = Message.of_stream ~buffer_size:chan.buffer_size stream in
+            let%lwt () = Channel.push_single chan msg in
+            return_ok_one
+          | `Multiple ->
+            let%lwt msgs = Message.list_of_stream ~sep:chan.separator stream in
+            let%lwt () = join (List.map ~f:(fun msg -> Channel.push_single chan msg) msgs) in
+            return (Ok (List.length msgs))
+          | `Atomic ->
+            let%lwt msgs = Message.list_of_stream ~sep:chan.separator stream in
+            let%lwt () = Channel.push_atomic chan msgs in
+            return (Ok (List.length msgs))
+        end
+    end
 
-let route_atomic router chan_name msgs = return (Ok ())
+let fetch router chan_name =
+  return (Ok ())

@@ -9,7 +9,7 @@ type t = {
   generic: Config_t.config_listener;
   specific: Config_t.config_http_settings;
   sock: Lwt_unix.file_descr;
-  mutable filter: (Server.conn -> Request.t -> Cohttp_lwt_body.t -> (unit, string) Result.t Lwt.t);
+  mutable filter: (Server.conn -> Request.t -> Cohttp_lwt_body.t -> (string * Mode.t, string) Result.t Lwt.t);
   close: unit Lwt.u;
   ctx: Cohttp_lwt_unix_net.ctx;
   thread: unit Lwt.t;
@@ -20,25 +20,78 @@ let sexp_of_t http =
     Sexp.List [
       Sexp.Atom http.generic.name;
       Sexp.Atom http.generic.host;
-      Sexp.Atom (Int.to_string http.generic.port)
+      Sexp.Atom (Int.to_string http.generic.port);
     ];
     Sexp.List [
       Sexp.Atom (Int.to_string http.specific.backlog);
-    ]
+    ];
   ]
 
-let default_filter _ _ _ = return (Error "Listener not ready")
+let mode_header = "newque-mode"
 
-let callback http route_single route_atomic ((ch, _) as conn) req body =
+let default_filter _ req _ =
+  let path = Request.uri req |> Uri.path in
+  let url_fragments = path |> String.split ~on:'/' in
+  let result = match url_fragments with
+    | ""::chan_name::_ ->
+      let mode_value =
+        Request.headers req
+        |> Fn.flip (Header.get) mode_header
+        |> Option.map ~f:String.lowercase
+      in
+      begin match mode_value with
+        | Some "multiple" -> Ok (chan_name, `Multiple)
+        | Some "atomic" -> Ok (chan_name, `Atomic)
+        | None | Some "single" -> Ok (chan_name, `Single)
+        | Some str -> Error (Printf.sprintf "Invalid %s header value: %s" mode_header str)
+      end
+    | _ -> Error (Printf.sprintf "Invalid path %s" path)
+  in
+  return result
+
+let json_post_body code errors saved =
+  `Assoc [
+    ("code", `Int code);
+    ("errors", `List (List.map errors ~f:(fun x -> `String x)));
+    ("saved", `Int saved);
+  ]
+
+let json_get_body code errors =
+  `Assoc [
+    ("code", `Int code);
+    ("errors", `List (List.map errors ~f:(fun x -> `String x)));
+  ]
+
+let handler http route ((ch, _) as conn) req body =
   let%lwt http = http in
   match%lwt http.filter conn req body with
   | Error str ->
     let body = str in
     let status = Code.status_of_code 400 in
     Server.respond_string ~status ~body ()
-  | Ok () ->
-    let%lwt body = Cohttp_lwt_body.to_string body in
-    let status = Code.status_of_code 200 in
+  | Ok (chan_name, mode) ->
+    let%lwt (code, json) = match Request.meth req with
+
+      | `POST ->
+        (* Publishing *)
+        let stream = Cohttp_lwt_body.to_stream body in
+        let%lwt (code, errors, saved) = begin match%lwt route ~chan_name ~mode stream with
+          | Ok 0 -> return (400, ["No message found in the request body"], 0)
+          | Ok count -> return (201, [], count)
+          | Error err -> return (500, [err], 0)
+        end in
+        return (code, json_post_body code errors saved)
+
+      | `GET ->
+        (* Consuming *)
+        return (200, json_get_body 200 [])
+
+      | meth ->
+        let err = Printf.sprintf "Invalid HTTP method %s" (Code.string_of_method meth) in
+        return (405, json_get_body 405 [err])
+    in
+    let status = Code.status_of_code code in
+    let body = Yojson.Basic.to_string json in
     Server.respond_string ~status ~body ()
 
 let open_sockets = Int.Table.create ~size:5 ()
@@ -67,7 +120,7 @@ let make_socket ~backlog host port =
   Lwt_unix.set_close_on_exec sock;
   return sock
 
-let start generic specific route_single route_atomic =
+let start generic specific route =
   let open Config_t in
   let thunk () = make_socket ~backlog:specific.backlog generic.host generic.port in
   let%lwt sock = match Int.Table.find_and_remove open_sockets generic.port with
@@ -82,7 +135,7 @@ let start generic specific route_single route_atomic =
   let ctx = Cohttp_lwt_unix_net.init ~ctx () in
   let mode = `TCP (`Socket sock) in
   let (instance_t, instance_w) = wait () in
-  let conf = Server.make ~callback:(callback instance_t route_single route_atomic) () in
+  let conf = Server.make ~callback:(handler instance_t route) () in
   let (stop, close) = wait () in
   let thread = Server.create ~stop ~ctx ~mode conf in
   let instance = {generic; specific; sock; filter=default_filter; close; ctx; thread;} in

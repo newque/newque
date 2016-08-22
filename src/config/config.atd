@@ -29,7 +29,7 @@ type config_listener = {
 type config_durability = [
   | Memory <json name="memory">
   | Disk <json name="disk">
-  | Synced <json name="synced">
+  | Sync <json name="sync">
 ] <ocaml repr="classic">
 
 type config_acknowledgement = [
@@ -43,6 +43,7 @@ type config_channel = {
   durability: config_durability;
   acknowledgement: config_acknowledgement;
   ~separator <ocaml default="\"\n\"">: string;
+  ~buffer_size <json name="averageSize"> <ocaml default="256">: int;
 }
 
 type config_newque = {
