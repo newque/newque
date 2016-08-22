@@ -9,7 +9,7 @@ type t = {
     Cohttp_lwt_unix.Server.conn ->
     Cohttp_lwt_unix.Request.t ->
     Cohttp_lwt_body.t ->
-    (string * Mode.t, string) Result.t Lwt.t;
+    (string * Mode.t, int * string list) Result.t Lwt.t;
   close : unit Lwt.u;
   ctx : Cohttp_lwt_unix_net.ctx;
   thread : unit Lwt.t;
@@ -20,9 +20,9 @@ val start :
   Config_t.config_http_settings ->
   (
     chan_name:string ->
-    mode:Mode.t ->
+    mode:Mode.Pub.t ->
     string Lwt_stream.t ->
-    (int, string) Result.t Lwt.t
+    (int, int * string list) Result.t Lwt.t
   ) ->
   t Lwt.t
 

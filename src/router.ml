@@ -44,12 +44,12 @@ let register_channels router channels =
   | errors -> Error errors
 
 let return_ok_one = return (Ok 1)
-let route router ~listen_name ~chan_name ~mode stream =
+let publish router ~listen_name ~chan_name ~mode stream =
   match String.Table.find router.table listen_name with
-  | None -> return (Error (Printf.sprintf "Unknown listener \'%s\'" listen_name))
+  | None -> return (Error (400, [Printf.sprintf "Unknown listener \'%s\'" listen_name]))
   | Some chan_table ->
     begin match String.Table.find chan_table chan_name with
-      | None -> return (Error (Printf.sprintf "No channel \'%s\' associated with listener \'%s\'" chan_name listen_name))
+      | None -> return (Error (400, [Printf.sprintf "No channel \'%s\' associated with listener \'%s\'" chan_name listen_name]))
       | Some chan ->
         let open Channel in
         begin match mode with

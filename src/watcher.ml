@@ -18,7 +18,7 @@ let listeners watcher = Int.Table.data watcher.table
 let start_http watcher generic specific =
   (* Partially apply the routing function *)
   let open Config_t in
-  Http.start generic specific (Router.route watcher.router ~listen_name:generic.name)
+  Http.start generic specific (Router.publish watcher.router ~listen_name:generic.name)
 
 let rec monitor watcher listen =
   match listen.server with

@@ -11,10 +11,10 @@ val register_listeners : t -> Listener.t list -> (unit, string list) Result.t
 
 val register_channels : t -> Channel.t list -> (unit, string list) Result.t
 
-val route :
+val publish :
   t ->
   listen_name:string ->
   chan_name:string ->
-  mode:Mode.t ->
+  mode:Mode.Pub.t ->
   string Lwt_stream.t ->
-  (int, string) Result.t Lwt.t
+  (int, int * string list) Result.t Lwt.t
