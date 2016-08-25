@@ -43,7 +43,6 @@ let register_channels router channels =
   | [] -> Ok ()
   | errors -> Error errors
 
-let return_ok_one = return (Ok 1)
 let publish router ~listen_name ~chan_name ~mode stream =
   match String.Table.find router.table listen_name with
   | None -> return (Error (400, [Printf.sprintf "Unknown listener \'%s\'" listen_name]))
@@ -55,15 +54,18 @@ let publish router ~listen_name ~chan_name ~mode stream =
         begin match mode with
           | `Single ->
             let%lwt msg = Message.of_stream ~buffer_size:chan.buffer_size stream in
-            let%lwt () = Channel.push_single chan msg in
-            return_ok_one
+            let%lwt count = Channel.push_single chan msg in
+            return (Ok count)
           | `Multiple ->
             let%lwt msgs = Message.list_of_stream ~sep:chan.separator stream in
-            let%lwt () = join (List.map ~f:(fun msg -> Channel.push_single chan msg) msgs) in
-            return (Ok (List.length msgs))
+            let%lwt counts = Lwt_list.map_p (fun msg ->
+                Channel.push_single chan msg
+              ) msgs in
+            let total = List.fold counts ~init:0 ~f:(+) in
+            return (Ok total)
           | `Atomic ->
             let%lwt msgs = Message.list_of_stream ~sep:chan.separator stream in
-            let%lwt () = Channel.push_atomic chan msgs in
+            let%lwt count = Channel.push_atomic chan msgs in
             return (Ok (List.length msgs))
         end
     end

@@ -1,5 +1,5 @@
 {
   "listeners": ["http9000"],
-  "durability": "memory",
+  "persistence": "memory",
   "acknowledgement": "none"
 }

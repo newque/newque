@@ -19,10 +19,10 @@ sig
   val fatal : string -> unit Lwt.t
 end
 
-module type Settings =
+module type Argument =
 sig
   val path : string
   val section : string
 end
 
-module Make : functor (Settings : Settings) -> S
+module Make : functor (Argument : Argument) -> S

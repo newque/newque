@@ -1,3 +1,4 @@
+(* LOGGING *)
 type config_log_level = [
   | Debug <json name="debug">
   | Info <json name="info">
@@ -7,6 +8,8 @@ type config_log_level = [
   | Fatal <json name="fatal">
 ] <ocaml repr="classic">
 
+
+(* NETWORK *)
 type config_http_settings = {
   ~backlog <ocaml default="20">: int;
 }
@@ -26,12 +29,22 @@ type config_listener = {
   settings <json tag_field="protocol">: config_proto;
 }
 
-type config_durability = [
+
+(* PERSISTENCE *)
+type config_redis = {
+  host <json name="host">: string;
+  port <json name="port">: int;
+  ?auth <json name="auth">: string option;
+} <ocaml field_prefix="r_">
+
+type config_persistence = [
   | Memory <json name="memory">
   | Disk <json name="disk">
-  | Sync <json name="sync">
-] <ocaml repr="classic">
+  | Redis <json name="redis">
+]
 
+
+(* CHANNELS *)
 type config_acknowledgement = [
   | Instant <json name="none">
   | Saved <json name="saved">
@@ -40,13 +53,16 @@ type config_acknowledgement = [
 
 type config_channel = {
   endpoint_names <json name="listeners">: string list;
-  durability: config_durability;
-  acknowledgement: config_acknowledgement;
+  persistence: config_persistence;
+  ack: config_acknowledgement;
   ~separator <ocaml default="\"\n\"">: string;
   ~buffer_size <json name="averageSize"> <ocaml default="256">: int;
 }
 
+
+(* GENERAL *)
 type config_newque = {
   log_level <json name="logLevel">: config_log_level;
   endpoints <json name="listeners">: config_listener list;
+  ?p_redis <json name="redis">: config_redis option;
 }

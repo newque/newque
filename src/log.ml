@@ -46,14 +46,14 @@ module type S = sig
   val fatal : string -> unit t
 end
 
-module type Settings = sig
+module type Argument = sig
   val path : string
   val section : string
 end
 
-module Make (Settings: Settings) : S = struct
-  let section = Lwt_log.Section.make Settings.section
-  let path_logger = lazy (Lwt_log.file ~mode:`Append ~perm:Fs.default_perm ~file_name:Settings.path ())
+module Make (Argument: Argument) : S = struct
+  let section = Lwt_log.Section.make Argument.section
+  let path_logger = lazy (Lwt_log.file ~mode:`Append ~perm:Fs.default_perm ~file_name:Argument.path ())
   let path_and_out level str =
     let%lwt logger = Lazy.force path_logger in
     Lwt_log.log ~section ~level ~logger str <&> stdout ~section level str

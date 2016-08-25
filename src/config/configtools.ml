@@ -11,7 +11,7 @@ let parse_main path =
     return (Config_j.config_newque_of_string contents)
   with
   | Ag_oj_run.Error str ->
-    let%lwt _ = Log.stdout Lwt_log.Info str in
+    let%lwt _ = Log.stdout Lwt_log.Fatal str in
     failwith ("Error while parsing " ^ path)
 
 let apply_main config watcher =
@@ -23,7 +23,8 @@ let apply_main config watcher =
     | Notice -> Lwt_log.Notice
     | Warning -> Lwt_log.Warning
     | Error -> Lwt_log.Error
-    | Fatal -> Lwt_log.Fatal end
+    | Fatal -> Lwt_log.Fatal
+  end
   |> Lwt_log.add_rule "*";
   (* TODO: dedup port and names *)
   Watcher.create_listeners watcher config.endpoints
