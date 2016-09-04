@@ -18,7 +18,13 @@ let start config_path =
     if%lwt dir then return_unit else
       Log.stderr Lwt_log.Error (path ^ " is not a directory or can't be created as one")
   in
-  let%lwt () = Lwt_list.iter_s check_directory [Fs.log_dir; Fs.log_chan_dir; Fs.conf_dir; Fs.conf_chan_dir] in
+  let%lwt () = Lwt_list.iter_s check_directory [
+      Fs.log_dir;
+      Fs.log_chan_dir;
+      Fs.conf_dir;
+      Fs.conf_chan_dir;
+      Fs.data_dir;
+    ] in
 
   (* Make logger *)
   let module Logger = Log.Make (struct let path = Log.outlog let section = "Main" end) in
@@ -28,6 +34,10 @@ let start config_path =
   let%lwt config = Configtools.parse_main config_path in
   let watcher = Watcher.create () in
   let%lwt () = Configtools.apply_main config watcher in
+
+  (* Create admin server *)
+  let%lwt (admin_server , success_str) = Configtools.create_admin_server watcher config in
+  let%lwt () = Logger.info success_str in
 
   (* Load channel config files *)
   let%lwt channels = Configtools.parse_channels Fs.conf_chan_dir in
@@ -42,8 +52,7 @@ let start config_path =
       |> Logger.error
   in
 
-  let%lwt () = Lwt_unix.sleep 60. in
-  return_unit
+  admin_server.thread
 
 let _ =
   Lwt_unix.run (start (Fs.conf_dir ^ "newque.json"))

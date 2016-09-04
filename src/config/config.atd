@@ -54,15 +54,21 @@ type config_acknowledgement = [
 type config_channel = {
   endpoint_names <json name="listeners">: string list;
   persistence: config_persistence;
-  ack: config_acknowledgement;
+  ack <json name="acknowledgement">: config_acknowledgement;
   ~separator <ocaml default="\"\n\"">: string;
   ~buffer_size <json name="averageSize"> <ocaml default="256">: int;
 }
 
 
 (* GENERAL *)
+type config_admin = {
+  host: string;
+  port: int;
+} <ocaml field_prefix="a_">
+
 type config_newque = {
   log_level <json name="logLevel">: config_log_level;
+  admin: config_admin;
   endpoints <json name="listeners">: config_listener list;
   ?p_redis <json name="redis">: config_redis option;
 }

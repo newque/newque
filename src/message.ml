@@ -35,3 +35,5 @@ let list_of_stream ~sep ?(init=None) stream =
   |> return
 
 let contents msg = msg.raw
+
+let length msg = String.length msg.raw

@@ -9,11 +9,6 @@ type t = {
   generic: Config_t.config_listener;
   specific: Config_t.config_http_settings;
   sock: Lwt_unix.file_descr;
-  mutable filter:
-    Server.conn ->
-    Request.t ->
-    Cohttp_lwt_body.t ->
-    (string * Mode.t, int * string list) Result.t Lwt.t;
   close: unit Lwt.u;
   ctx: Cohttp_lwt_unix_net.ctx;
   thread: unit Lwt.t;
@@ -31,6 +26,16 @@ let sexp_of_t http =
     ];
   ]
 
+type http_routing = [
+  | `Admin
+  | `Standard of (
+      chan_name:string ->
+      mode:Mode.Pub.t ->
+      string Lwt_stream.t ->
+      (int, int * string list) Result.t Lwt.t
+    )
+]
+
 let mode_header = "newque-mode"
 
 let default_filter _ req _ =
@@ -46,7 +51,8 @@ let default_filter _ req _ =
       begin match ((Request.meth req), mode_value) with
         | `POST, (Some "multiple") -> Ok (chan_name, `Pub `Multiple)
         | `POST, (Some "atomic") -> Ok (chan_name, `Pub `Atomic)
-        | `POST, (Some "single") | `POST, None -> Ok (chan_name, `Pub `Single)
+        | `POST, (Some "single") | `POST, None ->
+          Ok (chan_name, `Pub `Single)
         | `POST, (Some str) ->
           Error (400, [Printf.sprintf "Invalid %s header value: %s" mode_header str])
         | meth, _ ->
@@ -71,7 +77,7 @@ let json_body code errors =
 
 let handler http publish ((ch, _) as conn) req body =
   let%lwt http = http in
-  let%lwt (code, json) = match%lwt http.filter conn req body with
+  let%lwt (code, json) = match%lwt default_filter conn req body with
     | Error (code, errors) -> return (code, json_body code errors)
     | Ok (chan_name, m) ->
       match m with
@@ -116,7 +122,7 @@ let make_socket ~backlog host port =
   Lwt_unix.set_close_on_exec sock;
   return sock
 
-let start generic specific publish =
+let start generic specific http_routing_kind =
   let open Config_t in
   let thunk () = make_socket ~backlog:specific.backlog generic.host generic.port in
   let%lwt sock = match Int.Table.find_and_remove open_sockets generic.port with
@@ -131,10 +137,13 @@ let start generic specific publish =
   let ctx = Cohttp_lwt_unix_net.init ~ctx () in
   let mode = `TCP (`Socket sock) in
   let (instance_t, instance_w) = wait () in
-  let conf = Server.make ~callback:(handler instance_t publish) () in
+  let conf = match http_routing_kind with
+    | `Standard publish -> Server.make ~callback:(handler instance_t publish) ()
+    | `Admin -> Server.make ~callback:(Admin.handler) ()
+  in
   let (stop, close) = wait () in
   let thread = Server.create ~stop ~ctx ~mode conf in
-  let instance = {generic; specific; sock; filter=default_filter; close; ctx; thread;} in
+  let instance = {generic; specific; sock; close; ctx; thread;} in
   wakeup instance_w instance;
   return instance
 

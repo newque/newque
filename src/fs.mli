@@ -1,12 +1,10 @@
 val default_perm : int
 
 val log_dir : string
-
 val log_chan_dir : string
-
 val conf_dir : string
-
 val conf_chan_dir : string
+val data_dir : string
 
 val format_unix_exn : Unix.error -> string -> string -> string
 

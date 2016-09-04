@@ -6,6 +6,7 @@ let log_dir = "./logs/"
 let log_chan_dir = "./logs/channels/"
 let conf_dir = "./conf/"
 let conf_chan_dir = "./conf/channels/"
+let data_dir = "./data/"
 
 (* | Unix.Unix_error (c, n, p) -> return (Error (Logger.format_unix_exn c n p)) *)
 let format_unix_exn code name param =

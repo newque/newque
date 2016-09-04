@@ -30,11 +30,12 @@ open Cohttp_lwt_unix
 #mod_use "src/log.ml"
 #mod_use "src/config/config_t.ml"
 #mod_use "src/config/config_j.ml"
+#mod_use "src/admin.ml"
 #mod_use "src/mode.ml"
 #mod_use "src/protocols/http.ml"
 
 #mod_use "src/message.ml"
-#mod_use "src/acknowledgement.ml"
+#mod_use "src/ack.ml"
 #mod_use "src/persistence/persistence.ml"
 #mod_use "src/persistence/memory.ml"
 #mod_use "src/persistence/disk.ml"

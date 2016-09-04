@@ -13,3 +13,5 @@ val list_of_stream :
   t list Lwt.t
 
 val contents : t -> string
+
+val length : t -> int

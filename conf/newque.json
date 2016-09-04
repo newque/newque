@@ -1,11 +1,15 @@
 {
   "logLevel": "debug", // debug, info, notice, warning, error, fatal
+  "admin": {
+    "host": "0.0.0.0",
+    "port": 8001
+  },
   "listeners": [
     {
       "protocol": "HTTP",
-      "name": "http9000",
+      "name": "http8000",
       "host": "0.0.0.0",
-      "port": 9000,
+      "port": 8000,
       "settings": {
         "backlog": 20 // Optional. Default 20. "backlog" for the listen(2) syscall
       }

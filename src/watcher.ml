@@ -18,7 +18,7 @@ let listeners watcher = Int.Table.data watcher.table
 let start_http watcher generic specific =
   (* Partially apply the routing function *)
   let open Config_t in
-  Http.start generic specific (Router.publish watcher.router ~listen_name:generic.name)
+  Http.start generic specific (`Standard (Router.publish watcher.router ~listen_name:generic.name))
 
 let rec monitor watcher listen =
   match listen.server with
@@ -59,6 +59,7 @@ let create_listeners watcher endpoints =
         | Some {server=(ZMQ (existing, _));_} -> failwith "Unimplemented"
         | None -> return_unit
       in
+      (* Now start the new listeners *)
       let%lwt started = match generic.settings with
         | Http_proto specific ->
           let%lwt () = Logger.notice (Printf.sprintf "Starting %s on HTTP %s:%s" generic.name generic.host (Int.to_string generic.port)) in
