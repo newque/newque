@@ -111,11 +111,4 @@ module Make (Argument: Argument) : S = struct
   let warning_lazy = path_and_out_lazy Lwt_log.Warning
   let error_lazy = path_and_out_lazy Lwt_log.Error
   let fatal_lazy = path_and_out_lazy Lwt_log.Fatal
-
-
-  (* let info_lazy str = path_and_out Lwt_log.Info (Lazy.force str)
-     let notice_lazy str = path_and_out Lwt_log.Notice (Lazy.force str)
-     let warning_lazy str = path_and_err Lwt_log.Warning (Lazy.force str)
-     let error_lazy str = path_and_err Lwt_log.Error (Lazy.force str)
-     let fatal_lazy str = path_and_err Lwt_log.Fatal (Lazy.force str) *)
 end

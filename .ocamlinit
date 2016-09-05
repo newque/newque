@@ -26,6 +26,8 @@ open Cohttp_lwt_unix
 #require "atd"
 #require "atdgen"
 
+#require "sqlite3"
+
 #mod_use "src/fs.ml"
 #mod_use "src/log.ml"
 #mod_use "src/config/config_t.ml"

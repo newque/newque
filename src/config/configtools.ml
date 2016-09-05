@@ -28,7 +28,7 @@ let apply_main config watcher =
   Watcher.create_listeners watcher config.endpoints
 
 (* TODO: dedup endpoints *)
-let parse_channels path =
+let parse_channels config path =
   let open Channel in
   let%lwt files = Fs.list_files path in
   Lwt_list.map_p (fun filename ->
@@ -45,7 +45,9 @@ let parse_channels path =
         in
         let parsed = Config_j.config_channel_of_string contents in
         let name = List.slice fragments 0 (-1) |> String.concat ~sep:"." in
-        return (Channel.create name parsed)
+        match (parsed.persistence, config.redis) with
+        | (`Redis, None) -> failwith (Printf.sprintf "Missing Redis configuration in newque.json for channel %s" name)
+        | (_, redis) -> return (Channel.create ?redis name parsed)
       with
       | Ag_oj_run.Error str ->
         let%lwt _ = Log.stdout Lwt_log.Fatal str in

@@ -20,13 +20,14 @@ Executable "newque"
   MainIs: main.ml
   CompiledObject: byte
   BuildDepends:
+    atd,
+    atdgen,
     core,
-    threads,
-    lwt,
-    lwt.unix,
-    lwt.ppx,
-    ppx_sexp_conv,
     cohttp,
     cohttp.lwt,
-    atd,
-    atdgen
+    lwt,
+    lwt.ppx,
+    lwt.unix,
+    ppx_sexp_conv,
+    sqlite3,
+    threads

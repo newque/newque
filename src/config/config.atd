@@ -70,5 +70,5 @@ type config_newque = {
   log_level <json name="logLevel">: config_log_level;
   admin: config_admin;
   endpoints <json name="listeners">: config_listener list;
-  ?p_redis <json name="redis">: config_redis option;
+  ?redis: config_redis option;
 }

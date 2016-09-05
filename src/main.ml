@@ -40,7 +40,7 @@ let start config_path =
   let%lwt () = Logger.info success_str in
 
   (* Load channel config files *)
-  let%lwt channels = Configtools.parse_channels Fs.conf_chan_dir in
+  let%lwt channels = Configtools.parse_channels config Fs.conf_chan_dir in
   let result = Configtools.apply_channels watcher channels in
   let%lwt () = match result with
     | Ok () ->
@@ -52,7 +52,8 @@ let start config_path =
       |> Logger.error
   in
 
-  admin_server.thread
+  let%lwt () = admin_server.thread in
+  Logger.fatal "Admin server thread terminated."
 
 let _ =
   Lwt_unix.run (start (Fs.conf_dir ^ "newque.json"))
