@@ -1,7 +1,6 @@
 open Core.Std
 open Cohttp
 open Cohttp_lwt_unix
-open Sexplib.Conv
 
 type t = {
   generic : Config_t.config_listener;

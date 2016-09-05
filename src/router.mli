@@ -1,5 +1,4 @@
 open Core.Std
-open Sexplib.Conv
 
 type t = {
   table: Channel.t String.Table.t String.Table.t;

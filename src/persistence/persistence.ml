@@ -1,12 +1,11 @@
 open Core.Std
-open Sexplib.Conv
 
 module type Template = sig
   type t [@@deriving sexp]
 
   val close : t -> unit Lwt.t
 
-  val push : t -> chan_name:string -> Message.t -> Ack.t -> int Lwt.t
+  val push : t -> chan_name:string -> Message.t list -> Ack.t -> int Lwt.t
 
   val size : t -> int Lwt.t
 end
@@ -19,7 +18,7 @@ end
 module type S = sig
   type t [@@deriving sexp]
 
-  val push : chan_name:string -> Message.t -> Ack.t -> int Lwt.t
+  val push : chan_name:string -> Message.t list -> Ack.t -> int Lwt.t
 
   val size : unit -> int Lwt.t
 end
@@ -32,9 +31,9 @@ module Make (Argument: Argument) : S = struct
 
   let instance = Argument.create ()
 
-  let push ~chan_name msg ack =
+  let push ~chan_name msgs ack =
     let%lwt instance = instance in
-    Argument.IO.push instance ~chan_name msg ack
+    Argument.IO.push instance ~chan_name msgs ack
 
   let size () =
     let%lwt instance = instance in

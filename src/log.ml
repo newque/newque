@@ -26,15 +26,23 @@ let stderr_logger = Lwt_log.channel ~close_mode:`Keep ~channel:Lwt_io.stderr ()
 let stdout ?(section=default_section) level str = Lwt_log.log ~section ~logger:stdout_logger ~level str
 let stderr ?(section=default_section) level str = Lwt_log.log ~section ~logger:stdout_logger ~level str
 
+(* TODO: Decide what to do with these synchronous exceptions *)
 let json_of_sexp sexp =
   let is_assoc sexp =
     match sexp with
     | Sexp.List [(Sexp.Atom _); _] -> true
     | _ -> false
   in
+  let has_dup_keys ll =
+    List.contains_dup (List.map ll ~f:(fun sexp ->
+        match sexp with
+        | Sexp.List [(Sexp.Atom key); _] -> key
+        | _ -> failwith "Unreachable"
+      ))
+  in
   let rec traverse sexp =
     match sexp with
-    | Sexp.List ll when List.for_all ll ~f:is_assoc ->
+    | Sexp.List ll when (List.for_all ll ~f:is_assoc) && not (has_dup_keys ll) ->
       `Assoc (List.map ll ~f:(function
           | Sexp.List [Sexp.Atom head; tail] -> (head, (traverse tail))
           | _ -> failwith "Unreachable"
@@ -53,6 +61,7 @@ let str_of_sexp ?(pretty=true) sexp =
   if pretty then Yojson.Basic.pretty_to_string (json_of_sexp sexp)
   else Yojson.Basic.to_string (json_of_sexp sexp)
 
+(* TODO: Catch potential errors *)
 let sexp_of_atdgen str =
   match Yojson.Basic.from_string str with
   | `String s -> Sexp.Atom s

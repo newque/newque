@@ -48,7 +48,7 @@ let rec monitor watcher listen =
         let (_, new_wakener) = wait () in
         monitor watcher {id=listen.id; server=(HTTP (restarted, new_wakener))}
     end
-  | ZMQ (zmq, wakener) -> failwith "Unimplemented"
+  | ZMQ (zmq, wakener) -> fail_with "Unimplemented"
 
 let create_listeners watcher endpoints =
   let open Config_t in
@@ -56,7 +56,7 @@ let create_listeners watcher endpoints =
       (* Stop and replace possible existing listener on the same port *)
       let%lwt () = match Int.Table.find_and_remove watcher.table generic.port with
         | Some {server=(HTTP (existing, _));_} -> Http.stop existing
-        | Some {server=(ZMQ (existing, _));_} -> failwith "Unimplemented"
+        | Some {server=(ZMQ (existing, _));_} -> fail_with "Unimplemented"
         | None -> return_unit
       in
       (* Now start the new listeners *)
@@ -66,7 +66,7 @@ let create_listeners watcher endpoints =
           let%lwt http = start_http watcher generic specific in
           let (_, wakener) = wait () in
           return {id=generic.name; server=(HTTP (http, wakener))}
-        | Zmq_proto specific -> failwith "Unimplemented"
+        | Zmq_proto specific -> fail_with "Unimplemented"
       in
       async (fun () -> monitor watcher started);
       Int.Table.add_exn watcher.table ~key:generic.port ~data:started;

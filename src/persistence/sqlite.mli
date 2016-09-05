@@ -1,5 +1,5 @@
-open Sexplib.Conv
-
 type t [@@deriving sexp]
 
-val create : tablenames:string list -> string -> t
+val create : string -> t Lwt.t
+
+val insert : t -> string list -> int Lwt.t

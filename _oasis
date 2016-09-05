@@ -18,7 +18,7 @@ PreCleanCommand: rm -rf tmp src/config/config_*.ml* logs
 Executable "newque"
   Path: tmp
   MainIs: main.ml
-  CompiledObject: byte
+  CompiledObject: best
   BuildDepends:
     atd,
     atdgen,

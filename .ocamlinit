@@ -38,8 +38,9 @@ open Cohttp_lwt_unix
 #mod_use "src/mode.ml"
 #mod_use "src/protocols/http.ml"
 
-#mod_use "src/message.ml"
-#mod_use "src/atomic.ml"
+#mod_use "src/serializable/single.ml"
+#mod_use "src/serializable/atomic.ml"
+#mod_use "src/serializable/message.ml"
 #mod_use "src/ack.ml"
 #mod_use "src/persistence/persistence.ml"
 #mod_use "src/persistence/sqlite.ml"

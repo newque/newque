@@ -1,4 +1,4 @@
-type t [@@deriving protobuf]
+type t [@@deriving protobuf, sexp]
 
 val of_singles : Single.t list -> t
 

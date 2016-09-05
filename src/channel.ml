@@ -1,13 +1,12 @@
 open Core.Std
 open Lwt
-open Sexplib.Conv
 
 let log_path name = Fs.conf_chan_dir ^ name
 
 type t = {
   name: string;
   endpoint_names: string list;
-  push: chan_name:string -> Message.t -> Ack.t -> int Lwt.t sexp_opaque;
+  push: chan_name:string -> Message.t list -> Ack.t -> int Lwt.t sexp_opaque;
   ack: Ack.t;
   separator: string;
   buffer_size: int;
@@ -49,5 +48,5 @@ let create ?redis name (conf_channel : Config_t.config_channel) =
     buffer_size = conf_channel.buffer_size;
   }
 
-let push (chan: t) (msg : Message.t) =
-  chan.push ~chan_name:chan.name msg chan.ack
+let push (chan: t) (msgs : Message.t list) =
+  chan.push ~chan_name:chan.name msgs chan.ack

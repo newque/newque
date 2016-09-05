@@ -1,6 +1,5 @@
 open Core.Std
 open Lwt
-open Sexplib.Conv
 
 module Logger = Log.Make (struct let path = Log.outlog let section = "Router" end)
 
@@ -52,29 +51,14 @@ let publish router ~listen_name ~chan_name ~mode stream =
       | Some chan ->
         let open Channel in
         let%lwt count = begin match%lwt Message.of_stream ~mode ~sep:chan.separator ~buffer_size:chan.buffer_size stream with
-          | `One msg -> Channel.push chan msg
-          | `Many msgs ->
-            let%lwt counts = Lwt_list.map_p (Channel.push chan) msgs in
-            return (List.fold ~init:0 ~f:(+) counts)
+          | `One msg -> Channel.push chan [msg]
+          | `Many msgs -> Channel.push chan msgs
         end in
+        ignore_result (Logger.debug_lazy (lazy (
+            Printf.sprintf "%s (size: %d): %s -> %s" (Mode.Pub.to_string mode) count listen_name chan_name
+          )));
         return (Ok count)
     end
 
 let fetch router chan_name =
   return (Ok ())
-
-
-
-(* ignore_result (Logger.debug_lazy (lazy (
-   Printf.sprintf "Single: %s -> %s (%d bytes)" listen_name chan_name (Message.length msg)
-   ))); *)
-
-(* ignore_result (Logger.debug_lazy (lazy (
-   Printf.sprintf "Multiple (size: %d): %s -> %s (%d bytes)"
-    (List.length msgs) listen_name chan_name (List.fold ~init:0 ~f:(fun a b -> a + (Message.length b)) msgs)
-   ))); *)
-
-(* ignore_result (Logger.debug_lazy (lazy (
-    Printf.sprintf "Atomic (size: %d): %s -> %s (%d bytes)"
-      (List.length msgs) listen_name chan_name (List.fold ~init:0 ~f:(fun a b -> a + (Message.length b)) msgs)
-   ))); *)

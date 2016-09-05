@@ -4,6 +4,11 @@ module Pub = struct
     | `Multiple
     | `Atomic
   ]
+  let to_string tag =
+    match tag with
+    | `Single -> "Single"
+    | `Multiple -> "Multiple"
+    | `Atomic -> "Atomic"
 end
 
 module Sub = struct

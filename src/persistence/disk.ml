@@ -1,6 +1,5 @@
 open Core.Std
 open Lwt
-open Sexplib.Conv
 
 module Logger = Log.Make (struct let path = Log.outlog let section = "Disk" end)
 
@@ -13,7 +12,7 @@ type disk_t = {
 let create dir tablename =
   let file = Printf.sprintf "%s%s.data" dir tablename in
   let%lwt () = Logger.info (Printf.sprintf "Initializing %s" file) in
-  let db = Sqlite.create ~tablenames:[tablename] file in
+  let%lwt db = Sqlite.create file in
   let instance = {db; file; tablename;} in
   return instance
 
@@ -23,10 +22,12 @@ module M = struct
 
   let close (pers : t) = return_unit
 
-  let return_one = return 1
-  let push (pers : t) ~chan_name (msg : Message.t) (ack : Ack.t) =
+  let push (pers : t) ~chan_name (msgs : Message.t list) (ack : Ack.t) =
     print_endline (pers.file ^ "  PUSH!! ");
-    return_one
+
+    print_endline (List.sexp_of_t Message.sexp_of_t msgs |> Log.str_of_sexp);
+
+    Sqlite.insert pers.db (List.map ~f:Message.serialize msgs)
 
   let size (pers : t) =
     return 21

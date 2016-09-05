@@ -4,7 +4,7 @@ open Lwt
 type t =
   | Single of Single.t [@key 1]
   | Atomic of Atomic.t [@key 2]
-[@@deriving protobuf]
+[@@deriving protobuf, sexp]
 
 let of_string ~mode ~sep str =
   let split str =

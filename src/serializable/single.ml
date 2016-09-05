@@ -3,7 +3,7 @@ open Lwt
 
 type t = {
   raw: string [@key 1];
-} [@@deriving protobuf]
+} [@@deriving protobuf, sexp]
 
 let of_stream ~buffer_size ?(init=None) stream =
   let buffer = Bigbuffer.create buffer_size in
@@ -12,7 +12,7 @@ let of_stream ~buffer_size ?(init=None) stream =
       (fun chunk -> Bigbuffer.add_string buffer chunk; return_unit)
       stream
   in
-  return {raw=(Bigbuffer.contents buffer);}
+  return {raw = (Bigbuffer.contents buffer);}
 
 let of_string raw = {raw}
 

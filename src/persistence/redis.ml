@@ -1,6 +1,5 @@
 open Core.Std
 open Lwt
-open Sexplib.Conv
 
 type redis_t = {
   conn: unit;
@@ -19,7 +18,7 @@ module M = struct
 
   let close (conf : t) = return_unit
 
-  let push (pers : t) ~chan_name (msg : Message.t) (ack : Ack.t) =
+  let push (pers : t) ~chan_name (msgs : Message.t list) (ack : Ack.t) =
     return 1
 
   let size (pers : t) =

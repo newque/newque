@@ -109,10 +109,10 @@ let make_socket ~backlog host port =
   let open Lwt_unix in
   let%lwt () = Logger.notice (Printf.sprintf "Creating a new TCP socket on %s:%d" host port) in
   let%lwt info = Lwt_unix.getaddrinfo host "0" [AI_PASSIVE; AI_SOCKTYPE SOCK_STREAM] in
-  let sockaddr, ip = match List.hd info with
-    | Some {ai_addr = (ADDR_UNIX _)} -> failwith "Cant listen to TCP on a domain socket"
-    | Some {ai_addr = (ADDR_INET (a,_))} -> ADDR_INET (a,port), Ipaddr_unix.of_inet_addr a
-    | None -> ADDR_INET (Unix.Inet_addr.bind_any,port), Ipaddr.(V4 V4.any)
+  let%lwt (sockaddr, ip) = match List.hd info with
+    | Some {ai_addr = (ADDR_UNIX _)} -> fail_with "Cant listen to TCP on a domain socket"
+    | Some {ai_addr = (ADDR_INET (a,_))} -> return (ADDR_INET (a,port), Ipaddr_unix.of_inet_addr a)
+    | None -> return (ADDR_INET (Unix.Inet_addr.bind_any,port), Ipaddr.(V4 V4.any))
   in
   let sock = Lwt_unix.socket (Unix.domain_of_sockaddr sockaddr)
       Unix.SOCK_STREAM 0 in
