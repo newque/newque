@@ -53,6 +53,11 @@ let str_of_sexp ?(pretty=true) sexp =
   if pretty then Yojson.Basic.pretty_to_string (json_of_sexp sexp)
   else Yojson.Basic.to_string (json_of_sexp sexp)
 
+let sexp_of_atdgen str =
+  match Yojson.Basic.from_string str with
+  | `String s -> Sexp.Atom s
+  | _ -> Sexp.Atom str
+
 module type S = sig
   val debug : string -> unit t
   val info : string -> unit t

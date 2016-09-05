@@ -2,14 +2,8 @@ open Core.Std
 open Lwt
 
 type t = {
-  raw: string;
-}
-
-(* Called from the JSON parser *)
-(* let separator_validation str =
-   match String.length str with
-   | 0 -> Some "Message separator cannot be empty"
-   | x -> None *)
+  raw: string [@key 1];
+} [@@deriving protobuf]
 
 let of_stream ~buffer_size ?(init=None) stream =
   let buffer = Bigbuffer.create buffer_size in
@@ -19,6 +13,8 @@ let of_stream ~buffer_size ?(init=None) stream =
       stream
   in
   return {raw=(Bigbuffer.contents buffer);}
+
+let of_string raw = {raw}
 
 let list_of_stream ~sep ?(init=None) stream =
   let delim = Str.regexp_string sep in
@@ -33,7 +29,3 @@ let list_of_stream ~sep ?(init=None) stream =
   in
   Option.value_map last ~default:msgs ~f:(fun raw -> {raw}::msgs)
   |> return
-
-let contents msg = msg.raw
-
-let length msg = String.length msg.raw

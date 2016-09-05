@@ -5,10 +5,12 @@
 open Core.Std
 
 #require "ppx_sexp_conv";;
+#require "ppx_deriving_protobuf";;
 
 #require "lwt"
 #require "lwt.unix"
 #require "lwt.ppx"
+#require "lwt.preemptive"
 open Lwt
 
 #require "cohttp"
@@ -37,8 +39,10 @@ open Cohttp_lwt_unix
 #mod_use "src/protocols/http.ml"
 
 #mod_use "src/message.ml"
+#mod_use "src/atomic.ml"
 #mod_use "src/ack.ml"
 #mod_use "src/persistence/persistence.ml"
+#mod_use "src/persistence/sqlite.ml"
 #mod_use "src/persistence/memory.ml"
 #mod_use "src/persistence/disk.ml"
 #mod_use "src/persistence/redis.ml"

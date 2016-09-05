@@ -19,11 +19,8 @@ module M = struct
 
   let close (conf : t) = return_unit
 
-  let push_single (pers : t) ~chan_name (msg : Message.t) (ack : Ack.t) =
+  let push (pers : t) ~chan_name (msg : Message.t) (ack : Ack.t) =
     return 1
-
-  let push_atomic (pers : t) ~chan_name (msgs : Message.t list) (ack : Ack.t) =
-    return 5
 
   let size (pers : t) =
     return 20

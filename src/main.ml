@@ -24,6 +24,7 @@ let start config_path =
       Fs.conf_dir;
       Fs.conf_chan_dir;
       Fs.data_dir;
+      Fs.data_chan_dir;
     ] in
 
   (* Make logger *)

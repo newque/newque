@@ -51,37 +51,30 @@ let publish router ~listen_name ~chan_name ~mode stream =
       | None -> return (Error (400, [Printf.sprintf "No channel \'%s\' associated with listener \'%s\'" chan_name listen_name]))
       | Some chan ->
         let open Channel in
-        begin match mode with
-          | `Single ->
-            let%lwt msg = Message.of_stream ~buffer_size:chan.buffer_size stream in
-            ignore_result (Logger.debug_lazy (lazy (
-                Printf.sprintf "Single: %s -> %s (%d bytes)" listen_name chan_name (Message.length msg)
-              )));
-            let%lwt count = Channel.push_single chan msg in
-            return (Ok count)
-
-          | `Multiple ->
-            let%lwt msgs = Message.list_of_stream ~sep:chan.separator stream in
-            ignore_result (Logger.debug_lazy (lazy (
-                Printf.sprintf "Multiple (size: %d): %s -> %s (%d bytes)"
-                  (List.length msgs) listen_name chan_name (List.fold ~init:0 ~f:(fun a b -> a + (Message.length b)) msgs)
-              )));
-            let%lwt counts = Lwt_list.map_p (fun msg ->
-                Channel.push_single chan msg
-              ) msgs in
-            let total = List.fold counts ~init:0 ~f:(+) in
-            return (Ok total)
-
-          | `Atomic ->
-            let%lwt msgs = Message.list_of_stream ~sep:chan.separator stream in
-            ignore_result (Logger.debug_lazy (lazy (
-                Printf.sprintf "Atomic (size: %d): %s -> %s (%d bytes)"
-                  (List.length msgs) listen_name chan_name (List.fold ~init:0 ~f:(fun a b -> a + (Message.length b)) msgs)
-              )));
-            let%lwt count = Channel.push_atomic chan msgs in
-            return (Ok (List.length msgs))
-        end
+        let%lwt count = begin match%lwt Message.of_stream ~mode ~sep:chan.separator ~buffer_size:chan.buffer_size stream with
+          | `One msg -> Channel.push chan msg
+          | `Many msgs ->
+            let%lwt counts = Lwt_list.map_p (Channel.push chan) msgs in
+            return (List.fold ~init:0 ~f:(+) counts)
+        end in
+        return (Ok count)
     end
 
 let fetch router chan_name =
   return (Ok ())
+
+
+
+(* ignore_result (Logger.debug_lazy (lazy (
+   Printf.sprintf "Single: %s -> %s (%d bytes)" listen_name chan_name (Message.length msg)
+   ))); *)
+
+(* ignore_result (Logger.debug_lazy (lazy (
+   Printf.sprintf "Multiple (size: %d): %s -> %s (%d bytes)"
+    (List.length msgs) listen_name chan_name (List.fold ~init:0 ~f:(fun a b -> a + (Message.length b)) msgs)
+   ))); *)
+
+(* ignore_result (Logger.debug_lazy (lazy (
+    Printf.sprintf "Atomic (size: %d): %s -> %s (%d bytes)"
+      (List.length msgs) listen_name chan_name (List.fold ~init:0 ~f:(fun a b -> a + (Message.length b)) msgs)
+   ))); *)

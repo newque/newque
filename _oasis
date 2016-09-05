@@ -27,7 +27,9 @@ Executable "newque"
     cohttp.lwt,
     lwt,
     lwt.ppx,
+    lwt.preemptive,
     lwt.unix,
     ppx_sexp_conv,
+    ppx_deriving_protobuf,
     sqlite3,
     threads

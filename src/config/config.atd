@@ -51,6 +51,7 @@ type config_acknowledgement = [
   | Read <json name="read">
 ] <ocaml repr="classic">
 
+(* TODO: Validate that the separators are non-empty *)
 type config_channel = {
   endpoint_names <json name="listeners">: string list;
   persistence: config_persistence;
