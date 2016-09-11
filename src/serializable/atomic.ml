@@ -5,4 +5,5 @@ type t = {
 } [@@deriving protobuf, sexp]
 
 let of_singles msgs = {msgs}
+
 let of_strings strs = {msgs = List.map ~f:Single.of_string strs}

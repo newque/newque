@@ -30,13 +30,15 @@ type http_routing = [
   | `Admin
   | `Standard of (
       chan_name:string ->
+      id_header:string option ->
       mode:Mode.Pub.t ->
       string Lwt_stream.t ->
       (int, int * string list) Result.t Lwt.t
     )
 ]
 
-let mode_header = "newque-mode"
+let mode_header_name = "newque-mode"
+let id_header_name = "newque-msg-id"
 
 let default_filter _ req _ =
   let path = Request.uri req |> Uri.path in
@@ -45,7 +47,7 @@ let default_filter _ req _ =
     | ""::chan_name::_ ->
       let mode_value =
         Request.headers req
-        |> Fn.flip (Header.get) mode_header
+        |> Fn.flip (Header.get) mode_header_name
         |> Option.map ~f:String.lowercase
       in
       begin match ((Request.meth req), mode_value) with
@@ -54,7 +56,7 @@ let default_filter _ req _ =
         | `POST, (Some "single") | `POST, None ->
           Ok (chan_name, `Pub `Single)
         | `POST, (Some str) ->
-          Error (400, [Printf.sprintf "Invalid %s header value: %s" mode_header str])
+          Error (400, [Printf.sprintf "Invalid %s header value: %s" mode_header_name str])
         | meth, _ ->
           Error (405, [Printf.sprintf "Invalid HTTP method %s" (Code.string_of_method meth)])
       end
@@ -76,6 +78,7 @@ let json_body code errors =
   ]
 
 let handler http publish ((ch, _) as conn) req body =
+  (* ignore (async (fun () -> Logger.debug_lazy (lazy (Util.string_of_sexp (Request.sexp_of_t req))))); *)
   let%lwt http = http in
   let%lwt (code, json) = match%lwt default_filter conn req body with
     | Error (code, errors) -> return (code, json_body code errors)
@@ -83,7 +86,8 @@ let handler http publish ((ch, _) as conn) req body =
       match m with
       | `Pub mode ->
         let stream = Cohttp_lwt_body.to_stream body in
-        let%lwt (code, errors, saved) = begin match%lwt publish ~chan_name ~mode stream with
+        let id_header = Header.get (Request.headers req) id_header_name in
+        let%lwt (code, errors, saved) = begin match%lwt publish ~chan_name ~id_header ~mode stream with
           | Ok 0 -> return (400, ["No message found in the request body"], 0)
           | Ok count -> return (201, [], count)
           | Error (code, errors) -> return (code, errors, 0)
@@ -94,7 +98,8 @@ let handler http publish ((ch, _) as conn) req body =
   in
   let status = Code.status_of_code code in
   let body = Yojson.Basic.to_string json in
-  Server.respond_string ~status ~body ()
+  let headers = Header.init_with "Content-Type" "application/json" in
+  Server.respond_string ~headers ~status ~body ()
 
 let open_sockets = Int.Table.create ~size:5 ()
 

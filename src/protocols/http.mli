@@ -15,6 +15,7 @@ type http_routing = [
   | `Admin
   | `Standard of (
       chan_name:string ->
+      id_header:string option ->
       mode:Mode.Pub.t ->
       string Lwt_stream.t ->
       (int, int * string list) Result.t Lwt.t

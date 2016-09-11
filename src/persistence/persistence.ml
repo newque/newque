@@ -5,7 +5,7 @@ module type Template = sig
 
   val close : t -> unit Lwt.t
 
-  val push : t -> chan_name:string -> Message.t list -> Ack.t -> int Lwt.t
+  val push : t -> chan_name:string -> msgs:string list -> ids:string list -> Ack.t -> int Lwt.t
 
   val size : t -> int Lwt.t
 end
@@ -18,7 +18,7 @@ end
 module type S = sig
   type t [@@deriving sexp]
 
-  val push : chan_name:string -> Message.t list -> Ack.t -> int Lwt.t
+  val push : chan_name:string -> Message.t list -> Id.t list -> Ack.t -> int Lwt.t
 
   val size : unit -> int Lwt.t
 end
@@ -31,9 +31,13 @@ module Make (Argument: Argument) : S = struct
 
   let instance = Argument.create ()
 
-  let push ~chan_name msgs ack =
+  let push ~chan_name msgs ids ack =
     let%lwt instance = instance in
-    Argument.IO.push instance ~chan_name msgs ack
+    let ids = List.map ~f:Id.to_string ids in
+    (* DEBUGGING: Currently writing JSON rather than Protobuf to make development easier *)
+    (* let msgs = List.map ~f:Message.serialize msgs in *)
+    let msgs = List.map ~f:(fun msg -> Message.sexp_of_t msg |> Util.string_of_sexp ~pretty:false) msgs in
+    Argument.IO.push instance ~chan_name ~msgs ~ids ack
 
   let size () =
     let%lwt instance = instance in

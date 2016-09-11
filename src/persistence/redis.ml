@@ -18,7 +18,7 @@ module M = struct
 
   let close (conf : t) = return_unit
 
-  let push (pers : t) ~chan_name (msgs : Message.t list) (ack : Ack.t) =
+  let push (pers : t) ~chan_name ~msgs ~ids ack =
     return 1
 
   let size (pers : t) =

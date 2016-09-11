@@ -46,7 +46,7 @@ let start config_path =
   let%lwt () = match result with
     | Ok () ->
       Printf.sprintf "Current router state: %s"
-        (Watcher.router watcher |> Router.sexp_of_t |> Log.str_of_sexp)
+        (Watcher.router watcher |> Router.sexp_of_t |> Util.string_of_sexp)
       |> Logger.info
     | Error ll ->
       String.concat ~sep:", " ll

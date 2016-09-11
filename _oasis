@@ -17,7 +17,7 @@ PreCleanCommand: rm -rf tmp src/config/config_*.ml* logs
 
 Executable "newque"
   Path: tmp
-  MainIs: main.ml
+  MainIs: newque.ml
   CompiledObject: best
   BuildDepends:
     atd,
@@ -32,4 +32,5 @@ Executable "newque"
     ppx_sexp_conv,
     ppx_deriving_protobuf,
     sqlite3,
-    threads
+    threads,
+    uuidm

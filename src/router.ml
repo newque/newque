@@ -42,7 +42,7 @@ let register_channels router channels =
   | [] -> Ok ()
   | errors -> Error errors
 
-let publish router ~listen_name ~chan_name ~mode stream =
+let publish router ~listen_name ~chan_name ~id_header ~mode stream =
   match String.Table.find router.table listen_name with
   | None -> return (Error (400, [Printf.sprintf "Unknown listener \'%s\'" listen_name]))
   | Some chan_table ->
@@ -50,14 +50,16 @@ let publish router ~listen_name ~chan_name ~mode stream =
       | None -> return (Error (400, [Printf.sprintf "No channel \'%s\' associated with listener \'%s\'" chan_name listen_name]))
       | Some chan ->
         let open Channel in
-        let%lwt count = begin match%lwt Message.of_stream ~mode ~sep:chan.separator ~buffer_size:chan.buffer_size stream with
-          | `One msg -> Channel.push chan [msg]
-          | `Many msgs -> Channel.push chan msgs
-        end in
-        ignore_result (Logger.debug_lazy (lazy (
-            Printf.sprintf "%s (size: %d): %s -> %s" (Mode.Pub.to_string mode) count listen_name chan_name
-          )));
-        return (Ok count)
+        let%lwt msgs = Message.of_stream ~mode ~sep:chan.separator ~buffer_size:chan.buffer_size stream in
+        begin match Id.of_header ~mode ~msgs id_header with
+          | Error str -> return (Error (400, [str]))
+          | Ok ids ->
+            let%lwt count = Channel.push chan msgs ids in
+            ignore_result (Logger.debug_lazy (lazy (
+                Printf.sprintf "Wrote: %s (size: %d): %s -> %s" (Mode.Pub.to_string mode) count listen_name chan_name
+              )));
+            return (Ok count)
+        end
     end
 
 let fetch router chan_name =

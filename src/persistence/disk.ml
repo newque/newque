@@ -12,7 +12,13 @@ type disk_t = {
 let create dir tablename =
   let file = Printf.sprintf "%s%s.data" dir tablename in
   let%lwt () = Logger.info (Printf.sprintf "Initializing %s" file) in
-  let%lwt db = Sqlite.create file in
+  let%lwt db = try%lwt
+      Sqlite.create file
+    with
+    | ex ->
+      let%lwt () = Logger.error (Exn.to_string ex) in
+      fail ex
+  in
   let instance = {db; file; tablename;} in
   return instance
 
@@ -22,12 +28,9 @@ module M = struct
 
   let close (pers : t) = return_unit
 
-  let push (pers : t) ~chan_name (msgs : Message.t list) (ack : Ack.t) =
-    print_endline (pers.file ^ "  PUSH!! ");
-
-    print_endline (List.sexp_of_t Message.sexp_of_t msgs |> Log.str_of_sexp);
-
-    Sqlite.insert pers.db (List.map ~f:Message.serialize msgs)
+  let push (pers : t) ~chan_name ~msgs ~ids ack =
+    let%lwt () = Logger.debug (List.sexp_of_t String.sexp_of_t msgs |> Util.string_of_sexp) in
+    Sqlite.insert pers.db msgs ids
 
   let size (pers : t) =
     return 21

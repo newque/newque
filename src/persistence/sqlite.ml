@@ -16,6 +16,11 @@ type t = {
   stmts: statements sexp_opaque;
 } [@@deriving sexp]
 
+(* Ridiculously high number of retries by default,
+   because it is only retried when the db is locked.
+   We only want it to fail in catastrophic cases. *)
+let default_retries = 50
+
 let is_success rc =
   match rc with
   | Rc.OK -> true
@@ -28,10 +33,7 @@ let run_ignore ~str thunk =
   else
     Logger.warning (Printf.sprintf "Operation %s failed with code %s" str (Rc.to_string rc))
 
-(* Ridiculously high number of retries by default,
-   because it is only retried when the db is locked.
-   We only want it to fail in catastrophic cases. *)
-let execute ?(retry=50) ~destroy (stmt, sql) =
+let execute ?(retry=default_retries) ~destroy (stmt, sql) =
   let%lwt () = Logger.debug_lazy (lazy (Printf.sprintf "Executing %s" sql)) in
   let rec run count =
     match S3.step stmt with
@@ -48,7 +50,7 @@ let execute ?(retry=50) ~destroy (stmt, sql) =
     | code ->
       failwith (Printf.sprintf "Execution failed with code %s" (Rc.to_string code))
   in
-  let result = wrap (fun () -> run 1) in
+  let%lwt result = wrap (fun () -> run 1) in
   let%lwt () = begin match destroy with
     | true -> run_ignore ~str:"Finalize Statement" (fun () -> S3.finalize stmt)
     | false -> begin
@@ -62,17 +64,14 @@ let execute ?(retry=50) ~destroy (stmt, sql) =
         | ex -> wrap (fun () -> S3.recompile stmt)
       end
   end in
-  result
+  return result
 
 let prepare db sql =
   match S3.prepare db sql with
   | exception ex -> fail ex
   | stmt -> return (stmt, sql)
 
-(* Ridiculously high number of retries by default,
-   because it is only retried when the db is locked.
-   We only want it to fail in catastrophic cases. *)
-let bind ?(retry=50) stmt pos arg =
+let bind ?(retry=default_retries) stmt pos arg =
   let rec run count =
     match S3.bind stmt pos arg with
     | Rc.OK -> ()
@@ -99,10 +98,10 @@ let bind ?(retry=50) stmt pos arg =
    in
    run (Ok ()) thunks *)
 
-let create_table_sql = "CREATE TABLE IF NOT EXISTS MESSAGES (timens BIGINT NOT NULL, raw BLOB NOT NULL)"
+let create_table_sql = "CREATE TABLE IF NOT EXISTS MESSAGES (uuid BLOB NOT NULL, timens BIGINT NOT NULL, raw BLOB NOT NULL, PRIMARY KEY(uuid));"
 let insert_sql count =
-  let arr = Array.create ~len:count "(?,?)" in
-  Printf.sprintf "INSERT INTO MESSAGES (timens, raw) VALUES %s;" (String.concat_array ~sep:"," arr)
+  let arr = Array.create ~len:count "(?,?,?)" in
+  Printf.sprintf "INSERT INTO MESSAGES (uuid,timens,raw) VALUES %s" (String.concat_array ~sep:"," arr)
 
 let create file =
   let%lwt db = wrap (fun () -> S3.db_open file) in
@@ -112,23 +111,24 @@ let create file =
   let stmts = {create_table} in
   return {db; file; stmts;}
 
-let get_time () = Time_ns.now () |> Time_ns.to_int63_ns_since_epoch |> Int63.to_int64
-
-let insert db blobs =
-  let%lwt () = Logger.info "Inserting!" in
+let insert db ~msgs ~ids =
+  let time = Id.time_ns () in
   let run slice =
-    let%lwt () = Logger.info ("Inserting " ^ (Int.to_string (List.length slice))) in
-    let time = get_time () in
     let%lwt ((st, _) as stmt) = prepare db.db (insert_sql (List.length slice)) in
-    let%lwt () = Lwt_list.iteri_s (fun i raw ->
-        let%lwt () = bind st (i+1) (Data.INT time) in
-        bind st (i+2) (Data.BLOB raw)
+    let%lwt () = Lwt_list.iteri_s (fun i (raw, id) ->
+        let pos = i * 3 in
+        let uuid_data = Data.BLOB id in
+        let timens_data = Data.INT time in
+        let raw_data = Data.BLOB raw in
+        let%lwt () = bind st (pos+1) uuid_data in
+        let%lwt () = bind st (pos+2) timens_data in
+        bind st (pos+3) raw_data
       ) slice in
     execute ~destroy:true stmt
   in
-  let divided = List.groupi blobs ~break:(fun i _ _ -> i mod 100 = 0) in
-  let%lwt () = Lwt_list.iter_p run divided in
-  return (List.length blobs)
+  let%lwt divided = Util.rev_zip_group ~size:2 msgs ids in
+  let%lwt () = Lwt_list.iter_s run divided in
+  return (List.length msgs)
 
 
 
