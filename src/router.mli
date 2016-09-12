@@ -17,4 +17,4 @@ val publish :
   id_header:string option ->
   mode:Mode.Pub.t ->
   string Lwt_stream.t ->
-  (int, int * string list) Result.t Lwt.t
+  (int, string list) Result.t Lwt.t

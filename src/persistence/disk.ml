@@ -35,7 +35,7 @@ module M = struct
     | ex ->
       (* TODO: Restart DB *)
       let%lwt () = Logger.error (Printf.sprintf "Failed to write to %s with error %s. The DB must be restarted." instance.file (Exn.to_string ex)) in
-      return 0
+      fail ex
 
   let size instance =
     return 21

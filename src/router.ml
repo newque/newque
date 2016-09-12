@@ -44,15 +44,15 @@ let register_channels router channels =
 
 let publish router ~listen_name ~chan_name ~id_header ~mode stream =
   match String.Table.find router.table listen_name with
-  | None -> return (Error (400, [Printf.sprintf "Unknown listener \'%s\'" listen_name]))
+  | None -> return (Error [Printf.sprintf "Unknown listener \'%s\'" listen_name])
   | Some chan_table ->
     begin match String.Table.find chan_table chan_name with
-      | None -> return (Error (400, [Printf.sprintf "No channel \'%s\' associated with listener \'%s\'" chan_name listen_name]))
+      | None -> return (Error [Printf.sprintf "No channel \'%s\' associated with listener \'%s\'" chan_name listen_name])
       | Some chan ->
         let open Channel in
         let%lwt msgs = Message.of_stream ~mode ~sep:chan.separator ~buffer_size:chan.buffer_size stream in
         begin match Id.rev_list_of_header ~mode ~msgs id_header with
-          | Error str -> return (Error (400, [str]))
+          | Error str -> return (Error [str])
           | Ok ids ->
             let%lwt count = Channel.push chan msgs ids in
             ignore_result (Logger.debug_lazy (lazy (

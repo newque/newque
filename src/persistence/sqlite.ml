@@ -122,7 +122,7 @@ let rollback_sql = "ROLLBACK;"
 let create_table_sql = "CREATE TABLE IF NOT EXISTS MESSAGES (uuid BLOB NOT NULL, timens BIGINT NOT NULL, raw BLOB NOT NULL, PRIMARY KEY(uuid));"
 let insert_sql count =
   let arr = Array.create ~len:count "(?,?,?)" in
-  Printf.sprintf "INSERT INTO MESSAGES (uuid,timens,raw) VALUES %s;" (String.concat_array ~sep:"," arr)
+  Printf.sprintf "INSERT OR IGNORE INTO MESSAGES (uuid,timens,raw) VALUES %s;" (String.concat_array ~sep:"," arr)
 
 let create file =
   let mutex = Mutex.create () in

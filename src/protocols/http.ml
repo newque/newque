@@ -33,7 +33,7 @@ type http_routing = [
       id_header:string option ->
       mode:Mode.Pub.t ->
       string Lwt_stream.t ->
-      (int, int * string list) Result.t Lwt.t
+      (int, string list) Result.t Lwt.t
     )
 ]
 
@@ -88,11 +88,15 @@ let handler http publish ((ch, _) as conn) req body =
       | `Pub mode ->
         let stream = Cohttp_lwt_body.to_stream body in
         let id_header = Header.get (Request.headers req) id_header_name in
-        let%lwt (code, errors, saved) = begin match%lwt publish ~chan_name ~id_header ~mode stream with
-          | Ok 0 -> return (400, ["No message found in the request body"], 0)
-          | Ok count -> return (201, [], count)
-          | Error (code, errors) -> return (code, errors, 0)
-        end in
+        let%lwt (code, errors, saved) = begin try%lwt
+            begin match%lwt publish ~chan_name ~id_header ~mode stream with
+              | Ok count -> return (201, [], count)
+              | Error errors -> return (400, errors, 0)
+            end
+          with
+          | ex -> return (400, [Exn.to_string ex], 0)
+        end
+        in
         return (code, json_pub_body code errors saved)
       | `Sub _ ->
         return (200, json_body 200 [])
