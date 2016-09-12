@@ -13,7 +13,7 @@ Plugins: META (0.4), DevFiles (0.4)
 
 PreBuildCommand: rm -rf tmp && rm -f src/config/config_*.ml* && mkdir tmp && find src -name "*.ml*" | xargs ocp-indent -i && atdgen -t ./src/config/config.atd && atdgen -j -j-std ./src/config/config.atd && find src -name '*.ml*' | xargs -J% cp % ./tmp
 
-PreCleanCommand: rm -rf tmp src/config/config_*.ml* logs
+PreCleanCommand: rm -rf tmp src/config/config_*.ml* logs data
 
 Executable "newque"
   Path: tmp

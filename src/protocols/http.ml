@@ -75,6 +75,7 @@ let json_body code errors =
   `Assoc [
     ("code", `Int code);
     ("errors", `List (List.map errors ~f:(fun x -> `String x)));
+    ("saved", `Int 0);
   ]
 
 let handler http publish ((ch, _) as conn) req body =

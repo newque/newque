@@ -25,7 +25,7 @@ let of_stream ~mode ~sep ~buffer_size stream =
     return (List.map ll ~f:(fun s -> Single s))
   | `Atomic ->
     let%lwt ll = Single.rev_list_of_stream ~sep stream in
-    return [Atomic (Atomic.of_singles ll)]
+    return [Atomic (Atomic.of_singles (List.rev ll))]
 
 let serialize msg = Protobuf.Encoder.encode_exn to_protobuf msg
 let parse blob : t = Protobuf.Decoder.decode_exn from_protobuf blob

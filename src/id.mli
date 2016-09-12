@@ -2,7 +2,7 @@ open Core.Std
 
 type t
 
-val of_header :
+val rev_list_of_header :
   ?sep:string ->
   mode:Mode.Pub.t ->
   msgs:Message.t list ->

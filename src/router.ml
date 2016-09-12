@@ -51,7 +51,7 @@ let publish router ~listen_name ~chan_name ~id_header ~mode stream =
       | Some chan ->
         let open Channel in
         let%lwt msgs = Message.of_stream ~mode ~sep:chan.separator ~buffer_size:chan.buffer_size stream in
-        begin match Id.of_header ~mode ~msgs id_header with
+        begin match Id.rev_list_of_header ~mode ~msgs id_header with
           | Error str -> return (Error (400, [str]))
           | Ok ids ->
             let%lwt count = Channel.push chan msgs ids in

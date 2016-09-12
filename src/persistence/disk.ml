@@ -29,7 +29,6 @@ module M = struct
   let close instance = return_unit
 
   let push instance ~chan_name ~msgs ~ids ack =
-    let%lwt () = Logger.debug (List.sexp_of_t String.sexp_of_t msgs |> Util.string_of_sexp) in
     try%lwt
       Sqlite.insert instance.db msgs ids
     with

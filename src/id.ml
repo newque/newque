@@ -6,7 +6,7 @@ let time_ns () = Time_ns.now () |> Time_ns.to_int63_ns_since_epoch |> Int63.to_i
 
 let uuid () = Uuidm.v `V4 |> Uuidm.to_bytes
 
-let of_header ?(sep=",") ~mode ~msgs header_option =
+let rev_list_of_header ?(sep=",") ~mode ~msgs header_option =
   match header_option with
   | None ->
     begin match mode with
@@ -23,7 +23,7 @@ let of_header ?(sep=",") ~mode ~msgs header_option =
         let empty = List.filter ~f:String.is_empty ids in
         begin match ((List.is_empty empty), (List.length ids), (List.length msgs)) with
           | (false, _, _) -> Error "IDs cannot be empty strings."
-          | (true, id_count, msg_count) when id_count = msg_count -> Ok ids
+          | (true, id_count, msg_count) when id_count = msg_count -> Ok (List.rev ids)
           | (true, id_count, msg_count) ->
             Error (Printf.sprintf "Mismatch between the number of IDs (%d) and the number of messages (%d)" id_count msg_count)
         end
