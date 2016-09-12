@@ -16,23 +16,29 @@ let create dir tablename =
       Sqlite.create file
     with
     | ex ->
-      let%lwt () = Logger.error (Exn.to_string ex) in
+      (* TODO: Restart DB *)
+      let%lwt () = Logger.error (Printf.sprintf "Failed to create DB %s with error %s. The %s channel will not work." file (Exn.to_string ex) tablename) in
       fail ex
   in
-  let instance = {db; file; tablename;} in
-  return instance
+  return {db; file; tablename}
 
 module M = struct
 
   type t = disk_t [@@deriving sexp]
 
-  let close (pers : t) = return_unit
+  let close instance = return_unit
 
-  let push (pers : t) ~chan_name ~msgs ~ids ack =
+  let push instance ~chan_name ~msgs ~ids ack =
     let%lwt () = Logger.debug (List.sexp_of_t String.sexp_of_t msgs |> Util.string_of_sexp) in
-    Sqlite.insert pers.db msgs ids
+    try%lwt
+      Sqlite.insert instance.db msgs ids
+    with
+    | ex ->
+      (* TODO: Restart DB *)
+      let%lwt () = Logger.error (Printf.sprintf "Failed to write to %s with error %s. The DB must be restarted." instance.file (Exn.to_string ex)) in
+      return 0
 
-  let size (pers : t) =
+  let size instance =
     return 21
 
 end

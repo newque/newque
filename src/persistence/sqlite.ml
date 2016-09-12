@@ -8,40 +8,37 @@ module Data = Sqlite3.Data
 module Logger = Log.Make (struct let path = Log.outlog let section = "Sqlite" end)
 
 type statements = {
+  begin_transaction: Sqlite3.stmt * string;
+  commit_transaction: Sqlite3.stmt * string;
+  rollback_transaction: Sqlite3.stmt * string;
   create_table: Sqlite3.stmt * string;
 }
 type t = {
   db: Sqlite3.db sexp_opaque;
   file: string;
+  mutex: Mutex.t sexp_opaque;
   stmts: statements sexp_opaque;
 } [@@deriving sexp]
 
 (* Ridiculously high number of retries by default,
    because it is only retried when the db is locked.
    We only want it to fail in catastrophic cases. *)
-let default_retries = 50
+let default_retries = 10
 
-let is_success rc =
+let throw_if_fail ~str rc =
   match rc with
-  | Rc.OK -> true
-  | _ -> false
+  | Rc.OK -> ()
+  | _ -> failwith str
 
-let run_ignore ~str thunk =
-  let%lwt rc = wrap thunk in
-  if is_success rc then
-    return_unit
-  else
-    Logger.warning (Printf.sprintf "Operation %s failed with code %s" str (Rc.to_string rc))
-
-let execute ?(retry=default_retries) ~destroy (stmt, sql) =
-  let%lwt () = Logger.debug_lazy (lazy (Printf.sprintf "Executing %s" sql)) in
+let exec_sync db ?(retry=default_retries) ~destroy (stmt, sql) =
+  ignore (async (fun () -> Logger.debug_lazy (lazy (Printf.sprintf "Executing %s" sql))));
   let rec run count =
     match S3.step stmt with
-    | Rc.DONE -> ()
+    | Rc.DONE -> S3.changes db
     | (Rc.BUSY as code) | (Rc.LOCKED as code) ->
       begin match count <= retry with
         | true ->
-          ignore_result (Logger.debug "Retrying execution");
+          ignore (async (fun () -> Logger.warning (Printf.sprintf "Retrying execution (%s)" (Rc.to_string code))));
           Thread.yield ();
           run (count + 1)
         | false ->
@@ -50,89 +47,113 @@ let execute ?(retry=default_retries) ~destroy (stmt, sql) =
     | code ->
       failwith (Printf.sprintf "Execution failed with code %s" (Rc.to_string code))
   in
-  let%lwt result = wrap (fun () -> run 1) in
-  let%lwt () = begin match destroy with
-    | true -> run_ignore ~str:"Finalize Statement" (fun () -> S3.finalize stmt)
-    | false -> begin
-        try%lwt
-          let%lwt rc = wrap (fun () -> S3.reset stmt) in
-          if not (is_success rc) then
-            fail_with "Failed to Reset Statement"
-          else
-            return_unit
+  let result = run 1 in
+  begin match destroy with
+    | true -> ignore (S3.finalize stmt)
+    | false ->
+      begin try
+          throw_if_fail ~str:"Failed to reset statement" (S3.reset stmt)
         with
-        | ex -> wrap (fun () -> S3.recompile stmt)
+        | ex ->
+          ignore (async (fun () -> Logger.error (Exn.to_string ex)));
+          S3.recompile stmt
       end
-  end in
-  return result
+  end;
+  result
 
-let prepare db sql =
-  match S3.prepare db sql with
-  | exception ex -> fail ex
-  | stmt -> return (stmt, sql)
+let execute db ~destroy stmt =
+  Lwt_preemptive.detach (fun () ->
+      Mutex.critical_section db.mutex ~f:(fun () ->
+          exec_sync db.db ~destroy stmt
+        )
+    ) ()
 
-let bind ?(retry=default_retries) stmt pos arg =
-  let rec run count =
-    match S3.bind stmt pos arg with
-    | Rc.OK -> ()
-    | (Rc.BUSY as code) | (Rc.LOCKED as code) ->
-      begin match count <= retry with
-        | true ->
-          ignore_result (Logger.debug "Retrying bind");
-          Thread.yield ();
-          run (count + 1)
-        | false ->
-          failwith (Printf.sprintf "Bind failed after %d retries with code %s" retry (Rc.to_string code))
-      end
-    | code ->
-      failwith (Printf.sprintf "Bind failed with code %s" (Rc.to_string code))
-  in
-  wrap (fun () -> run 1)
+let transaction db ~destroy stmts =
+  Lwt_preemptive.detach (fun () ->
+      Mutex.critical_section db.mutex ~f:(fun () ->
+          ignore (exec_sync db.db ~destroy:false db.stmts.begin_transaction);
+          try
+            let total_changed = List.fold stmts ~init:0 ~f:(fun acc stmt ->
+                let changed = exec_sync db.db ~destroy stmt in
+                acc + changed
+              )
+            in
+            ignore (exec_sync db.db ~destroy:false db.stmts.commit_transaction);
+            total_changed
+          with
+          | ex ->
+            ignore (async (fun () -> Logger.error (Exn.to_string ex)));
+            exec_sync db.db ~destroy:false db.stmts.rollback_transaction
+        )
+    ) ()
 
-(* let transaction thunks =
-   let rec run result thunks =
-    match thunks with
-    | [] -> result
-    | thunk::rest ->
+let prepare db mutex sql =
+  Lwt_preemptive.detach (fun () ->
+      Mutex.critical_section mutex ~f:(fun () ->
+          ((S3.prepare db sql), sql)
+        )
+    ) ()
 
-   in
-   run (Ok ()) thunks *)
+let bind db ?(retry=default_retries) stmt args =
+  Lwt_preemptive.detach (fun () ->
+      Mutex.critical_section db.mutex ~f:(fun () ->
+          let rec run pos arg count =
+            match S3.bind stmt pos arg with
+            | Rc.OK -> ()
+            | (Rc.BUSY as code) | (Rc.LOCKED as code) ->
+              begin match count <= retry with
+                | true ->
+                  ignore (async (fun () -> Logger.warning (Printf.sprintf "Retrying bind (%s)" (Rc.to_string code))));
+                  Thread.yield ();
+                  run pos arg (count + 1)
+                | false ->
+                  failwith (Printf.sprintf "Bind failed after %d retries with code %s" retry (Rc.to_string code))
+              end
+            | code ->
+              failwith (Printf.sprintf "Bind failed with code %s" (Rc.to_string code))
+          in
+          List.iter ~f:(fun (i, arg) -> run i arg 0) args
+        )
+    ) ()
 
+let begin_sql = "BEGIN;"
+let commit_sql = "COMMIT;"
+let rollback_sql = "ROLLBACK;"
 let create_table_sql = "CREATE TABLE IF NOT EXISTS MESSAGES (uuid BLOB NOT NULL, timens BIGINT NOT NULL, raw BLOB NOT NULL, PRIMARY KEY(uuid));"
 let insert_sql count =
   let arr = Array.create ~len:count "(?,?,?)" in
-  Printf.sprintf "INSERT INTO MESSAGES (uuid,timens,raw) VALUES %s" (String.concat_array ~sep:"," arr)
+  Printf.sprintf "INSERT INTO MESSAGES (uuid,timens,raw) VALUES %s;" (String.concat_array ~sep:"," arr)
 
 let create file =
+  let mutex = Mutex.create () in
   let%lwt db = wrap (fun () -> S3.db_open file) in
-  let%lwt create_table = prepare db create_table_sql in
-  let%lwt () = execute ~destroy:true create_table in
 
-  let stmts = {create_table} in
-  return {db; file; stmts;}
+  let%lwt create_table = prepare db mutex create_table_sql in
+  let%lwt begin_transaction = prepare db mutex begin_sql in
+  let%lwt commit_transaction = prepare db mutex commit_sql in
+  let%lwt rollback_transaction = prepare db mutex rollback_sql in
+  let stmts = {create_table; begin_transaction; commit_transaction; rollback_transaction} in
+  let instance = {db; file; mutex; stmts} in
+
+  let%lwt _ = execute instance ~destroy:false create_table in
+  return instance
 
 let insert db ~msgs ~ids =
   let time = Id.time_ns () in
-  let run slice =
-    let%lwt ((st, _) as stmt) = prepare db.db (insert_sql (List.length slice)) in
-    let%lwt () = Lwt_list.iteri_s (fun i (raw, id) ->
+  let make_stmt slice =
+    let%lwt ((st, _) as stmt) = prepare db.db db.mutex (insert_sql (List.length slice)) in
+    let args = List.concat_mapi slice ~f:(fun i (raw, id) ->
         let pos = i * 3 in
-        let uuid_data = Data.BLOB id in
-        let timens_data = Data.INT time in
-        let raw_data = Data.BLOB raw in
-        let%lwt () = bind st (pos+1) uuid_data in
-        let%lwt () = bind st (pos+2) timens_data in
-        bind st (pos+3) raw_data
-      ) slice in
-    execute ~destroy:true stmt
+        [((pos + 1), Data.BLOB id); ((pos + 2), Data.INT time); ((pos + 3), Data.BLOB raw)]
+      )
+    in
+    let%lwt () = bind db st args in
+    return stmt
   in
-  let%lwt divided = Util.rev_zip_group ~size:2 msgs ids in
-  let%lwt () = Lwt_list.iter_s run divided in
-  return (List.length msgs)
-
-
-
-
-
-
-
+  match%lwt Util.rev_zip_group ~size:100 msgs ids with
+  | (group::[]) ->
+    let%lwt stmt = make_stmt group in
+    execute db ~destroy:true stmt
+  | groups ->
+    let%lwt stmts = Lwt_list.map_s make_stmt groups in
+    transaction db ~destroy:true stmts

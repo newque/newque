@@ -62,4 +62,16 @@ describe('push', function () {
     .then(shouldHaveWritten(1))
   })
 
+  it.only('should send ATOMIC, without separator', function () {
+    var buf = 'abcdefghijkl'
+    return Fn.call('POST', 8000, '/example', buf, [[modeHeader, 'atomic']])
+    .then(shouldHaveWritten(1))
+  })
+
+  it.only('should send ATOMIC, with separator', function () {
+    var buf = 'A abc\nA def\nA ghi\nA jkl'
+    return Fn.call('POST', 8000, '/example', buf, [[modeHeader, 'atomic']])
+    .then(shouldHaveWritten(1))
+  })
+
 })
