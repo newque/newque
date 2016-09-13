@@ -16,12 +16,12 @@ module M = struct
 
   type t = memory_t [@@deriving sexp]
 
-  let close (pers : t) = return_unit
+  let close (instance : t) = return_unit
 
-  let push (pers : t) ~chan_name ~msgs ~ids ack =
+  let push (instance : t) ~msgs ~ids ack =
     return 1
 
-  let size (pers : t) =
+  let size (instance : t) =
     return 20
 
 end

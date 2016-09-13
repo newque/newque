@@ -6,7 +6,8 @@ let log_path name = Fs.conf_chan_dir ^ name
 type t = {
   name: string;
   endpoint_names: string list;
-  push: chan_name:string -> Message.t list -> Id.t list -> Ack.t -> int Lwt.t sexp_opaque;
+  push: Message.t list -> Id.t list -> Ack.t -> int Lwt.t sexp_opaque;
+  size: unit -> int Lwt.t sexp_opaque;
   ack: Ack.t;
   separator: string;
   buffer_size: int;
@@ -43,10 +44,13 @@ let create ?redis name (conf_channel : Config_t.config_channel) =
     name;
     endpoint_names = conf_channel.endpoint_names;
     push = Persist.push;
+    size = Persist.size;
     ack = conf_channel.ack;
     separator = conf_channel.separator;
     buffer_size = conf_channel.buffer_size;
   }
 
 let push (chan: t) (msgs : Message.t list) (ids: Id.t list) =
-  chan.push ~chan_name:chan.name msgs ids chan.ack
+  chan.push msgs ids chan.ack
+
+let size (chan: t) () = chan.size ()

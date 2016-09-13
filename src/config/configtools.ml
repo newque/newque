@@ -71,7 +71,7 @@ let create_admin_server watcher config =
     port = config.admin.a_port;
     settings = Http_proto admin_spec_conf;
   } in
-  let%lwt admin_server = Http.start admin_conf admin_spec_conf `Admin in
+  let%lwt admin_server = Http.start admin_conf admin_spec_conf Http.Admin in
   let (_, wakener) = wait () in
   let open Listener in
   async (fun () -> Watcher.monitor watcher {id = admin_conf.name; server = HTTP (admin_server, wakener);});

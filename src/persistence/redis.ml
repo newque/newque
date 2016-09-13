@@ -16,12 +16,12 @@ module M = struct
 
   type t = redis_t [@@deriving sexp]
 
-  let close (conf : t) = return_unit
+  let close instance = return_unit
 
-  let push (pers : t) ~chan_name ~msgs ~ids ack =
+  let push instance ~msgs ~ids ack =
     return 1
 
-  let size (pers : t) =
+  let size instance =
     return 20
 
 end

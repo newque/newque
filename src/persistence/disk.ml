@@ -28,9 +28,9 @@ module M = struct
 
   let close instance = return_unit
 
-  let push instance ~chan_name ~msgs ~ids ack =
+  let push instance ~msgs ~ids ack =
     try%lwt
-      Sqlite.insert instance.db msgs ids
+      Sqlite.push instance.db msgs ids
     with
     | ex ->
       (* TODO: Restart DB *)
@@ -38,6 +38,12 @@ module M = struct
       fail ex
 
   let size instance =
-    return 21
+    try%lwt
+      Sqlite.size instance.db
+    with
+    | ex ->
+      (* TODO: Restart DB *)
+      let%lwt () = Logger.error (Printf.sprintf "Failed to fetch from %s with error %s. The DB must be restarted." instance.file (Exn.to_string ex)) in
+      fail ex
 
 end

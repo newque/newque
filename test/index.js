@@ -25,13 +25,29 @@ var shouldHaveWritten = function (count) {
   }
 }
 
-var shouldFail = function (count) {
+var shouldHaveCounted = function (count) {
   return function (result) {
     return new Promise(function (resolve, reject) {
-      assert(result.res.statusCode === 400)
-      assert(result.body.code === 400)
+      assert(result.res.statusCode === 200)
+      assert(result.body.code === 200)
+      assert(result.body.errors.length === 0)
+      assert(result.body.count === count)
+      return resolve()
+    })
+    .catch(function (err) {
+      console.log(result.res.statusCode)
+      console.log(result.body)
+      throw err
+    })
+  }
+}
+
+var shouldFail = function (code) {
+  return function (result) {
+    return new Promise(function (resolve, reject) {
+      assert(result.res.statusCode === code)
+      assert(result.body.code === code)
       assert(result.body.errors.length > 0)
-      assert(result.body.saved === count)
       console.log(result.body.errors)
       return resolve()
     })
@@ -72,7 +88,7 @@ describe('Push', function () {
     it('With bad header', function () {
       var buf = 'abcdef'
       return Fn.call('POST', 8000, '/example', buf, [[modeHeader, 'invalid header']])
-      .then(shouldFail(0))
+      .then(shouldFail(400))
     })
   })
 
@@ -150,25 +166,25 @@ describe('Push', function () {
     it('With separator, non-matching lengths 1', function () {
       var buf = 'A abc\nA def\nA ghi\nA jkl'
       return Fn.call('POST', 8000, '/example', buf, [[modeHeader, 'multiple'], [idHeader, 'id20,id21,id22']])
-      .then(shouldFail(0))
+      .then(shouldFail(400))
     })
 
     it('With separator, non-matching lengths 2', function () {
       var buf = 'A abc\nA def\nA ghi'
       return Fn.call('POST', 8000, '/example', buf, [[modeHeader, 'multiple'], [idHeader, 'id30,id31,id32,id33']])
-      .then(shouldFail(0))
+      .then(shouldFail(400))
     })
 
     it('With separator, empty IDs 1', function () {
       var buf = 'A abc\nA def\nA ghi'
       return Fn.call('POST', 8000, '/example', buf, [[modeHeader, 'multiple'], [idHeader, 'id40,id41,id42,']])
-      .then(shouldFail(0))
+      .then(shouldFail(400))
     })
 
     it('With separator, empty IDs 2', function () {
       var buf = 'A abc\nA def\nA ghi'
       return Fn.call('POST', 8000, '/example', buf, [[modeHeader, 'multiple'], [idHeader, 'id50,id51,,id52,id53']])
-      .then(shouldFail(0))
+      .then(shouldFail(400))
     })
 
     it('With separator, atomic', function () {
@@ -184,4 +200,49 @@ describe('Push', function () {
     })
   })
 
+  describe('Routing', function () {
+    it('Invalid path 1', function () {
+      var buf = ''
+      return Fn.call('POST', 8000, '/', buf)
+      .then(shouldFail(400))
+    })
+
+    it('Invalid path 2', function () {
+      var buf = ''
+      return Fn.call('POST', 8000, '/nothing', buf)
+      .then(shouldFail(400))
+    })
+
+    it('Invalid method', function () {
+      var buf = ''
+      return Fn.call('XYZ', 8000, '/example', buf)
+      .then(shouldFail(405))
+    })
+  })
+})
+
+describe('Count', function () {
+  it('Valid', function () {
+    var buf = ''
+    return Fn.call('GET', 8000, '/example/count', buf)
+    .then(shouldHaveCounted(26))
+  })
+
+  it('Invalid path', function () {
+    var buf = ''
+    return Fn.call('GET', 8000, '//count', buf)
+    .then(shouldFail(400))
+  })
+
+  it('Invalid path 2', function () {
+    var buf = ''
+    return Fn.call('GET', 8000, '/nothing/count', buf)
+    .then(shouldFail(400))
+  })
+
+  it('Invalid method', function () {
+    var buf = ''
+    return Fn.call('XYZ', 8000, '/example/count', buf)
+    .then(shouldFail(405))
+  })
 })

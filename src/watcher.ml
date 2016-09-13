@@ -10,7 +10,7 @@ type t = {
 }
 
 (* Listener by port *)
-let create () = { table = Int.Table.create ~size:5 (); router = Router.create ();}
+let create () = { table = Int.Table.create ~size:5 (); router = Router.create () }
 
 let router watcher = watcher.router
 let listeners watcher = Int.Table.data watcher.table
@@ -18,7 +18,12 @@ let listeners watcher = Int.Table.data watcher.table
 let start_http watcher generic specific =
   (* Partially apply the routing function *)
   let open Config_t in
-  Http.start generic specific (`Standard (Router.publish watcher.router ~listen_name:generic.name))
+  let open Http in
+  Http.start generic specific (Standard {
+      write = Router.write watcher.router ~listen_name:generic.name;
+      read = Router.read watcher.router ~listen_name:generic.name;
+      count = Router.count watcher.router ~listen_name:generic.name;
+    })
 
 let rec monitor watcher listen =
   match listen.server with

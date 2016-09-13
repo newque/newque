@@ -31,6 +31,7 @@ open Cohttp_lwt_unix
 #require "uuidm"
 #require "sqlite3"
 
+#mod_use "src/util.ml"
 #mod_use "src/fs.ml"
 #mod_use "src/log.ml"
 #mod_use "src/config/config_t.ml"
@@ -39,6 +40,7 @@ open Cohttp_lwt_unix
 #mod_use "src/mode.ml"
 #mod_use "src/protocols/http.ml"
 
+#mod_use "src/id.ml"
 #mod_use "src/serializable/single.ml"
 #mod_use "src/serializable/atomic.ml"
 #mod_use "src/serializable/message.ml"

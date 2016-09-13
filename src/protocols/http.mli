@@ -11,16 +11,28 @@ type t = {
   thread : unit Lwt.t;
 } [@@deriving sexp_of]
 
-type http_routing = [
-  | `Admin
-  | `Standard of (
-      chan_name:string ->
-      id_header:string option ->
-      mode:Mode.Pub.t ->
-      string Lwt_stream.t ->
-      (int, string list) Result.t Lwt.t
-    )
-]
+(* TODO: Clean this up.. *)
+type standard_routing = {
+  write: (
+    chan_name:string ->
+    id_header:string option ->
+    mode:Mode.Write.t ->
+    string Lwt_stream.t ->
+    (int, string list) Result.t Lwt.t);
+  read: (
+    chan_name:string ->
+    id_header:string option ->
+    mode:Mode.Read.t ->
+    (unit, string list) Result.t Lwt.t);
+  count: (
+    chan_name:string ->
+    mode:Mode.Count.t ->
+    (int, string list) Result.t Lwt.t);
+}
+
+type http_routing =
+  | Admin
+  | Standard of standard_routing
 
 val start :
   Config_t.config_listener ->
