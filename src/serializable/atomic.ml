@@ -1,9 +1,11 @@
 open Core.Std
 
 type t = {
-  msgs: Single.t list [@key 1];
+  msgs: Single.t array [@key 1];
 } [@@deriving protobuf, sexp]
 
 let of_singles msgs = {msgs}
 
-let of_strings strs = {msgs = List.map ~f:Single.of_string strs}
+let of_strings strs = {msgs = Array.map ~f:Single.of_string strs}
+
+let contents atomic = Array.map atomic.msgs ~f:Single.contents

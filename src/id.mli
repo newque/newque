@@ -2,12 +2,12 @@ open Core.Std
 
 type t
 
-val rev_list_of_header :
+val array_of_header :
   ?sep:string ->
   mode:Mode.Write.t ->
-  msgs:Message.t list ->
+  msgs:Message.t array ->
   string option ->
-  (t list, string) Result.t
+  (t array, string) Result.t
 
 val to_string : t -> string
 

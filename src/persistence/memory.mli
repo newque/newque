@@ -1,3 +1,3 @@
 module M : Persistence.Template
 
-val create : string -> M.t Lwt.t
+val create : chan_name:string -> avg_read:int -> M.t Lwt.t

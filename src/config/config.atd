@@ -58,6 +58,7 @@ type config_channel = {
   ack <json name="acknowledgement">: config_acknowledgement;
   ~separator <ocaml default="\"\n\"">: string;
   ~buffer_size <json name="averageSize"> <ocaml default="256">: int;
+  ~avg_read <json name="averageRead"> <ocaml default="32">: int;
 }
 
 

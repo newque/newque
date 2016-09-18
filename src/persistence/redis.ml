@@ -21,6 +21,9 @@ module M = struct
   let push instance ~msgs ~ids ack =
     return 1
 
+  let pull instance ~mode =
+    return [| |]
+
   let size instance =
     return 20
 

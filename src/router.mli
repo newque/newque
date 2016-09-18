@@ -17,6 +17,7 @@ val write :
   id_header:string option ->
   mode:Mode.Write.t ->
   string Lwt_stream.t ->
+  (* Written count, list of error messages *)
   (int, string list) Result.t Lwt.t
 
 val read :
@@ -25,11 +26,13 @@ val read :
   chan_name:string ->
   id_header:string option ->
   mode:Mode.Read.t ->
-  (unit, string list) Result.t Lwt.t
+  (* Message payloads, list of error messages *)
+  (string array, string list) Result.t Lwt.t
 
 val count :
   t ->
   listen_name:string ->
   chan_name:string ->
   mode:Mode.Count.t ->
+  (* Count, list of error messages *)
   (int, string list) Result.t Lwt.t

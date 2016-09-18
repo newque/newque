@@ -4,7 +4,7 @@
   "description": "Newque tests",
   "main": "index.js",
   "scripts": {
-    "test": "mocha index.js"
+    "test": "mocha index.js --delay"
   },
   "repository": {
     "type": "git",

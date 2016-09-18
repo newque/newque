@@ -37,7 +37,7 @@ type standard_routing = {
     chan_name:string ->
     id_header:string option ->
     mode:Mode.Read.t ->
-    (unit, string list) Result.t Lwt.t);
+    (string array, string list) Result.t Lwt.t);
   count: (
     chan_name:string ->
     mode:Mode.Count.t ->
@@ -50,6 +50,8 @@ type http_routing =
 
 let mode_header_name = "newque-mode"
 let id_header_name = "newque-msg-id"
+let length_header_name = "newque-response-length"
+let json_response_header = Header.init_with "Content-Type" "application/json"
 
 let default_filter _ req _ =
   let path = Request.uri req |> Uri.path in
@@ -96,13 +98,6 @@ let json_count_body code errors count =
     ("count", count);
   ]
 
-let json_read_body code errors results =
-  `Assoc [
-    ("code", `Int code);
-    ("errors", `List (List.map errors ~f:(fun x -> `String x)));
-    ("results", `List results);
-  ]
-
 let json_body code errors =
   `Assoc [
     ("code", `Int code);
@@ -112,46 +107,60 @@ let json_body code errors =
 let handler http routing ((ch, _) as conn) req body =
   (* ignore (async (fun () -> Logger.debug_lazy (lazy (Util.string_of_sexp (Request.sexp_of_t req))))); *)
   let%lwt http = http in
-  let%lwt (code, json) = match%lwt default_filter conn req body with
-    | Error (code, errors) -> return (code, json_body code errors)
-    | Ok (chan_name, mode) ->
-      begin match Mode.wrap mode with
-        | `Write mode ->
-          let stream = Cohttp_lwt_body.to_stream body in
-          let id_header = Header.get (Request.headers req) id_header_name in
-          let%lwt (code, errors, saved) = begin try%lwt
-              begin match%lwt routing.write ~chan_name ~id_header ~mode stream with
-                | Ok count -> return (201, [], count)
-                | Error errors -> return (400, errors, 0)
-              end
-            with ex -> return (500, [Exn.to_string ex], 0)
-          end in
-          return (code, json_write_body code errors saved)
-        | `Read mode ->
-          let id_header = Header.get (Request.headers req) id_header_name in
-          let%lwt (code, errors, saved) = begin try%lwt
-              begin match%lwt routing.read ~chan_name ~id_header ~mode with
-                | Ok () -> return (200, [], [])
-                | Error errors -> return (400, errors, [])
-              end
-            with ex -> return (500, [Exn.to_string ex], [])
-          end in
-          return (code, json_read_body code errors saved)
-        | `Count as mode ->
-          let%lwt (code, errors, count) = begin try%lwt
-              begin match%lwt routing.count ~chan_name ~mode with
-                | Ok count -> return (200, [], count)
-                | Error errors -> return (400, errors, 0)
-              end
-            with ex -> return (500, [Exn.to_string ex], 0)
-          end in
-          return (code, json_count_body code errors count)
-      end
-  in
-  let status = Code.status_of_code code in
-  let body = Yojson.Basic.to_string json in
-  let headers = Header.init_with "Content-Type" "application/json" in
-  Server.respond_string ~headers ~status ~body ()
+  match%lwt default_filter conn req body with
+  | Error (code, errors) ->
+    let headers = json_response_header in
+    let status = Code.status_of_code code in
+    let body = Yojson.Basic.to_string (json_body code errors) in
+    Server.respond_string ~headers ~status ~body ()
+  | Ok (chan_name, mode) ->
+    begin match Mode.wrap mode with
+
+      | `Write mode ->
+        let stream = Cohttp_lwt_body.to_stream body in
+        let id_header = Header.get (Request.headers req) id_header_name in
+        let%lwt (code, errors, saved) = begin try%lwt
+            begin match%lwt routing.write ~chan_name ~id_header ~mode stream with
+              | Ok count -> return (201, [], count)
+              | Error errors -> return (400, errors, 0)
+            end
+          with ex -> return (500, [Exn.to_string ex], 0)
+        end in
+        let headers = json_response_header in
+        let status = Code.status_of_code code in
+        let body = Yojson.Basic.to_string (json_write_body code errors saved) in
+        Server.respond_string ~headers ~status ~body ()
+
+      | `Read mode ->
+        let id_header = Header.get (Request.headers req) id_header_name in
+        let%lwt (code, errors, saved) = begin try%lwt
+            begin match%lwt routing.read ~chan_name ~id_header ~mode with
+              | Ok arr -> return (200, [], arr)
+              | Error errors -> return (400, errors, [| |])
+            end
+          with ex -> return (500, [Exn.to_string ex], [| |])
+        end in
+        let headers = Header.add_list (Header.init ()) [
+            ("Content-Type", "application/octet-stream");
+            (length_header_name, Int.to_string (Array.length saved));
+          ] in
+        let status = Code.status_of_code code in
+        let body = String.concat_array ~sep:"\n" saved in
+        Server.respond_string ~headers ~status ~body ()
+
+      | `Count as mode ->
+        let%lwt (code, errors, count) = begin try%lwt
+            begin match%lwt routing.count ~chan_name ~mode with
+              | Ok count -> return (200, [], count)
+              | Error errors -> return (400, errors, 0)
+            end
+          with ex -> return (500, [Exn.to_string ex], 0)
+        end in
+        let headers = json_response_header in
+        let status = Code.status_of_code code in
+        let body = Yojson.Basic.to_string (json_count_body code errors count) in
+        Server.respond_string ~headers ~status ~body ()
+    end
 
 let open_sockets = Int.Table.create ~size:5 ()
 

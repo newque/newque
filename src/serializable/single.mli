@@ -8,8 +8,10 @@ val of_stream :
 
 val of_string : string -> t
 
-val rev_list_of_stream :
+val contents : t -> string
+
+val array_of_stream :
   sep:string ->
   ?init:string option ->
   string Lwt_stream.t ->
-  t list Lwt.t
+  t array Lwt.t

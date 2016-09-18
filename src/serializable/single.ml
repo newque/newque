@@ -19,7 +19,9 @@ let of_stream ~buffer_size ?(init=(Some "")) stream =
 
 let of_string raw = {raw}
 
-let rev_list_of_stream ~sep ?(init=(Some "")) stream =
+let contents single = single.raw
+
+let array_of_stream ~sep ?(init=(Some "")) stream =
   let%lwt (msgs, last) = Lwt_stream.fold_s (fun read (acc, leftover) ->
       let chunk = Option.value_map leftover ~default:read ~f:(fun a -> a ^ read) in
       Util.split ~sep chunk
@@ -29,4 +31,4 @@ let rev_list_of_stream ~sep ?(init=(Some "")) stream =
       |> return
     ) stream ([], init)
   in
-  return (Option.value_map last ~default:msgs ~f:(fun raw -> {raw}::msgs))
+  return (Array.of_list_rev (Option.value_map last ~default:msgs ~f:(fun raw -> {raw}::msgs)))

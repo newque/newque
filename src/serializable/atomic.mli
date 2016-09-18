@@ -1,5 +1,7 @@
 type t [@@deriving protobuf, sexp]
 
-val of_singles : Single.t list -> t
+val of_singles : Single.t array -> t
 
-val of_strings : string list -> t
+val of_strings : string array -> t
+
+val contents : t -> string array

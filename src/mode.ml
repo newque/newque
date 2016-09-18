@@ -13,9 +13,15 @@ end
 module Read = struct
   type t = [
     | `One
+    | `Many of int
     | `After_id of string
     | `After_ts of int
   ]
+  let to_string (tag : t) = match tag with
+    | `One -> "One"
+    | `Many x -> Printf.sprintf "Many(%d) " x
+    | `After_id s -> Printf.sprintf "After_id(%s)" s
+    | `After_ts ts -> Printf.sprintf "After_ts(%d)" ts
 end
 
 module Count = struct
@@ -41,6 +47,7 @@ let wrap (tag : Any.t) : t = match tag with
   | `Multiple -> `Write `Multiple
   | `Atomic -> `Write `Atomic
   | `One -> `Read `One
+  | (`Many _) as x -> `Read x
   | (`After_id _) as x -> `Read x
   | (`After_ts _) as x-> `Read x
   | `Count -> `Count

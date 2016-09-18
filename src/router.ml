@@ -57,7 +57,7 @@ let write router ~listen_name ~chan_name ~id_header ~mode stream =
   | Ok chan ->
     let open Channel in
     let%lwt msgs = Message.of_stream ~mode ~sep:chan.separator ~buffer_size:chan.buffer_size stream in
-    begin match Id.rev_list_of_header ~mode ~msgs id_header with
+    begin match Id.array_of_header ~mode ~msgs id_header with
       | Error str -> return (Error [str])
       | Ok ids ->
         let%lwt count = Channel.push chan msgs ids in
@@ -67,7 +67,16 @@ let write router ~listen_name ~chan_name ~id_header ~mode stream =
         return (Ok count)
     end
 
-let read router ~listen_name ~chan_name ~id_header ~mode = return (Ok ())
+let read router ~listen_name ~chan_name ~id_header ~mode =
+  match find_chan router ~listen_name ~chan_name with
+  | (Error _) as err -> return err
+  | Ok chan ->
+    let%lwt data = Channel.pull chan ~mode in
+    let payloads = Array.concat_map data ~f:Message.contents in
+    ignore_result (Logger.debug_lazy (lazy (
+        Printf.sprintf "Read: %s (size: %d) from %s" chan_name (Array.length payloads) listen_name
+      )));
+    return (Ok payloads)
 
 let count router ~listen_name ~chan_name ~(mode: Mode.Count.t) =
   match find_chan router ~listen_name ~chan_name with

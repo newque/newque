@@ -23,7 +23,7 @@ type standard_routing = {
     chan_name:string ->
     id_header:string option ->
     mode:Mode.Read.t ->
-    (unit, string list) Result.t Lwt.t);
+    (string array, string list) Result.t Lwt.t);
   count: (
     chan_name:string ->
     mode:Mode.Count.t ->
