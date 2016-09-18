@@ -27,6 +27,12 @@ type t = {
    We only want it to fail in catastrophic cases. *)
 let default_retries = 10
 
+  #ifdef DEBUG
+let batch_size = 2
+  #else
+let batch_size = 100
+  #endif
+
 let throw_if_fail ~str rc =
   match rc with
   | Rc.OK -> ()
@@ -192,7 +198,7 @@ let push db ~msgs ~ids =
     let%lwt () = bind db st args in
     return stmt
   in
-  match%lwt Util.zip_group ~size:100 msgs ids with
+  match%lwt Util.zip_group ~size:batch_size msgs ids with
   | (group::[]) ->
     let%lwt stmt = make_stmt group in
     execute db ~destroy:true stmt

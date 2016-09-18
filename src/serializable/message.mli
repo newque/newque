@@ -1,10 +1,10 @@
 type t [@@deriving sexp]
 
-(* val of_string :
-   mode:Mode.Write.t ->
-   sep:string ->
-   string ->
-   t list *)
+val of_string :
+  mode:Mode.Write.t ->
+  sep:string ->
+  string ->
+  t array
 
 val of_stream :
   mode:Mode.Write.t ->

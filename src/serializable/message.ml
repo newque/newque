@@ -8,12 +8,12 @@ type t =
   | Atomic of Atomic.t [@key 2]
 [@@deriving protobuf, sexp]
 
-(* let of_string ~mode ~sep str =
-   let split = Util.split ~sep in
-   match mode with
-   | `Single -> [Single (Single.of_string str)]
-   | `Multiple -> List.map ~f:(fun s -> Single (Single.of_string s)) (split str)
-   | `Atomic -> [Atomic (Atomic.of_strings (split str))] *)
+let of_string ~mode ~sep str =
+  let split = Util.split ~sep in
+  match mode with
+  | `Single -> [| Single (Single.of_string str) |]
+  | `Multiple -> Array.of_list_map ~f:(fun s -> Single (Single.of_string s)) (split str)
+  | `Atomic -> [| Atomic (Atomic.of_string_list (split str)) |]
 
 let of_stream ~mode ~sep ~buffer_size stream =
   match mode with
