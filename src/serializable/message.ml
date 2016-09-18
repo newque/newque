@@ -41,7 +41,6 @@ let parse_exn blob =
   Protobuf.Decoder.decode_exn from_protobuf blob
     #endif
 
-
 let contents msg =
   match msg with
   | Single m -> [| Single.contents m |]

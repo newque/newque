@@ -78,7 +78,7 @@ let execute db ~destroy stmt =
     )
   ) ()
 
-let query_sync db ?(retry=default_retries) ~destroy (stmt, sql) =
+let query db ?(retry=default_retries) ~destroy (stmt, sql) =
   Lwt_preemptive.detach (fun () ->
     Mutex.critical_section db.mutex ~f:(fun () ->
       ignore (async (fun () -> Logger.debug_lazy (lazy (Printf.sprintf "Querying %s" sql))));
@@ -92,14 +92,14 @@ let query_sync db ?(retry=default_retries) ~destroy (stmt, sql) =
         | (Rc.BUSY as code) | (Rc.LOCKED as code) ->
           begin match count <= retry with
             | true ->
-              ignore (async (fun () -> Logger.warning (Printf.sprintf "Retrying execution (%s)" (Rc.to_string code))));
+              ignore (async (fun () -> Logger.warning (Printf.sprintf "Retrying query (%s)" (Rc.to_string code))));
               Thread.yield ();
               run (count + 1)
             | false ->
-              failwith (Printf.sprintf "Execution failed after %d retries with code %s" retry (Rc.to_string code))
+              failwith (Printf.sprintf "Querying failed after %d retries with code %s" retry (Rc.to_string code))
           end
         | code ->
-          failwith (Printf.sprintf "Execution failed with code %s" (Rc.to_string code))
+          failwith (Printf.sprintf "Querying failed with code %s" (Rc.to_string code))
       in
       let () = run 1 in
       clean_sync ~destroy stmt;
@@ -158,6 +158,8 @@ let bind db ?(retry=default_retries) stmt args =
 let create_table_sql = "CREATE TABLE IF NOT EXISTS MESSAGES (uuid BLOB NOT NULL, timens BIGINT NOT NULL, raw BLOB NOT NULL, PRIMARY KEY(uuid));"
 let create_timens_index_sql = "CREATE INDEX IF NOT EXISTS MESSAGES_TIMENS_IDX ON MESSAGES (timens);"
 let read_one_sql = "SELECT uuid, timens, raw FROM MESSAGES ORDER BY ROWID ASC LIMIT 1;"
+let read_many_sql count =
+  Printf.sprintf "SELECT uuid, timens, raw FROM MESSAGES ORDER BY ROWID ASC LIMIT %d;" count
 let count_sql = "SELECT COUNT(*) FROM MESSAGES;"
 let begin_sql = "BEGIN;"
 let commit_sql = "COMMIT;"
@@ -209,7 +211,15 @@ let push db ~msgs ~ids =
 let pull db ~mode =
   match mode with
   | `One ->
-    begin match%lwt query_sync db ~destroy:false db.stmts.read_one with
+    begin match%lwt query db ~destroy:false db.stmts.read_one with
+      | [| |] -> return [| |]
+      | [| [| Data.BLOB uuid; Data.INT timens; Data.BLOB raw |] |] ->
+        return [| raw |]
+      | dataset -> failwith (Printf.sprintf "Select One failed for %s, dataset size: %d" db.file (Array.length dataset))
+    end
+  | `Many count ->
+    let%lwt stmt = prepare db.db db.mutex (read_many_sql count) in
+    begin match%lwt query db ~destroy:true stmt with
       | [| |] -> return [| |]
       | [| [| Data.BLOB uuid; Data.INT timens; Data.BLOB raw |] |] ->
         return [| raw |]
@@ -218,6 +228,6 @@ let pull db ~mode =
   | _ -> return [| |]
 
 let size db =
-  match%lwt query_sync db ~destroy:false db.stmts.count with
+  match%lwt query db ~destroy:false db.stmts.count with
   | [| [| Data.INT x |] |] -> return (Int64.to_int_exn x)
   | dataset -> failwith (Printf.sprintf "Count failed for %s, dataset size: %d" db.file (Array.length dataset))
