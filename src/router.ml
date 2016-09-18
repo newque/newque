@@ -14,30 +14,30 @@ let create () =
 let register_listeners router listeners =
   let open Listener in
   List.filter_map listeners ~f:(fun listen ->
-      let entry = String.Table.create ~size:5 () in
-      match String.Table.add router.table ~key:listen.id ~data:entry with
-      | `Ok -> None
-      | `Duplicate -> Some (Printf.sprintf "Cannot register listener %s because it already exists" listen.id)
-    )
+    let entry = String.Table.create ~size:5 () in
+    match String.Table.add router.table ~key:listen.id ~data:entry with
+    | `Ok -> None
+    | `Duplicate -> Some (Printf.sprintf "Cannot register listener %s because it already exists" listen.id)
+  )
   |> fun ll -> if List.length ll = 0 then Ok () else Error ll
 
 (* Important: At this time, listeners must exist prior to adding channels *)
 let register_channels router channels =
   let open Channel in
   List.concat_map channels ~f:(fun chan ->
-      List.filter_map chan.endpoint_names ~f:(fun listen_name ->
-          match String.Table.find router.table listen_name with
-          | Some chan_table ->
-            begin match String.Table.add chan_table ~key:chan.name ~data:chan with
-              | `Ok -> None
-              | `Duplicate -> Some (
-                  Printf.sprintf
-                    "Registered channel %s with listener %s but another channel with the same name already existed"
-                    chan.name listen_name
-                )
-            end
-          | None -> Some (Printf.sprintf "Cannot add channel %s to %s. Does that listener exist?" chan.name listen_name)
-        ))
+    List.filter_map chan.endpoint_names ~f:(fun listen_name ->
+      match String.Table.find router.table listen_name with
+      | Some chan_table ->
+        begin match String.Table.add chan_table ~key:chan.name ~data:chan with
+          | `Ok -> None
+          | `Duplicate -> Some (
+              Printf.sprintf
+                "Registered channel %s with listener %s but another channel with the same name already existed"
+                chan.name listen_name
+            )
+        end
+      | None -> Some (Printf.sprintf "Cannot add channel %s to %s. Does that listener exist?" chan.name listen_name)
+    ))
   |> function
   | [] -> Ok ()
   | errors -> Error errors

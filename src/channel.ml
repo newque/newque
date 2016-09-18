@@ -17,29 +17,29 @@ type t = {
 let create ?redis name (conf_channel : Config_t.config_channel) =
   let open Config_t in
   let module Persist = (val (match conf_channel.persistence with
-      | `Memory ->
-        let module Arg = struct
-          module IO = Memory.M
-          let create () = Memory.create ~chan_name:name ~avg_read:conf_channel.avg_read
-        end in
-        (module Persistence.Make (Arg) : Persistence.S)
+    | `Memory ->
+      let module Arg = struct
+        module IO = Memory.M
+        let create () = Memory.create ~chan_name:name ~avg_read:conf_channel.avg_read
+      end in
+      (module Persistence.Make (Arg) : Persistence.S)
 
-      | `Disk ->
-        let module Arg = struct
-          module IO = Disk.M
-          let create () = Disk.create Fs.data_chan_dir ~chan_name:name ~avg_read:conf_channel.avg_read
-        end in
-        (module Persistence.Make (Arg) : Persistence.S)
+    | `Disk ->
+      let module Arg = struct
+        module IO = Disk.M
+        let create () = Disk.create Fs.data_chan_dir ~chan_name:name ~avg_read:conf_channel.avg_read
+      end in
+      (module Persistence.Make (Arg) : Persistence.S)
 
-      | `Redis ->
-        (* Option.value_exn is safe here because of the check in Configtools *)
-        let {r_host; r_port; r_auth;} = Option.value_exn redis in
-        let module Arg = struct
-          module IO = Redis.M
-          let create () = Redis.create r_host r_port r_auth
-        end in
-        (module Persistence.Make (Arg) : Persistence.S)
-    ) : Persistence.S)
+    | `Redis ->
+      (* Option.value_exn is safe here because of the check in Configtools *)
+      let {r_host; r_port; r_auth;} = Option.value_exn redis in
+      let module Arg = struct
+        module IO = Redis.M
+        let create () = Redis.create r_host r_port r_auth
+      end in
+      (module Persistence.Make (Arg) : Persistence.S)
+  ) : Persistence.S)
   in
   {
     name;

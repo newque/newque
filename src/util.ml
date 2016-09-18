@@ -10,16 +10,16 @@ let zip_group ~size arr1 arr2 =
   if Array.length arr1 <> Array.length arr2 then
     fail_with (Printf.sprintf "Different array lengths: %d and %d" (Array.length arr1) (Array.length arr2))
   else
-    let len = Array.length arr1 in
-    let div = len / size in
-    let groups = if div * size = len then div else div + 1 in
-    return (
-      List.init groups ~f:(fun i ->
-          Array.init (Int.min size (len - (i * size))) ~f:(fun j ->
-              (arr1.((i * size) + j), arr2.((i * size) + j))
-            )
-        )
+  let len = Array.length arr1 in
+  let div = len / size in
+  let groups = if div * size = len then div else div + 1 in
+  return (
+    List.init groups ~f:(fun i ->
+      Array.init (Int.min size (len - (i * size))) ~f:(fun j ->
+        (arr1.((i * size) + j), arr2.((i * size) + j))
+      )
     )
+  )
 
 (* TODO: Decide what to do with these synchronous exceptions *)
 let is_assoc sexp =

@@ -27,8 +27,20 @@ let of_stream ~mode ~sep ~buffer_size stream =
     let%lwt arr = Single.array_of_stream ~sep stream in
     return [| Atomic (Atomic.of_singles arr) |]
 
-let serialize msg = Protobuf.Encoder.encode_exn to_protobuf msg
-let parse blob : t = Protobuf.Decoder.decode_exn from_protobuf blob
+let serialize msg =
+  #ifdef DEBUG
+    Util.string_of_sexp ~pretty:false (sexp_of_t msg)
+    #else
+  Protobuf.Encoder.encode_exn to_protobuf msg
+    #endif
+
+let parse_exn blob =
+  #ifdef DEBUG
+    t_of_sexp (Util.sexp_of_json_str_exn blob)
+    #else
+  Protobuf.Decoder.decode_exn from_protobuf blob
+    #endif
+
 
 let contents msg =
   match msg with

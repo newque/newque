@@ -58,22 +58,22 @@ let rec monitor watcher listen =
 let create_listeners watcher endpoints =
   let open Config_t in
   Lwt_list.iter_p (fun generic ->
-      (* Stop and replace possible existing listener on the same port *)
-      let%lwt () = match Int.Table.find_and_remove watcher.table generic.port with
-        | Some {server=(HTTP (existing, _));_} -> Http.stop existing
-        | Some {server=(ZMQ (existing, _));_} -> fail_with "Unimplemented"
-        | None -> return_unit
-      in
-      (* Now start the new listeners *)
-      let%lwt started = match generic.settings with
-        | Http_proto specific ->
-          let%lwt () = Logger.notice (Printf.sprintf "Starting %s on HTTP %s:%s" generic.name generic.host (Int.to_string generic.port)) in
-          let%lwt http = start_http watcher generic specific in
-          let (_, wakener) = wait () in
-          return {id=generic.name; server=(HTTP (http, wakener))}
-        | Zmq_proto specific -> fail_with "Unimplemented"
-      in
-      async (fun () -> monitor watcher started);
-      Int.Table.add_exn watcher.table ~key:generic.port ~data:started;
-      return_unit
-    ) endpoints
+    (* Stop and replace possible existing listener on the same port *)
+    let%lwt () = match Int.Table.find_and_remove watcher.table generic.port with
+      | Some {server=(HTTP (existing, _));_} -> Http.stop existing
+      | Some {server=(ZMQ (existing, _));_} -> fail_with "Unimplemented"
+      | None -> return_unit
+    in
+    (* Now start the new listeners *)
+    let%lwt started = match generic.settings with
+      | Http_proto specific ->
+        let%lwt () = Logger.notice (Printf.sprintf "Starting %s on HTTP %s:%s" generic.name generic.host (Int.to_string generic.port)) in
+        let%lwt http = start_http watcher generic specific in
+        let (_, wakener) = wait () in
+        return {id=generic.name; server=(HTTP (http, wakener))}
+      | Zmq_proto specific -> fail_with "Unimplemented"
+    in
+    async (fun () -> monitor watcher started);
+    Int.Table.add_exn watcher.table ~key:generic.port ~data:started;
+    return_unit
+  ) endpoints

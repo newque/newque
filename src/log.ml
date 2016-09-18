@@ -68,15 +68,15 @@ module Make (Argument: Argument) : S = struct
 
   let path_and_out_lazy level str =
     if (int_of_level level) < (!lazy_level) then return_unit else
-      let str = Lazy.force str in
-      let%lwt logger = Lazy.force path_logger in
-      Lwt_log.log ~section ~level ~logger str <&> stdout ~section level str
+    let str = Lazy.force str in
+    let%lwt logger = Lazy.force path_logger in
+    Lwt_log.log ~section ~level ~logger str <&> stdout ~section level str
 
   let path_and_err_lazy level str =
     if (int_of_level level) < (!lazy_level) then return_unit else
-      let str = Lazy.force str in
-      let%lwt logger = Lazy.force path_logger in
-      Lwt_log.log ~section ~level ~logger str <&> stderr ~section level str
+    let str = Lazy.force str in
+    let%lwt logger = Lazy.force path_logger in
+    Lwt_log.log ~section ~level ~logger str <&> stderr ~section level str
 
   let debug_lazy = path_and_out_lazy Lwt_log.Debug
   let info_lazy = path_and_out_lazy Lwt_log.Info

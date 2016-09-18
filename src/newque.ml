@@ -1,4 +1,6 @@
-Printexc.record_backtrace true
+#ifdef DEBUG
+  Printexc.record_backtrace true
+  #endif
 
 open Core.Std
 open Lwt

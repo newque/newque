@@ -27,7 +27,7 @@ let array_of_stream ~sep ?(init=(Some "")) stream =
       Util.split ~sep chunk
       |> (fun lines -> List.split_n lines (List.length lines))
       |> (fun (fulls, partial) ->
-          (List.rev_map_append fulls acc ~f:(fun raw -> {raw})), List.hd partial)
+        (List.rev_map_append fulls acc ~f:(fun raw -> {raw})), List.hd partial)
       |> return
     ) stream ([], init)
   in

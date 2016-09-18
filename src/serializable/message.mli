@@ -15,6 +15,6 @@ val of_stream :
 
 val serialize : t -> string
 
-val parse : string -> t
+val parse_exn : string -> t
 
 val contents : t -> string array

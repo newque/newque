@@ -28,10 +28,10 @@ let is_directory ?(create = false) path =
 let list_files path =
   Lwt_unix.files_of_directory path
   |> Lwt_stream.filter_s (fun file ->
-      let%lwt stats = Lwt_unix.stat (path ^ file) in
-      let open Lwt_unix in
-      match stats.st_kind with
-      | S_REG -> return_true
-      | S_DIR | S_CHR | S_BLK | S_LNK | S_FIFO | S_SOCK -> return_false
-    )
+    let%lwt stats = Lwt_unix.stat (path ^ file) in
+    let open Lwt_unix in
+    match stats.st_kind with
+    | S_REG -> return_true
+    | S_DIR | S_CHR | S_BLK | S_LNK | S_FIFO | S_SOCK -> return_false
+  )
   |> Lwt_stream.to_list

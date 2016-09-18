@@ -39,18 +39,13 @@ module Make (Argument: Argument) : S = struct
   let push msgs ids ack =
     let%lwt instance = instance in
     let ids = Array.map ~f:Id.to_string ids in
-    (* DEBUGGING: Currently writing JSON rather than Protobuf to make development easier *)
-    (* let msgs = Array.map ~f:Message.serialize msgs in *)
-    let msgs = Array.map ~f:(fun msg -> Message.sexp_of_t msg |> Util.string_of_sexp ~pretty:false) msgs in
+    let msgs = Array.map ~f:Message.serialize msgs in
     Argument.IO.push instance ~msgs ~ids ack
 
   let pull ~mode =
     let%lwt instance = instance in
     let%lwt raw = Argument.IO.pull instance ~mode in
-    (* Message.parse *)
-    wrap (fun () -> Array.map raw ~f:(fun blob ->
-        Util.sexp_of_json_str_exn blob |> Message.t_of_sexp
-      ))
+    wrap (fun () -> Array.map raw ~f:Message.parse_exn)
 
   let size () =
     let%lwt instance = instance in

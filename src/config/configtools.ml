@@ -32,28 +32,28 @@ let parse_channels config path =
   let open Channel in
   let%lwt files = Fs.list_files path in
   Lwt_list.map_p (fun filename ->
-      let fragments = String.split ~on:'.' filename in
-      let%lwt () = if (List.length fragments < 2) || (List.last_exn fragments <> "json")
-        then fail_with (Printf.sprintf "Channel file %s must end in .json" filename)
-        else return_unit
+    let fragments = String.split ~on:'.' filename in
+    let%lwt () = if (List.length fragments < 2) || (List.last_exn fragments <> "json")
+      then fail_with (Printf.sprintf "Channel file %s must end in .json" filename)
+      else return_unit
+    in
+    let filepath = Printf.sprintf "%s%s" path filename in
+    try%lwt
+      let%lwt contents =
+        (* TODO: make more efficient? *)
+        Lwt_io.chars_of_file filepath
+        |> Lwt_stream.to_string
       in
-      let filepath = Printf.sprintf "%s%s" path filename in
-      try%lwt
-        let%lwt contents =
-          (* TODO: make more efficient? *)
-          Lwt_io.chars_of_file filepath
-          |> Lwt_stream.to_string
-        in
-        let parsed = Config_j.config_channel_of_string contents in
-        let name = List.slice fragments 0 (-1) |> String.concat ~sep:"." in
-        match (parsed.persistence, config.redis) with
-        | (`Redis, None) -> fail_with (Printf.sprintf "Missing Redis configuration in newque.json for channel %s" name)
-        | (_, redis) -> return (Channel.create ?redis name parsed)
-      with
-      | Ag_oj_run.Error str ->
-        let%lwt _ = Log.stdout Lwt_log.Fatal str in
-        fail_with (Printf.sprintf "Error while parsing %s" filepath)
-    ) files
+      let parsed = Config_j.config_channel_of_string contents in
+      let name = List.slice fragments 0 (-1) |> String.concat ~sep:"." in
+      match (parsed.persistence, config.redis) with
+      | (`Redis, None) -> fail_with (Printf.sprintf "Missing Redis configuration in newque.json for channel %s" name)
+      | (_, redis) -> return (Channel.create ?redis name parsed)
+    with
+    | Ag_oj_run.Error str ->
+      let%lwt _ = Log.stdout Lwt_log.Fatal str in
+      fail_with (Printf.sprintf "Error while parsing %s" filepath)
+  ) files
 
 let apply_channels w channels =
   let open Result.Monad_infix in

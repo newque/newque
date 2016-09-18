@@ -67,87 +67,87 @@ let exec_sync db ?(retry=default_retries) ~destroy (stmt, sql) =
 
 let execute db ~destroy stmt =
   Lwt_preemptive.detach (fun () ->
-      Mutex.critical_section db.mutex ~f:(fun () ->
-          exec_sync db.db ~destroy stmt
-        )
-    ) ()
+    Mutex.critical_section db.mutex ~f:(fun () ->
+      exec_sync db.db ~destroy stmt
+    )
+  ) ()
 
 let query_sync db ?(retry=default_retries) ~destroy (stmt, sql) =
   Lwt_preemptive.detach (fun () ->
-      Mutex.critical_section db.mutex ~f:(fun () ->
-          ignore (async (fun () -> Logger.debug_lazy (lazy (Printf.sprintf "Querying %s" sql))));
-          let queue = Queue.create ~capacity:db.avg_read () in
-          let rec run count =
-            match S3.step stmt with
-            | Rc.ROW ->
-              Queue.enqueue queue (S3.row_data stmt);
-              run 0
-            | Rc.DONE -> ()
-            | (Rc.BUSY as code) | (Rc.LOCKED as code) ->
-              begin match count <= retry with
-                | true ->
-                  ignore (async (fun () -> Logger.warning (Printf.sprintf "Retrying execution (%s)" (Rc.to_string code))));
-                  Thread.yield ();
-                  run (count + 1)
-                | false ->
-                  failwith (Printf.sprintf "Execution failed after %d retries with code %s" retry (Rc.to_string code))
-              end
-            | code ->
-              failwith (Printf.sprintf "Execution failed with code %s" (Rc.to_string code))
-          in
-          let () = run 1 in
-          clean_sync ~destroy stmt;
-          Queue.to_array queue
-        )
-    ) ()
+    Mutex.critical_section db.mutex ~f:(fun () ->
+      ignore (async (fun () -> Logger.debug_lazy (lazy (Printf.sprintf "Querying %s" sql))));
+      let queue = Queue.create ~capacity:db.avg_read () in
+      let rec run count =
+        match S3.step stmt with
+        | Rc.ROW ->
+          Queue.enqueue queue (S3.row_data stmt);
+          run 0
+        | Rc.DONE -> ()
+        | (Rc.BUSY as code) | (Rc.LOCKED as code) ->
+          begin match count <= retry with
+            | true ->
+              ignore (async (fun () -> Logger.warning (Printf.sprintf "Retrying execution (%s)" (Rc.to_string code))));
+              Thread.yield ();
+              run (count + 1)
+            | false ->
+              failwith (Printf.sprintf "Execution failed after %d retries with code %s" retry (Rc.to_string code))
+          end
+        | code ->
+          failwith (Printf.sprintf "Execution failed with code %s" (Rc.to_string code))
+      in
+      let () = run 1 in
+      clean_sync ~destroy stmt;
+      Queue.to_array queue
+    )
+  ) ()
 
 let transaction db ~destroy stmts =
   Lwt_preemptive.detach (fun () ->
-      Mutex.critical_section db.mutex ~f:(fun () ->
-          ignore (exec_sync db.db ~destroy:false db.stmts.begin_transaction);
-          try
-            let total_changed = List.fold stmts ~init:0 ~f:(fun acc stmt ->
-                let changed = exec_sync db.db ~destroy stmt in
-                acc + changed
-              )
-            in
-            ignore (exec_sync db.db ~destroy:false db.stmts.commit_transaction);
-            total_changed
-          with
-          | ex ->
-            ignore (async (fun () -> Logger.error (Exn.to_string ex)));
-            exec_sync db.db ~destroy:false db.stmts.rollback_transaction
-        )
-    ) ()
+    Mutex.critical_section db.mutex ~f:(fun () ->
+      ignore (exec_sync db.db ~destroy:false db.stmts.begin_transaction);
+      try
+        let total_changed = List.fold stmts ~init:0 ~f:(fun acc stmt ->
+            let changed = exec_sync db.db ~destroy stmt in
+            acc + changed
+          )
+        in
+        ignore (exec_sync db.db ~destroy:false db.stmts.commit_transaction);
+        total_changed
+      with
+      | ex ->
+        ignore (async (fun () -> Logger.error (Exn.to_string ex)));
+        exec_sync db.db ~destroy:false db.stmts.rollback_transaction
+    )
+  ) ()
 
 let prepare db mutex sql =
   Lwt_preemptive.detach (fun () ->
-      Mutex.critical_section mutex ~f:(fun () ->
-          ((S3.prepare db sql), sql)
-        )
-    ) ()
+    Mutex.critical_section mutex ~f:(fun () ->
+      ((S3.prepare db sql), sql)
+    )
+  ) ()
 
 let bind db ?(retry=default_retries) stmt args =
   Lwt_preemptive.detach (fun () ->
-      Mutex.critical_section db.mutex ~f:(fun () ->
-          let rec run pos arg count =
-            match S3.bind stmt pos arg with
-            | Rc.OK -> ()
-            | (Rc.BUSY as code) | (Rc.LOCKED as code) ->
-              begin match count <= retry with
-                | true ->
-                  ignore (async (fun () -> Logger.warning (Printf.sprintf "Retrying bind (%s)" (Rc.to_string code))));
-                  Thread.yield ();
-                  run pos arg (count + 1)
-                | false ->
-                  failwith (Printf.sprintf "Bind failed after %d retries with code %s" retry (Rc.to_string code))
-              end
-            | code ->
-              failwith (Printf.sprintf "Bind failed with code %s" (Rc.to_string code))
-          in
-          Array.iter ~f:(fun (i, arg) -> run i arg 0) args
-        )
-    ) ()
+    Mutex.critical_section db.mutex ~f:(fun () ->
+      let rec run pos arg count =
+        match S3.bind stmt pos arg with
+        | Rc.OK -> ()
+        | (Rc.BUSY as code) | (Rc.LOCKED as code) ->
+          begin match count <= retry with
+            | true ->
+              ignore (async (fun () -> Logger.warning (Printf.sprintf "Retrying bind (%s)" (Rc.to_string code))));
+              Thread.yield ();
+              run pos arg (count + 1)
+            | false ->
+              failwith (Printf.sprintf "Bind failed after %d retries with code %s" retry (Rc.to_string code))
+          end
+        | code ->
+          failwith (Printf.sprintf "Bind failed with code %s" (Rc.to_string code))
+      in
+      Array.iter ~f:(fun (i, arg) -> run i arg 0) args
+    )
+  ) ()
 
 let create_table_sql = "CREATE TABLE IF NOT EXISTS MESSAGES (uuid BLOB NOT NULL, timens BIGINT NOT NULL, raw BLOB NOT NULL, PRIMARY KEY(uuid));"
 let create_timens_index_sql = "CREATE INDEX IF NOT EXISTS MESSAGES_TIMENS_IDX ON MESSAGES (timens);"
