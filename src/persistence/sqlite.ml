@@ -17,7 +17,6 @@ type statements = {
 type t = {
   db: Sqlite3.db sexp_opaque;
   file: string;
-  mutex: Mutex.t sexp_opaque;
   avg_read: int;
   stmts: statements sexp_opaque;
 } [@@deriving sexp]
@@ -73,9 +72,7 @@ let exec_sync db ?(retry=default_retries) ~destroy (stmt, sql) =
 
 let execute db ~destroy stmt =
   Lwt_preemptive.detach (fun () ->
-    Mutex.critical_section db.mutex ~f:(fun () ->
-      exec_sync db.db ~destroy stmt
-    )
+    exec_sync db.db ~destroy stmt
   ) ()
 
 type _ repr =
@@ -84,93 +81,85 @@ type _ repr =
   | Wrapped : Data.t array repr
 
 let query : type a. t -> ?retry:int -> destroy:bool -> S3.stmt * string -> a repr -> a array Lwt.t =
-  fun db ?(retry=default_retries) ~destroy (stmt, sql) rrr ->
+  fun db ?(retry=default_retries) ~destroy (stmt, sql) repr ->
     Lwt_preemptive.detach (fun () ->
-      Mutex.critical_section db.mutex ~f:(fun () ->
-        ignore (async (fun () -> Logger.debug_lazy (lazy (Printf.sprintf "Querying %s" sql))));
-        let queue : a Queue.t = Queue.create ~capacity:db.avg_read () in
-        let rec run count =
-          match ((S3.step stmt), rrr) with
-          | Rc.ROW, FBlob ->
-            begin match S3.column stmt 0 with
-              | Data.BLOB blob -> Queue.enqueue queue blob
-              | datatype -> failwith (Printf.sprintf "Querying failed, invalid datatype %s, expected BLOB" (Data.to_string_debug datatype))
-            end;
-            run 0
-          | Rc.ROW, FInt64 ->
-            begin match S3.column stmt 0 with
-              | Data.INT i -> Queue.enqueue queue i
-              | datatype -> failwith (Printf.sprintf "Querying failed, invalid datatype %s, expected INT" (Data.to_string_debug datatype))
-            end;
-            run 0
-          | Rc.ROW, Wrapped ->
-            Queue.enqueue queue (S3.row_data stmt);
-            run 0
-          | Rc.DONE, _ -> ()
-          | (Rc.BUSY as code), _ | (Rc.LOCKED as code), _ ->
-            begin match count <= retry with
-              | true ->
-                ignore (async (fun () -> Logger.warning (Printf.sprintf "Retrying query (%s)" (Rc.to_string code))));
-                Thread.yield ();
-                run (count + 1)
-              | false ->
-                failwith (Printf.sprintf "Querying failed after %d retries with code %s" retry (Rc.to_string code))
-            end
-          | code, _ ->
-            failwith (Printf.sprintf "Querying failed with code %s" (Rc.to_string code))
-        in
-        let () = run 1 in
-        clean_sync ~destroy stmt;
-        Queue.to_array queue
-      )
+      ignore (async (fun () -> Logger.debug_lazy (lazy (Printf.sprintf "Querying %s" sql))));
+      let queue : a Queue.t = Queue.create ~capacity:db.avg_read () in
+      let rec run count =
+        match S3.step stmt with
+        | Rc.ROW ->
+          begin match repr with
+            | FBlob ->
+              begin match S3.column stmt 0 with
+                | Data.BLOB blob -> Queue.enqueue queue blob
+                | datatype -> failwith (Printf.sprintf "Querying failed, invalid datatype %s, expected BLOB" (Data.to_string_debug datatype))
+              end
+            | FInt64 ->
+              begin match S3.column stmt 0 with
+                | Data.INT i -> Queue.enqueue queue i
+                | datatype -> failwith (Printf.sprintf "Querying failed, invalid datatype %s, expected INT" (Data.to_string_debug datatype))
+              end
+            | Wrapped -> Queue.enqueue queue (S3.row_data stmt)
+          end;
+          run 0
+        | Rc.DONE -> ()
+        | (Rc.BUSY as code) | (Rc.LOCKED as code) ->
+          begin match count <= retry with
+            | true ->
+              ignore (async (fun () -> Logger.warning (Printf.sprintf "Retrying query (%s)" (Rc.to_string code))));
+              Thread.yield ();
+              run (count + 1)
+            | false ->
+              failwith (Printf.sprintf "Querying failed after %d retries with code %s" retry (Rc.to_string code))
+          end
+        | code ->
+          failwith (Printf.sprintf "Querying failed with code %s" (Rc.to_string code))
+      in
+      let () = run 1 in
+      clean_sync ~destroy stmt;
+      Queue.to_array queue
     ) ()
 
 let transaction db ~destroy stmts =
   Lwt_preemptive.detach (fun () ->
-    Mutex.critical_section db.mutex ~f:(fun () ->
-      ignore (exec_sync db.db ~destroy:false db.stmts.begin_transaction);
-      try
-        let total_changed = List.fold stmts ~init:0 ~f:(fun acc stmt ->
-            let changed = exec_sync db.db ~destroy stmt in
-            acc + changed
-          )
-        in
-        ignore (exec_sync db.db ~destroy:false db.stmts.commit_transaction);
-        total_changed
-      with
-      | ex ->
-        ignore (async (fun () -> Logger.error (Exn.to_string ex)));
-        exec_sync db.db ~destroy:false db.stmts.rollback_transaction
-    )
+    ignore (exec_sync db.db ~destroy:false db.stmts.begin_transaction);
+    try
+      let total_changed = List.fold stmts ~init:0 ~f:(fun acc stmt ->
+          let changed = exec_sync db.db ~destroy stmt in
+          acc + changed
+        )
+      in
+      ignore (exec_sync db.db ~destroy:false db.stmts.commit_transaction);
+      total_changed
+    with
+    | ex ->
+      ignore (async (fun () -> Logger.error (Exn.to_string ex)));
+      exec_sync db.db ~destroy:false db.stmts.rollback_transaction
   ) ()
 
-let prepare db mutex sql =
+let prepare db sql =
   Lwt_preemptive.detach (fun () ->
-    Mutex.critical_section mutex ~f:(fun () ->
-      ((S3.prepare db sql), sql)
-    )
+    ((S3.prepare db sql), sql)
   ) ()
 
 let bind db ?(retry=default_retries) stmt args =
   Lwt_preemptive.detach (fun () ->
-    Mutex.critical_section db.mutex ~f:(fun () ->
-      let rec run pos arg count =
-        match S3.bind stmt pos arg with
-        | Rc.OK -> ()
-        | (Rc.BUSY as code) | (Rc.LOCKED as code) ->
-          begin match count <= retry with
-            | true ->
-              ignore (async (fun () -> Logger.warning (Printf.sprintf "Retrying bind (%s)" (Rc.to_string code))));
-              Thread.yield ();
-              run pos arg (count + 1)
-            | false ->
-              failwith (Printf.sprintf "Bind failed after %d retries with code %s" retry (Rc.to_string code))
-          end
-        | code ->
-          failwith (Printf.sprintf "Bind failed with code %s" (Rc.to_string code))
-      in
-      Array.iter ~f:(fun (i, arg) -> run i arg 0) args
-    )
+    let rec run pos arg count =
+      match S3.bind stmt pos arg with
+      | Rc.OK -> ()
+      | (Rc.BUSY as code) | (Rc.LOCKED as code) ->
+        begin match count <= retry with
+          | true ->
+            ignore (async (fun () -> Logger.warning (Printf.sprintf "Retrying bind (%s)" (Rc.to_string code))));
+            Thread.yield ();
+            run pos arg (count + 1)
+          | false ->
+            failwith (Printf.sprintf "Bind failed after %d retries with code %s" retry (Rc.to_string code))
+        end
+      | code ->
+        failwith (Printf.sprintf "Bind failed with code %s" (Rc.to_string code))
+    in
+    Array.iter ~f:(fun (i, arg) -> run i arg 0) args
   ) ()
 
 let create_table_sql = "CREATE TABLE IF NOT EXISTS MESSAGES (uuid BLOB NOT NULL, timens BIGINT NOT NULL, raw BLOB NOT NULL, PRIMARY KEY(uuid));"
@@ -187,29 +176,42 @@ let insert_sql count =
   Printf.sprintf "INSERT OR IGNORE INTO MESSAGES (uuid,timens,raw) VALUES %s;" (String.concat_array ~sep:"," arr)
 
 let create file ~avg_read =
-  let mutex = Mutex.create () in
   let%lwt db = wrap (fun () -> S3.db_open file) in
 
   (* These queries directly call exec_sync because the instance doesn't yet exist *)
-  let%lwt create_table = prepare db mutex create_table_sql in
+  let%lwt create_table = prepare db create_table_sql in
   let%lwt (_ : int) = wrap (fun () -> exec_sync db ~destroy:false create_table) in
-  let%lwt create_timens_index = prepare db mutex create_timens_index_sql in
+  let%lwt create_timens_index = prepare db create_timens_index_sql in
   let%lwt (_ : int) = wrap (fun () -> exec_sync db ~destroy:false create_timens_index) in
 
-  let%lwt count = prepare db mutex count_sql in
-  let%lwt read_one = prepare db mutex read_one_sql in
-  let%lwt begin_transaction = prepare db mutex begin_sql in
-  let%lwt commit_transaction = prepare db mutex commit_sql in
-  let%lwt rollback_transaction = prepare db mutex rollback_sql in
+  let%lwt count = prepare db count_sql in
+  let%lwt read_one = prepare db read_one_sql in
+  let%lwt begin_transaction = prepare db begin_sql in
+  let%lwt commit_transaction = prepare db commit_sql in
+  let%lwt rollback_transaction = prepare db rollback_sql in
 
   let stmts = {count; read_one; begin_transaction; commit_transaction; rollback_transaction} in
-  let instance = {db; file; mutex; avg_read; stmts} in
+  let instance = {db; file; avg_read; stmts} in
   return instance
+
+let close db =
+  let rec aux ?(retry=default_retries) count =
+    match count <= retry with
+    | true ->
+      begin match%lwt wrap (fun () -> S3.db_close db.db) with
+        | true -> return_unit
+        | false ->
+          let%lwt () = Logger.warning "Retrying db_close." in
+          aux (count + 1)
+      end
+    | false -> fail_with "Could not close db."
+  in
+  aux 0
 
 let push db ~msgs ~ids =
   let time = Id.time_ns () in
   let make_stmt slice =
-    let%lwt ((st, _) as stmt) = prepare db.db db.mutex (insert_sql (Array.length slice)) in
+    let%lwt ((st, _) as stmt) = prepare db.db (insert_sql (Array.length slice)) in
     let args = Array.concat_mapi slice ~f:(fun i (raw, id) ->
         let pos = i * 3 in
         [| ((pos + 1), Data.BLOB id); ((pos + 2), Data.INT time); ((pos + 3), Data.BLOB raw) |]
@@ -230,12 +232,11 @@ let pull db ~mode =
   match mode with
   | `One ->
     begin match%lwt query db ~destroy:false db.stmts.read_one FBlob with
-      | [| |] as x -> return x
-      | [| _ |] as x -> return x
+      | ([| |] as x) | ([| _ |] as x) -> return x
       | dataset -> failwith (Printf.sprintf "Select One failed for %s, dataset size: %d" db.file (Array.length dataset))
     end
   | `Many count ->
-    let%lwt stmt = prepare db.db db.mutex (read_many_sql count) in
+    let%lwt stmt = prepare db.db (read_many_sql count) in
     query db ~destroy:true stmt FBlob
   | _ -> return [| |]
 
