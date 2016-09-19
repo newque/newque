@@ -10,7 +10,7 @@ module type Template = sig
 
   val pull : t -> mode:Mode.Read.t -> string array Lwt.t
 
-  val size : t -> int Lwt.t
+  val size : t -> int64 Lwt.t
 end
 
 module type Argument = sig
@@ -25,7 +25,7 @@ module type S = sig
 
   val pull : mode:Mode.Read.t -> Message.t array Lwt.t
 
-  val size : unit -> int Lwt.t
+  val size : unit -> int64 Lwt.t
 end
 
 module Make (Argument: Argument) : S = struct

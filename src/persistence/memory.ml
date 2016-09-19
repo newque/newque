@@ -25,6 +25,6 @@ module M = struct
     return [| |]
 
   let size instance =
-    return 20
+    return (Int.to_int64 20)
 
 end

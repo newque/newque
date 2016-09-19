@@ -41,7 +41,7 @@ type standard_routing = {
   count: (
     chan_name:string ->
     mode:Mode.Count.t ->
-    (int, string list) Result.t Lwt.t);
+    (int64, string list) Result.t Lwt.t);
 }
 
 type http_routing =
@@ -91,7 +91,7 @@ let json_write_body code errors saved =
   ]
 
 let json_count_body code errors count =
-  let count = if List.is_empty errors then `Int count else `Null in
+  let count = if List.is_empty errors then `String count else `Null in
   `Assoc [
     ("code", `Int code);
     ("errors", `List (List.map errors ~f:(fun x -> `String x)));
@@ -151,10 +151,10 @@ let handler http routing ((ch, _) as conn) req body =
       | `Count as mode ->
         let%lwt (code, errors, count) = begin try%lwt
             begin match%lwt routing.count ~chan_name ~mode with
-              | Ok count -> return (200, [], count)
-              | Error errors -> return (400, errors, 0)
+              | Ok count -> return (200, [], (Int64.to_string count))
+              | Error errors -> return (400, errors, "0")
             end
-          with ex -> return (500, [Exn.to_string ex], 0)
+          with ex -> return (500, [Exn.to_string ex], "0")
         end in
         let headers = json_response_header in
         let status = Code.status_of_code code in

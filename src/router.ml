@@ -84,6 +84,6 @@ let count router ~listen_name ~chan_name ~(mode: Mode.Count.t) =
   | Ok chan ->
     let%lwt count = Channel.size chan () in
     ignore_result (Logger.debug_lazy (lazy (
-        Printf.sprintf "Counted: %s (size: %d) from %s" chan_name count listen_name
+        Printf.sprintf "Counted: %s (size: %Ld) from %s" chan_name count listen_name
       )));
     return (Ok count)

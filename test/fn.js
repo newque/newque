@@ -54,7 +54,7 @@ var shouldHaveCounted = exports.shouldHaveCounted = function (count) {
       assert(result.res.statusCode === 200)
       assert(result.body.code === 200)
       assert(result.body.errors.length === 0)
-      assert(result.body.count === count)
+      assert(result.body.count === '' + count)
       return resolve()
     })
     .catch(function (err) {

@@ -35,4 +35,4 @@ val count :
   chan_name:string ->
   mode:Mode.Count.t ->
   (* Count, list of error messages *)
-  (int, string list) Result.t Lwt.t
+  (int64, string list) Result.t Lwt.t

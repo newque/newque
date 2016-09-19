@@ -27,7 +27,7 @@ type standard_routing = {
   count: (
     chan_name:string ->
     mode:Mode.Count.t ->
-    (int, string list) Result.t Lwt.t);
+    (int64, string list) Result.t Lwt.t);
 }
 
 type http_routing =
