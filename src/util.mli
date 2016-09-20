@@ -2,6 +2,8 @@ open Core.Std
 
 val split : sep:string -> string -> string list
 
+val parse_int : string -> int option
+
 val zip_group : size:int -> 'a array -> 'b array -> ('a * 'b) array list Lwt.t
 
 val json_of_sexp : Sexp.t -> Yojson.Basic.json

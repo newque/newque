@@ -10,32 +10,32 @@ module.exports = function (id) {
       })
       .then(function () {
         var buf = 'M abc\nM def\nM ghi\nM jkl'
-        return Fn.call('POST', 8000, '/example', buf, [[C.modeHeader, 'multiple']])
+        return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'multiple']])
         .then(Fn.shouldHaveWritten(4))
       })
     })
 
     it('Valid', function () {
       var buf = ''
-      return Fn.call('GET', 8000, '/example/count', buf)
+      return Fn.call('GET', 8000, '/v1/example/count', buf)
       .then(Fn.shouldHaveCounted(4))
     })
 
     it('Invalid path', function () {
       var buf = ''
-      return Fn.call('GET', 8000, '//count', buf)
+      return Fn.call('GET', 8000, '/v1//count', buf)
       .then(Fn.shouldFail(400))
     })
 
     it('Invalid path 2', function () {
       var buf = ''
-      return Fn.call('GET', 8000, '/nothing/count', buf)
+      return Fn.call('GET', 8000, '/v1/nothing/count', buf)
       .then(Fn.shouldFail(400))
     })
 
     it('Invalid method', function () {
       var buf = ''
-      return Fn.call('XYZ', 8000, '/example/count', buf)
+      return Fn.call('XYZ', 8000, '/v1/example/count', buf)
       .then(Fn.shouldFail(405))
     })
 

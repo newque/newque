@@ -32,17 +32,16 @@ let batch_size = 2
 let batch_size = 100
   #endif
 
-let throw_if_fail ~str rc =
-  match rc with
-  | Rc.OK -> ()
-  | _ -> failwith str
-
 let clean_sync ~destroy stmt =
   match destroy with
   | true -> ignore (S3.finalize stmt)
   | false ->
     begin try
-        throw_if_fail ~str:"Failed to reset statement" (S3.reset stmt)
+        (* S3.reset itself can fail *)
+        begin match (S3.reset stmt) with
+          | Rc.OK -> ()
+          | _ -> failwith "Failed to reset statement"
+        end
       with
       | ex ->
         ignore (async (fun () -> Logger.error (Exn.to_string ex)));

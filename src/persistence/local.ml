@@ -13,7 +13,7 @@ type local_t = {
 
 let create ~file ~chan_name ~avg_read =
   let mutex = Lwt_mutex.create () in
-  let%lwt () = Logger.info (Printf.sprintf "Initializing %s" file) in
+  let%lwt () = Logger.info (Printf.sprintf "Initializing %s (%s)" file chan_name) in
   let%lwt db = try%lwt
       Sqlite.create file ~avg_read
     with
@@ -32,7 +32,7 @@ module M = struct
       Sqlite.close instance.db
     with
     | ex ->
-      let%lwt () = Logger.error (Printf.sprintf "Failed to close %s with error %s." instance.file (Exn.to_string ex)) in
+      let%lwt () = Logger.error (Printf.sprintf "Failed to close %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex)) in
       fail ex
 
   let close instance = Lwt_mutex.with_lock instance.mutex (fun () -> close_nolock instance)
@@ -44,7 +44,7 @@ module M = struct
       return (Ok restarted)
     with
     | ex ->
-      return (Error (Printf.sprintf "Failed to restart %s with error %s." instance.file (Exn.to_string ex)))
+      return (Error (Printf.sprintf "Failed to restart %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex)))
 
   let handle_failure instance ex ~errstr =
     let%lwt () = Logger.error errstr in
@@ -63,7 +63,7 @@ module M = struct
         Sqlite.push instance.db msgs ids
       with
       | ex ->
-        handle_failure instance ex ~errstr:(Printf.sprintf "Failed to write to %s with error %s. Restarting." instance.file (Exn.to_string ex))
+        handle_failure instance ex ~errstr:(Printf.sprintf "Failed to write to %s (%s) with error %s. Restarting." instance.file instance.chan_name (Exn.to_string ex))
     )
 
   let pull instance ~mode =
@@ -72,7 +72,7 @@ module M = struct
         Sqlite.pull instance.db ~mode
       with
       | ex ->
-        handle_failure instance ex ~errstr:(Printf.sprintf "Failed to fetch from %s with error %s." instance.file (Exn.to_string ex))
+        handle_failure instance ex ~errstr:(Printf.sprintf "Failed to fetch from %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex))
     )
 
   let size instance =
@@ -81,7 +81,7 @@ module M = struct
         Sqlite.size instance.db
       with
       | ex ->
-        handle_failure instance ex ~errstr:(Printf.sprintf "Failed to count %s with error %s." instance.file (Exn.to_string ex))
+        handle_failure instance ex ~errstr:(Printf.sprintf "Failed to count %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex))
     )
 
 end

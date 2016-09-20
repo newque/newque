@@ -52,11 +52,8 @@ let create ?redis name (conf_channel : Config_t.config_channel) =
     buffer_size = conf_channel.buffer_size;
   }
 
-let push (chan: t) (msgs : Message.t array) (ids: Id.t array) =
-  chan.push msgs ids chan.ack
+let push chan msgs ids = chan.push msgs ids chan.ack
 
-let pull (chan: t) ~(mode : Mode.Read.t) =
-  chan.pull ~mode
+let pull chan ~mode = chan.pull ~mode
 
-let size (chan: t) () =
-  chan.size ()
+let size chan () = chan.size ()

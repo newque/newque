@@ -47,8 +47,7 @@ open Cohttp_lwt_unix
 #mod_use "tmp/ack.ml"
 #mod_use "tmp/persistence.ml"
 #mod_use "tmp/sqlite.ml"
-#mod_use "tmp/memory.ml"
-#mod_use "tmp/disk.ml"
+#mod_use "tmp/local.ml"
 #mod_use "tmp/redis.ml"
 
 #mod_use "tmp/channel.ml"

@@ -5,6 +5,10 @@ let split ~sep str =
   let delim = Str.regexp_string sep in
   Str.split_delim delim str
 
+let parse_int str =
+  try Some (Int.of_string str)
+  with _ -> None
+
 (* This was rewritten in c/fortran style for efficiency *)
 let zip_group ~size arr1 arr2 =
   if Array.length arr1 <> Array.length arr2 then

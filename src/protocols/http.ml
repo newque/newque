@@ -58,24 +58,27 @@ let default_filter _ req _ =
   let url_fragments = path |> String.split ~on:'/' in
   (* print_endline (List.sexp_of_t String.sexp_of_t url_fragments |> Util.string_of_sexp); *)
   let result = match url_fragments with
-    | ""::chan_name::"count"::_ ->
+    | ""::"v1"::chan_name::"count"::_ ->
       begin match Request.meth req with
         | `GET -> Ok (chan_name, `Count)
         | meth -> Error (405, [Printf.sprintf "Invalid HTTP method %s" (Code.string_of_method meth)])
       end
-    | ""::chan_name::_ ->
+    | ""::"v1"::chan_name::_ ->
       let mode_value =
-        Request.headers req
-        |> Fn.flip (Header.get) mode_header_name
-        |> Option.map ~f:String.lowercase
+        Header.get (Request.headers req) mode_header_name
+        |> Result.of_option ~error:"<no header>"
+        |> (Fn.flip Result.bind) Mode.of_string
       in
       begin match ((Request.meth req), mode_value) with
-        | `POST, (Some "multiple") -> Ok (chan_name, `Multiple)
-        | `POST, (Some "atomic") -> Ok (chan_name, `Atomic)
-        | `POST, (Some "single") | `POST, None -> Ok (chan_name, `Single)
-        | `POST, (Some str) ->
+        | ((`POST), (Ok (`Single as m)))
+        | ((`POST), (Ok (`Multiple as m)))
+        | ((`POST), (Ok (`Atomic as m)))
+        | ((`GET), (Ok (`One as m)))
+        | ((`GET), (Ok ((`Many _) as m)))
+        | ((`GET), (Ok ((`After_id _) as m)))
+        | ((`GET), (Ok ((`After_ts _) as m))) -> Ok (chan_name, m)
+        | (_, (Error str)) ->
           Error (400, [Printf.sprintf "Invalid %s header value: %s" mode_header_name str])
-        | `GET, (Some "one") | `GET, None -> Ok (chan_name, `One)
         | meth, _ ->
           Error (405, [Printf.sprintf "Invalid HTTP method %s" (Code.string_of_method meth)])
       end
