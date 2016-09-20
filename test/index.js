@@ -19,8 +19,13 @@ Proc.pathExists(newquePath)
 })
 .then(Proc.cleanDirectories)
 .then(function () {
-  require('./sections/push')
-  require('./sections/count')
-  require('./sections/pull')
+  require('./sections/push')('disk1')
+  require('./sections/push')('memory1')
+
+  require('./sections/count')('disk1')
+  require('./sections/count')('memory1')
+
+  require('./sections/pull')('disk1')
+  require('./sections/pull')('memory1')
   run()
 })

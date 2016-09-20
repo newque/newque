@@ -19,15 +19,15 @@ let create ?redis name (conf_channel : Config_t.config_channel) =
   let module Persist = (val (match conf_channel.persistence with
     | `Memory ->
       let module Arg = struct
-        module IO = Memory.M
-        let create () = Memory.create ~chan_name:name ~avg_read:conf_channel.avg_read
+        module IO = Local.M
+        let create () = Local.create ~file:":memory:" ~chan_name:name ~avg_read:conf_channel.avg_read
       end in
       (module Persistence.Make (Arg) : Persistence.S)
 
     | `Disk ->
       let module Arg = struct
-        module IO = Disk.M
-        let create () = Disk.create Fs.data_chan_dir ~chan_name:name ~avg_read:conf_channel.avg_read
+        module IO = Local.M
+        let create () = Local.create ~file:(Printf.sprintf "%s%s.data" Fs.data_chan_dir name) ~chan_name:name ~avg_read:conf_channel.avg_read
       end in
       (module Persistence.Make (Arg) : Persistence.S)
 

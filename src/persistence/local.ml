@@ -1,19 +1,17 @@
 open Core.Std
 open Lwt
 
-module Logger = Log.Make (struct let path = Log.outlog let section = "Disk" end)
+module Logger = Log.Make (struct let path = Log.outlog let section = "Local" end)
 
-type disk_t = {
+type local_t = {
   mutable db: Sqlite.t;
-  dir: string;
-  chan_name: string;
   avg_read: int;
   file: string;
+  chan_name: string;
   mutex: Lwt_mutex.t sexp_opaque;
 } [@@deriving sexp]
 
-let create dir ~chan_name ~avg_read =
-  let file = Printf.sprintf "%s%s.data" dir chan_name in
+let create ~file ~chan_name ~avg_read =
   let mutex = Lwt_mutex.create () in
   let%lwt () = Logger.info (Printf.sprintf "Initializing %s" file) in
   let%lwt db = try%lwt
@@ -23,18 +21,17 @@ let create dir ~chan_name ~avg_read =
       let%lwt () = Logger.error (Printf.sprintf "Failed to create DB %s with error %s. The channel %s will not work." file (Exn.to_string ex) chan_name) in
       fail ex
   in
-  return {db; dir; chan_name; avg_read; file; mutex}
+  return {db; avg_read; file; chan_name; mutex}
 
 module M = struct
 
-  type t = disk_t [@@deriving sexp]
+  type t = local_t [@@deriving sexp]
 
   let close_nolock instance =
     try%lwt
       Sqlite.close instance.db
     with
     | ex ->
-      (* TODO: Restart DB *)
       let%lwt () = Logger.error (Printf.sprintf "Failed to close %s with error %s." instance.file (Exn.to_string ex)) in
       fail ex
 
@@ -43,7 +40,7 @@ module M = struct
   let restart_nolock instance =
     try%lwt
       let%lwt () = close_nolock instance in
-      let%lwt restarted = create instance.dir ~chan_name:instance.chan_name ~avg_read:instance.avg_read in
+      let%lwt restarted = create ~file:instance.file ~chan_name:instance.chan_name ~avg_read:instance.avg_read in
       return (Ok restarted)
     with
     | ex ->

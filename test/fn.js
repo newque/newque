@@ -54,7 +54,7 @@ var shouldHaveCounted = exports.shouldHaveCounted = function (count) {
       assert(result.res.statusCode === 200)
       assert(result.body.code === 200)
       assert(result.body.errors.length === 0)
-      assert(result.body.count === '' + count)
+      assert(result.body.count === count)
       return resolve()
     })
     .catch(function (err) {
@@ -83,8 +83,6 @@ var shouldHaveRead = exports.shouldHaveRead = function (values, separator) {
         arr.pop()
         var buf = Buffer.concat(arr)
         assert(Buffer.compare(buf, result.res.buffer) === 0)
-        console.log(JSON.stringify(buf.toString('utf8')))
-        console.log(JSON.stringify(result.res.buffer.toString('utf8')))
       }
       assert(parseInt(result.res.headers[C.lengthHeader], 10) === values.length)
 
