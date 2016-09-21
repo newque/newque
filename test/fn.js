@@ -1,5 +1,5 @@
 var request = require('superagent')
-var assert = require('assert')
+var assert = exports.assert = require('assert')
 var base = 'http://127.0.0.1:'
 
 var call = exports.call = function (method, port, path, buf, headers) {
@@ -38,7 +38,7 @@ var shouldHaveWritten = exports.shouldHaveWritten = function (count) {
       assert(result.body.code === 201)
       assert(result.body.errors.length === 0)
       assert(result.body.saved === count)
-      return resolve()
+      return resolve(result)
     })
     .catch(function (err) {
       console.log(result.res.statusCode)
@@ -55,7 +55,7 @@ var shouldHaveCounted = exports.shouldHaveCounted = function (count) {
       assert(result.body.code === 200)
       assert(result.body.errors.length === 0)
       assert(result.body.count === count)
-      return resolve()
+      return resolve(result)
     })
     .catch(function (err) {
       console.log(result.res.statusCode)
@@ -84,9 +84,11 @@ var shouldHaveRead = exports.shouldHaveRead = function (values, separator) {
         var buf = Buffer.concat(arr)
         assert(Buffer.compare(buf, result.res.buffer) === 0)
       }
+      // console.log(JSON.stringify(buf.toString('utf8')))
+      // console.log(JSON.stringify(result.res.buffer.toString('utf8')))
       assert(parseInt(result.res.headers[C.lengthHeader], 10) === values.length)
 
-      return resolve()
+      return resolve(result)
     })
   }
 }

@@ -45,7 +45,7 @@ type t = [
 ]
 
 (* Efficient, not pretty. *)
-let of_string str : (Any.t, string) Result.t =
+let of_string str : ([Write.t | Read.t], string) Result.t =
   match String.lowercase str with
   | "single" -> Ok `Single
   | "multiple" -> Ok `Multiple
@@ -61,7 +61,6 @@ let of_string str : (Any.t, string) Result.t =
         end
       | _ -> Error str
     end
-  | _ -> Error str
 
 let wrap (tag : Any.t) : t = match tag with
   | `Single -> `Write `Single

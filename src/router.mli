@@ -27,7 +27,7 @@ val read :
   id_header:string option ->
   mode:Mode.Read.t ->
   (* Message payloads, list of error messages *)
-  (string array, string list) Result.t Lwt.t
+  (string array * string, string list) Result.t Lwt.t
 
 val count :
   t ->

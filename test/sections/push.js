@@ -55,6 +55,12 @@ module.exports = function (id) {
         .then(Fn.shouldHaveWritten(4))
       })
 
+      it('With separator, secondary channel', function () {
+        var buf = 'M abc--M def--M ghi--M jkl'
+        return Fn.call('POST', 8000, '/v1/secondary', buf, [[C.modeHeader, 'multiple']])
+        .then(Fn.shouldHaveWritten(4))
+      })
+
       it('No data', function () {
         var buf = ''
         return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'multiple']])

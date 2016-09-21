@@ -21,6 +21,12 @@ module.exports = function (id) {
       .then(Fn.shouldHaveCounted(4))
     })
 
+    it('Valid, empty', function () {
+      var buf = ''
+      return Fn.call('GET', 8000, '/v1/empty/count', buf)
+      .then(Fn.shouldHaveCounted(0))
+    })
+
     it('Invalid path', function () {
       var buf = ''
       return Fn.call('GET', 8000, '/v1//count', buf)

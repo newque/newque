@@ -1,6 +1,5 @@
 {
   "listeners": ["http8000"],
   "persistence": "memory",
-  "acknowledgement": "none",
-  "separator": "--"
+  "acknowledgement": "none"
 }

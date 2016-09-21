@@ -37,7 +37,7 @@ let clean_sync ~destroy stmt =
   | true -> ignore (S3.finalize stmt)
   | false ->
     begin try
-        (* S3.reset itself can fail *)
+        (* S3.reset itself can throw *)
         begin match (S3.reset stmt) with
           | Rc.OK -> ()
           | _ -> failwith "Failed to reset statement"

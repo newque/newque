@@ -76,7 +76,7 @@ let read router ~listen_name ~chan_name ~id_header ~mode =
     ignore_result (Logger.debug_lazy (lazy (
         Printf.sprintf "Read: %s (size: %d) from %s" chan_name (Array.length payloads) listen_name
       )));
-    return (Ok payloads)
+    return (Ok (payloads, chan.Channel.separator))
 
 let count router ~listen_name ~chan_name ~(mode: Mode.Count.t) =
   match find_chan router ~listen_name ~chan_name with
