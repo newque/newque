@@ -79,45 +79,63 @@ type _ repr =
   | FInt64 : int64 repr
   | Wrapped : Data.t array repr
 
+let fetch_row_sync : type a. retry:int -> destroy:bool -> S3.stmt * string -> a repr -> a option =
+  fun ~retry ~destroy (stmt, sql) repr ->
+    let rec run count : a option =
+      match S3.step stmt with
+      | Rc.ROW ->
+        begin match repr with
+          | FBlob ->
+            begin match S3.column stmt 0 with
+              | Data.BLOB blob -> Some blob
+              | datatype -> failwith (Printf.sprintf "Querying failed, invalid datatype %s, expected BLOB" (Data.to_string_debug datatype))
+            end
+          | FInt64 ->
+            begin match S3.column stmt 0 with
+              | Data.INT i -> Some i
+              | datatype -> failwith (Printf.sprintf "Querying failed, invalid datatype %s, expected INT" (Data.to_string_debug datatype))
+            end
+          | Wrapped -> Some (S3.row_data stmt)
+        end
+      | Rc.DONE ->
+        clean_sync ~destroy stmt;
+        None
+      | (Rc.BUSY as code) | (Rc.LOCKED as code) ->
+        begin match count <= retry with
+          | true ->
+            ignore (async (fun () -> Logger.warning (Printf.sprintf "Retrying query (%s)" (Rc.to_string code))));
+            Thread.yield ();
+            run (count + 1)
+          | false ->
+            failwith (Printf.sprintf "Querying failed after %d retries with code %s" retry (Rc.to_string code))
+        end
+      | code ->
+        failwith (Printf.sprintf "Querying failed with code %s" (Rc.to_string code))
+    in
+    run 0
+
+let fetch_all mutex ?(retry=default_retries) ~destroy stmt repr =
+  Lwt_stream.map_exn (Lwt_stream.from (fun () ->
+      Lwt_mutex.with_lock mutex (fun () ->
+        Lwt_preemptive.detach (fun () ->
+          fetch_row_sync ~retry ~destroy stmt repr
+        ) ()
+      )
+    )
+  )
+
+(* ignore (async (fun () -> Logger.debug_lazy (lazy (Printf.sprintf "Querying %s" sql)))); *)
 let query : type a. t -> ?retry:int -> destroy:bool -> S3.stmt * string -> a repr -> a array Lwt.t =
   fun db ?(retry=default_retries) ~destroy (stmt, sql) repr ->
-    Lwt_preemptive.detach (fun () ->
-      ignore (async (fun () -> Logger.debug_lazy (lazy (Printf.sprintf "Querying %s" sql))));
-      let queue : a Queue.t = Queue.create ~capacity:db.avg_read () in
-      let rec run count =
-        match S3.step stmt with
-        | Rc.ROW ->
-          begin match repr with
-            | FBlob ->
-              begin match S3.column stmt 0 with
-                | Data.BLOB blob -> Queue.enqueue queue blob
-                | datatype -> failwith (Printf.sprintf "Querying failed, invalid datatype %s, expected BLOB" (Data.to_string_debug datatype))
-              end
-            | FInt64 ->
-              begin match S3.column stmt 0 with
-                | Data.INT i -> Queue.enqueue queue i
-                | datatype -> failwith (Printf.sprintf "Querying failed, invalid datatype %s, expected INT" (Data.to_string_debug datatype))
-              end
-            | Wrapped -> Queue.enqueue queue (S3.row_data stmt)
-          end;
-          run 0
-        | Rc.DONE -> ()
-        | (Rc.BUSY as code) | (Rc.LOCKED as code) ->
-          begin match count <= retry with
-            | true ->
-              ignore (async (fun () -> Logger.warning (Printf.sprintf "Retrying query (%s)" (Rc.to_string code))));
-              Thread.yield ();
-              run (count + 1)
-            | false ->
-              failwith (Printf.sprintf "Querying failed after %d retries with code %s" retry (Rc.to_string code))
-          end
-        | code ->
-          failwith (Printf.sprintf "Querying failed with code %s" (Rc.to_string code))
-      in
-      let () = run 1 in
-      clean_sync ~destroy stmt;
-      Queue.to_array queue
-    ) ()
+    let queue : a Queue.t = Queue.create ~capacity:db.avg_read () in
+    Lwt_mutex.with_lock mutex (fun () ->
+      Lwt_preemptive.detach (fun () ->
+        let run () =
+          fetch_row_sync
+        in
+        Queue.to_array queue
+      ) ()
+    )
 
 let transaction db ~destroy stmts =
   Lwt_preemptive.detach (fun () ->
@@ -227,7 +245,7 @@ let push db ~msgs ~ids =
     let%lwt stmts = Lwt_list.map_s make_stmt groups in
     transaction db ~destroy:true stmts
 
-let pull db ~mode =
+let pull_sync db ~mode =
   match mode with
   | `One ->
     begin match%lwt query db ~destroy:false db.stmts.read_one FBlob with

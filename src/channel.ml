@@ -7,7 +7,8 @@ type t = {
   name: string;
   endpoint_names: string list;
   push: Message.t array -> Id.t array -> Ack.t -> int Lwt.t sexp_opaque;
-  pull: mode:Mode.Read.t -> Message.t array Lwt.t sexp_opaque;
+  pull_sync: mode:Mode.Read.t -> string array Lwt.t sexp_opaque;
+  pull_stream: mode:Mode.Read.t -> string Lwt_stream.t Lwt.t sexp_opaque;
   size: unit -> int64 Lwt.t sexp_opaque;
   ack: Ack.t;
   separator: string;
@@ -45,7 +46,8 @@ let create ?redis name (conf_channel : Config_t.config_channel) =
     name;
     endpoint_names = conf_channel.endpoint_names;
     push = Persist.push;
-    pull = Persist.pull;
+    pull_sync = Persist.pull_sync;
+    pull_stream = Persist.pull_stream;
     size = Persist.size;
     ack = conf_channel.ack;
     separator = conf_channel.separator;
@@ -54,6 +56,8 @@ let create ?redis name (conf_channel : Config_t.config_channel) =
 
 let push chan msgs ids = chan.push msgs ids chan.ack
 
-let pull chan ~mode = chan.pull ~mode
+let pull_sync chan ~mode = chan.pull_sync ~mode
+
+let pull_stream chan ~mode = chan.pull_stream ~mode
 
 let size chan () = chan.size ()

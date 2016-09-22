@@ -66,14 +66,16 @@ module M = struct
         handle_failure instance ex ~errstr:(Printf.sprintf "Failed to write to %s (%s) with error %s. Restarting." instance.file instance.chan_name (Exn.to_string ex))
     )
 
-  let pull instance ~mode =
+  let pull_sync instance ~mode =
     Lwt_mutex.with_lock instance.mutex (fun () ->
       try%lwt
-        Sqlite.pull instance.db ~mode
+        Sqlite.pull_sync instance.db ~mode
       with
       | ex ->
         handle_failure instance ex ~errstr:(Printf.sprintf "Failed to fetch from %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex))
     )
+
+  let pull_stream instance ~mode = wrap (fun () -> Lwt_stream.of_list ["x"; "y"; "z"])
 
   let size instance =
     Lwt_mutex.with_lock instance.mutex (fun () ->

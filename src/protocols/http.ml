@@ -33,11 +33,16 @@ type standard_routing = {
     mode:Mode.Write.t ->
     string Lwt_stream.t ->
     (int, string list) Result.t Lwt.t);
-  read: (
+  read_sync: (
     chan_name:string ->
     id_header:string option ->
     mode:Mode.Read.t ->
     (string array * string, string list) Result.t Lwt.t);
+  read_stream: (
+    chan_name:string ->
+    id_header:string option ->
+    mode:Mode.Read.t ->
+    (string Lwt_stream.t * string, string list) Result.t Lwt.t);
   count: (
     chan_name:string ->
     mode:Mode.Count.t ->
@@ -101,21 +106,21 @@ let json_count_body code errors count =
     ("count", count);
   ]
 
-let json_body code errors =
-  `Assoc [
-    ("code", `Int code);
-    ("errors", `List (List.map errors ~f:(fun x -> `String x)));
-  ]
+let handle_errors code errors =
+  let headers = json_response_header in
+  let status = Code.status_of_code code in
+  let body = Yojson.Basic.to_string (`Assoc [
+      ("code", `Int code);
+      ("errors", `List (List.map errors ~f:(fun x -> `String x)));
+    ])
+  in
+  Server.respond_string ~headers ~status ~body ()
 
 let handler http routing ((ch, _) as conn) req body =
   (* ignore (async (fun () -> Logger.debug_lazy (lazy (Util.string_of_sexp (Request.sexp_of_t req))))); *)
   let%lwt http = http in
   match%lwt default_filter conn req body with
-  | Error (code, errors) ->
-    let headers = json_response_header in
-    let status = Code.status_of_code code in
-    let body = Yojson.Basic.to_string (json_body code errors) in
-    Server.respond_string ~headers ~status ~body ()
+  | Error (code, errors) -> handle_errors code errors
   | Ok (chan_name, mode) ->
     begin match Mode.wrap mode with
 
@@ -136,43 +141,42 @@ let handler http routing ((ch, _) as conn) req body =
 
       | `Read mode ->
         let id_header = Header.get (Request.headers req) id_header_name in
-        let%lwt (code, errors, read, sep) = begin try%lwt
-            begin match%lwt routing.read ~chan_name ~id_header ~mode with
-              | Ok (([| |] as arr), sep) -> return (204, [], arr, sep)
-              | Ok (arr, sep) -> return (200, [], arr, sep)
-              | Error errors -> return (400, errors, [| |], "")
+        begin try%lwt
+            begin match%lwt routing.read_sync ~chan_name ~id_header ~mode with
+              | Error errors -> handle_errors 400 errors
+              | Ok (arr, sep) ->
+                let status = Code.status_of_code (if Array.is_empty arr then 204 else 200) in
+                let headers = Header.add_list (Header.init ()) [
+                    ("Content-Type", "application/octet-stream");
+                    (length_header_name, Int.to_string (Array.length arr));
+                  ] in
+              (*
+                Imperative, performance-sensitive code.
+                Creates a separator array of the same length.
+                Then sets the last separator to the empty string.
+                The code that pushes to the stream is now branchless.
+              *)
+                let (stream, push) = Lwt_stream.create () in
+                let separators = Array.create ~len:(Array.length arr) sep in
+                if not (Array.is_empty separators) then Array.nset separators (-1) "";
+                let body_length = Array.foldi arr ~init:0 ~f:(fun i acc elem ->
+                    let s = separators.(i) in
+                    push (Some elem);
+                    push (Some s);
+                    acc + (String.length elem) + (String.length s)
+                  ) in
+                push (None); (* Terminates the stream *)
+                print_endline (Request.headers req |> Header.to_string);
+                let encoding = match Request.encoding req with
+                  | Transfer.Chunked -> Transfer.Chunked
+                  | Transfer.Unknown | Transfer.Fixed _ -> Transfer.Fixed (Int64.of_int body_length)
+                in
+                let response = Response.make ~status ~flush:true ~encoding ~headers () in
+                let body = Cohttp_lwt_body.of_stream stream in
+                return (response, body)
             end
-          with ex -> return (500, [Exn.to_string ex], [| |], "")
-        end in
-        let headers = Header.add_list (Header.init ()) [
-            ("Content-Type", "application/octet-stream");
-            (length_header_name, Int.to_string (Array.length read));
-          ] in
-        let status = Code.status_of_code code in
-        (*
-          Imperative, performance-sensitive code.
-          Creates a separator array of the same length.
-          Then sets the last separator to the empty string.
-          The code that pushes to the stream is now branchless.
-        *)
-        let (stream, push) = Lwt_stream.create () in
-        let separators = Array.create ~len:(Array.length read) sep in
-        if not (Array.is_empty separators) then Array.nset separators (-1) "";
-        let body_length = Array.foldi read ~init:0 ~f:(fun i acc elem ->
-            let s = separators.(i) in
-            push (Some elem);
-            push (Some s);
-            acc + (String.length elem) + (String.length s)
-          ) in
-        push (None); (* Terminates the stream *)
-        print_endline (Request.headers req |> Header.to_string);
-        let encoding = match Request.encoding req with
-          | Transfer.Chunked -> Transfer.Chunked
-          | Transfer.Unknown | Transfer.Fixed _ -> Transfer.Fixed (Int64.of_int body_length)
-        in
-        let response = Response.make ~status ~flush:true ~encoding ~headers () in
-        let body = Cohttp_lwt_body.of_stream stream in
-        return (response, body)
+          with ex -> handle_errors 500 [Exn.to_string ex]
+        end
 
       | `Count as mode ->
         let%lwt (code, errors, count) = begin try%lwt
