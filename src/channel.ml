@@ -7,12 +7,13 @@ type t = {
   name: string;
   endpoint_names: string list;
   push: Message.t array -> Id.t array -> Ack.t -> int Lwt.t sexp_opaque;
-  pull_sync: mode:Mode.Read.t -> string array Lwt.t sexp_opaque;
-  pull_stream: mode:Mode.Read.t -> string Lwt_stream.t Lwt.t sexp_opaque;
+  pull_slice: int -> mode:Mode.Read.t -> string array Lwt.t sexp_opaque;
+  pull_stream: int -> mode:Mode.Read.t -> string Lwt_stream.t Lwt.t sexp_opaque;
   size: unit -> int64 Lwt.t sexp_opaque;
   ack: Ack.t;
   separator: string;
   buffer_size: int;
+  max_read: int;
 } [@@deriving sexp]
 
 let create ?redis name (conf_channel : Config_t.config_channel) =
@@ -46,18 +47,19 @@ let create ?redis name (conf_channel : Config_t.config_channel) =
     name;
     endpoint_names = conf_channel.endpoint_names;
     push = Persist.push;
-    pull_sync = Persist.pull_sync;
+    pull_slice = Persist.pull_slice;
     pull_stream = Persist.pull_stream;
     size = Persist.size;
     ack = conf_channel.ack;
     separator = conf_channel.separator;
     buffer_size = conf_channel.buffer_size;
+    max_read = conf_channel.max_read;
   }
 
 let push chan msgs ids = chan.push msgs ids chan.ack
 
-let pull_sync chan ~mode = chan.pull_sync ~mode
+let pull_slice chan ~mode = chan.pull_slice chan.max_read ~mode
 
-let pull_stream chan ~mode = chan.pull_stream ~mode
+let pull_stream chan ~mode = chan.pull_stream chan.max_read ~mode
 
 let size chan () = chan.size ()

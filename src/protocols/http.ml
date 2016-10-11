@@ -33,7 +33,7 @@ type standard_routing = {
     mode:Mode.Write.t ->
     string Lwt_stream.t ->
     (int, string list) Result.t Lwt.t);
-  read_sync: (
+  read_slice: (
     chan_name:string ->
     id_header:string option ->
     mode:Mode.Read.t ->
@@ -117,7 +117,7 @@ let handle_errors code errors =
   Server.respond_string ~headers ~status ~body ()
 
 let handler http routing ((ch, _) as conn) req body =
-  (* ignore (async (fun () -> Logger.debug_lazy (lazy (Util.string_of_sexp (Request.sexp_of_t req))))); *)
+  (* async (fun () -> Logger.debug_lazy (lazy (Util.string_of_sexp (Request.sexp_of_t req)))); *)
   let%lwt http = http in
   match%lwt default_filter conn req body with
   | Error (code, errors) -> handle_errors code errors
@@ -142,7 +142,7 @@ let handler http routing ((ch, _) as conn) req body =
       | `Read mode ->
         let id_header = Header.get (Request.headers req) id_header_name in
         begin try%lwt
-            begin match%lwt routing.read_sync ~chan_name ~id_header ~mode with
+            begin match%lwt routing.read_slice ~chan_name ~id_header ~mode with
               | Error errors -> handle_errors 400 errors
               | Ok (arr, sep) ->
                 let status = Code.status_of_code (if Array.is_empty arr then 204 else 200) in

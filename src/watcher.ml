@@ -21,7 +21,7 @@ let start_http watcher generic specific =
   let open Http in
   Http.start generic specific (Standard {
       write = Router.write watcher.router ~listen_name:generic.name;
-      read_sync = Router.read_sync watcher.router ~listen_name:generic.name;
+      read_slice = Router.read_slice watcher.router ~listen_name:generic.name;
       read_stream = Router.read_stream watcher.router ~listen_name:generic.name;
       count = Router.count watcher.router ~listen_name:generic.name;
     })

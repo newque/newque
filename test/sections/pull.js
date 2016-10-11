@@ -51,9 +51,9 @@ module.exports = function (id) {
       .then(Fn.shouldHaveRead(['M abc', 'M def', 'M ghi', 'M jkl'], '\n'))
     })
 
-    it('Many, secondary channel', function () {
+    it('Many, secondary channel (max read, different separator)', function () {
       return Fn.call('GET', 8000, '/v1/secondary', null, [[C.modeHeader, 'many 3']])
-      .then(Fn.shouldHaveRead(['XYZ', 'ABCD', ''], '--'))
+      .then(Fn.shouldHaveRead(['XYZ', 'ABCD'], '--'))
     })
 
     it('Many, empty channel', function () {

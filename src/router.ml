@@ -67,11 +67,11 @@ let write router ~listen_name ~chan_name ~id_header ~mode stream =
         return (Ok count)
     end
 
-let read_sync router ~listen_name ~chan_name ~id_header ~mode =
+let read_slice router ~listen_name ~chan_name ~id_header ~mode =
   match find_chan router ~listen_name ~chan_name with
   | (Error _) as err -> return err
   | Ok chan ->
-    let%lwt payloads = Channel.pull_sync chan ~mode in
+    let%lwt payloads = Channel.pull_slice chan ~mode in
     ignore_result (Logger.debug_lazy (lazy (
         Printf.sprintf "Read: %s (size: %d) from %s" chan_name (Array.length payloads) listen_name
       )));

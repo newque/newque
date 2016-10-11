@@ -25,7 +25,7 @@ let zip_group ~size arr1 arr2 =
     )
   )
 
-(* TODO: Decide what to do with these synchronous exceptions *)
+(* TODO: Decide what to do with these "impossible" synchronous exceptions *)
 let is_assoc sexp =
   match sexp with
   | Sexp.List [Sexp.Atom _; _] -> true

@@ -2,5 +2,6 @@
   "listeners": ["http8000"],
   "persistence": "memory",
   "acknowledgement": "none",
-  "separator": "--"
+  "separator": "--",
+  "maxRead": 2
 }

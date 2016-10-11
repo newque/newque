@@ -20,7 +20,7 @@ val write :
   (* Written count, list of error messages *)
   (int, string list) Result.t Lwt.t
 
-val read_sync :
+val read_slice :
   t ->
   listen_name:string ->
   chan_name:string ->

@@ -11,6 +11,12 @@ type local_t = {
   mutex: Lwt_mutex.t sexp_opaque;
 } [@@deriving sexp]
 
+#ifdef DEBUG
+let batch_size = 2
+  #else
+let batch_size = 100
+  #endif
+
 let create ~file ~chan_name ~avg_read =
   let mutex = Lwt_mutex.create () in
   let%lwt () = Logger.info (Printf.sprintf "Initializing %s (%s)" file chan_name) in
@@ -66,16 +72,26 @@ module M = struct
         handle_failure instance ex ~errstr:(Printf.sprintf "Failed to write to %s (%s) with error %s. Restarting." instance.file instance.chan_name (Exn.to_string ex))
     )
 
-  let pull_sync instance ~mode =
+  let pull_slice instance max_read ~mode =
     Lwt_mutex.with_lock instance.mutex (fun () ->
       try%lwt
-        Sqlite.pull_sync instance.db ~mode
+        Sqlite.pull instance.db max_read mode
       with
       | ex ->
         handle_failure instance ex ~errstr:(Printf.sprintf "Failed to fetch from %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex))
     )
 
-  let pull_stream instance ~mode = wrap (fun () -> Lwt_stream.of_list ["x"; "y"; "z"])
+  let pull_stream instance max_read ~mode =
+    let (stream, push) = Lwt_stream.create () in
+    let rec run left =
+      if left = 0 then return_unit else
+      let took = min left batch_size in
+      let%lwt payloads = pull_slice instance max_read ~mode in
+      Array.iter payloads ~f:(fun x -> push (Some x));
+      run (left - took)
+    in
+    async (fun () -> run max_read);
+    return stream
 
   let size instance =
     Lwt_mutex.with_lock instance.mutex (fun () ->

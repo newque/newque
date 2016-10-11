@@ -82,6 +82,8 @@ var shouldHaveRead = exports.shouldHaveRead = function (values, separator) {
         assert(arr.length === values.length * 2)
         arr.pop()
         var buf = Buffer.concat(arr)
+        // console.log('Expecting', buf.toString('utf8'))
+        // console.log('Got', result.res.buffer.toString('utf8'))
         assert(Buffer.compare(buf, result.res.buffer) === 0)
       }
       // console.log(JSON.stringify(buf.toString('utf8')))

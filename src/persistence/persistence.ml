@@ -8,9 +8,9 @@ module type Template = sig
 
   val push : t -> msgs:string array -> ids:string array -> Ack.t -> int Lwt.t
 
-  val pull_sync : t -> mode:Mode.Read.t -> string array Lwt.t
+  val pull_slice : t -> int -> mode:Mode.Read.t -> string array Lwt.t
 
-  val pull_stream : t -> mode:Mode.Read.t -> string Lwt_stream.t Lwt.t
+  val pull_stream : t -> int -> mode:Mode.Read.t -> string Lwt_stream.t Lwt.t
 
   val size : t -> int64 Lwt.t
 end
@@ -25,9 +25,9 @@ module type S = sig
 
   val push : Message.t array -> Id.t array -> Ack.t -> int Lwt.t
 
-  val pull_sync : mode:Mode.Read.t -> string array Lwt.t
+  val pull_slice : int -> mode:Mode.Read.t -> string array Lwt.t
 
-  val pull_stream : mode:Mode.Read.t -> string Lwt_stream.t Lwt.t
+  val pull_stream : int -> mode:Mode.Read.t -> string Lwt_stream.t Lwt.t
 
   val size : unit -> int64 Lwt.t
 end
@@ -46,14 +46,18 @@ module Make (Argument: Argument) : S = struct
     let msgs = Array.map ~f:Message.serialize msgs in
     Argument.IO.push instance ~msgs ~ids ack
 
-  let pull_sync ~mode =
+  let pull_slice max_read ~mode =
     let%lwt instance = instance in
-    let%lwt raw = Argument.IO.pull_sync instance ~mode in
+    let%lwt raw = Argument.IO.pull_slice instance max_read ~mode in
     wrap (fun () -> Array.concat_map raw ~f:(fun x -> Message.contents (Message.parse_exn x)))
 
-  let pull_stream ~mode =
+  let pull_stream max_read ~mode =
     let%lwt instance = instance in
-    Argument.IO.pull_stream instance ~mode
+    let%lwt stream = Argument.IO.pull_stream instance max_read ~mode in
+    wrap (fun () ->
+      Lwt_stream.map_list (fun x ->
+        Array.to_list (Message.contents (Message.parse_exn x))
+      ) stream)
 
   let size () =
     let%lwt instance = instance in

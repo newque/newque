@@ -8,7 +8,7 @@ open Http
 
 let () = Lwt_engine.set ~transfer:true ~destroy:true (new Lwt_engine.libev)
 let () = Lwt.async_exception_hook := fun ex -> print_endline ("UNCAUGHT EXCEPTION: " ^ (Exn.to_string ex))
-let () = Lwt_preemptive.init 4 25 (fun str -> ignore (async (fun () -> Log.stdout Lwt_log.Info str)))
+let () = Lwt_preemptive.init 4 25 (fun str -> async (fun () -> Log.stdout Lwt_log.Info str))
 
 (* Only for startup, replaced by newque.json settings later *)
 let () = Lwt_log.add_rule "*" Lwt_log.Debug

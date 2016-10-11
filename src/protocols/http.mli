@@ -19,7 +19,7 @@ type standard_routing = {
     mode:Mode.Write.t ->
     string Lwt_stream.t ->
     (int, string list) Result.t Lwt.t);
-  read_sync: (
+  read_slice: (
     chan_name:string ->
     id_header:string option ->
     mode:Mode.Read.t ->

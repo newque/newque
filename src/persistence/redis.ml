@@ -21,10 +21,10 @@ module M = struct
   let push instance ~msgs ~ids ack =
     return 1
 
-  let pull_sync instance ~mode =
+  let pull_slice instance max_read ~mode =
     return [| |]
 
-  let pull_stream instance ~mode =
+  let pull_stream instance max_read ~mode =
     wrap (fun () -> Lwt_stream.of_list ["x"; "y"; "z"])
 
   let size instance =
