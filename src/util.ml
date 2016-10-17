@@ -5,8 +5,8 @@ let split ~sep str =
   let delim = Str.regexp_string sep in
   Str.split_delim delim str
 
-let parse_int str =
-  try Some (Int.of_string str)
+let parse_int64 str =
+  try Some (Int64.of_string str)
   with _ -> None
 
 (* This was rewritten in c/fortran style for efficiency *)
@@ -23,6 +23,22 @@ let zip_group ~size arr1 arr2 =
         (arr1.((i * size) + j), arr2.((i * size) + j))
       )
     )
+  )
+
+(* An efficient lazy stream flattener *)
+let stream_map_array_s ~batch_size ~mapper arr_stream =
+  let queue = Queue.create ~capacity:batch_size () in
+  Lwt_stream.from (fun () ->
+    match Queue.dequeue queue with
+    | (Some _) as x -> return x
+    | None ->
+      begin match%lwt Lwt_stream.get arr_stream with
+        | Some arr ->
+          (* Array.iter (mapper arr) ~f:(fun inner -> Array.iter inner ~f:(Queue.enqueue queue)); *)
+          Array.iter (mapper arr) ~f:(Queue.enqueue queue);
+          return (Queue.dequeue queue)
+        | None -> return_none
+      end
   )
 
 (* TODO: Decide what to do with these "impossible" synchronous exceptions *)

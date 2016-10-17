@@ -8,6 +8,12 @@ type redis_t = {
   auth: string option;
 } [@@deriving sexp]
 
+#ifdef DEBUG
+let read_batch_size = 2
+  #else
+let read_batch_size = 500
+  #endif
+
 let create host port auth =
   let instance = {conn = (); host; port; auth;} in
   return instance
@@ -21,11 +27,11 @@ module M = struct
   let push instance ~msgs ~ids ack =
     return 1
 
-  let pull_slice instance max_read ~mode =
+  let pull_slice instance ~search =
     return [| |]
 
-  let pull_stream instance max_read ~mode =
-    wrap (fun () -> Lwt_stream.of_list ["x"; "y"; "z"])
+  let pull_stream instance ~search =
+    wrap (fun () -> Lwt_stream.of_list [ [| "x"; "y"; "z" |] ])
 
   let size instance =
     return (Int.to_int64 20)

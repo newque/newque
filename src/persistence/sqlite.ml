@@ -9,7 +9,6 @@ module Logger = Log.Make (struct let path = Log.outlog let section = "Sqlite" en
 
 type statements = {
   count: Sqlite3.stmt * string;
-  read_one: Sqlite3.stmt * string;
   begin_transaction: Sqlite3.stmt * string;
   commit_transaction: Sqlite3.stmt * string;
   rollback_transaction: Sqlite3.stmt * string;
@@ -20,18 +19,20 @@ type t = {
   avg_read: int;
   stmts: statements sexp_opaque;
 } [@@deriving sexp]
-
 (* Ridiculously high number of retries by default,
    because it is only retried when the db is locked.
    We only want it to fail in catastrophic cases. *)
 let default_retries = 10
 
   #ifdef DEBUG
-let batch_size = 2
+let insert_batch_size = 2
   #else
-let batch_size = 100
+let insert_batch_size = 500
   #endif
 
+(******************
+   LOW LEVEL FUNCTIONS
+ ******************)
 let clean_sync ~destroy stmt =
   match destroy with
   | true -> ignore (S3.finalize stmt)
@@ -79,11 +80,12 @@ type _ repr =
   | FInt64 : int64 repr
   | Wrapped : Data.t array repr
 
-let query : type a. t -> ?retry:int -> destroy:bool -> S3.stmt * string -> a repr -> a array Lwt.t =
+let query : type a. t -> ?retry:int -> destroy:bool -> S3.stmt * string -> a repr -> (a array * int64) Lwt.t =
   fun db ?(retry=default_retries) ~destroy (stmt, sql) repr ->
     Lwt_preemptive.detach (fun () ->
+      async (fun () -> Logger.debug_lazy (lazy (Printf.sprintf "Querying %s" sql)));
       let queue : a Queue.t = Queue.create ~capacity:db.avg_read () in
-      let rec run count =
+      let rec run count last_rowid =
         match S3.step stmt with
         | Rc.ROW ->
           begin match repr with
@@ -99,24 +101,28 @@ let query : type a. t -> ?retry:int -> destroy:bool -> S3.stmt * string -> a rep
               end
             | Wrapped -> Queue.enqueue queue (S3.row_data stmt)
           end;
-          run 1
+          let last_rowid = begin match S3.column stmt 1 with
+            | Data.INT x -> x
+            | datatype -> failwith (Printf.sprintf "Querying failed, invalid last rowid check: %s" (Data.to_string_debug datatype))
+          end in
+          run 1 last_rowid
         | Rc.DONE ->
           clean_sync ~destroy stmt;
-          ()
+          last_rowid
         | (Rc.BUSY as code) | (Rc.LOCKED as code) ->
           begin match count <= retry with
             | true ->
               async (fun () -> Logger.warning (Printf.sprintf "Retrying query (%s)" (Rc.to_string code)));
               Thread.yield ();
-              run (count + 1)
+              run (count + 1) last_rowid
             | false ->
               failwith (Printf.sprintf "Querying failed after %d retries with code %s" retry (Rc.to_string code))
           end
         | code ->
           failwith (Printf.sprintf "Querying failed with code %s" (Rc.to_string code))
       in
-      run 1;
-      Queue.to_array queue
+      let last_rowid = run 1 Int64.max_value in
+      ((Queue.to_array queue), last_rowid)
     ) ()
 
 let transaction db ~destroy stmts =
@@ -141,7 +147,7 @@ let prepare db sql =
     ((S3.prepare db sql), sql)
   ) ()
 
-let bind db ?(retry=default_retries) stmt args =
+let bind ?(retry=default_retries) stmt args =
   Lwt_preemptive.detach (fun () ->
     let rec run pos arg count =
       match S3.bind stmt pos arg with
@@ -161,11 +167,24 @@ let bind db ?(retry=default_retries) stmt args =
     Array.iter ~f:(fun (i, arg) -> run i arg 1) args
   ) ()
 
+(***********
+   SQL BUILDERS
+ ***********)
 let create_table_sql = "CREATE TABLE IF NOT EXISTS MESSAGES (uuid BLOB NOT NULL, timens BIGINT NOT NULL, raw BLOB NOT NULL, PRIMARY KEY(uuid));"
 let create_timens_index_sql = "CREATE INDEX IF NOT EXISTS MESSAGES_TIMENS_IDX ON MESSAGES (timens);"
-let read_one_sql = "SELECT raw FROM MESSAGES ORDER BY ROWID ASC LIMIT 1;"
-let read_many_sql count =
-  Printf.sprintf "SELECT raw FROM MESSAGES ORDER BY ROWID ASC LIMIT %d;" count
+let make_filters filters =
+  let strings = Array.map filters ~f:(fun filter ->
+      match filter with
+      | `After_id _ -> "(ROWID > (SELECT ROWID FROM MESSAGES WHERE uuid = ?))"
+      | `After_ts _ -> "(timens > ?)"
+      | `After_rowid _ -> "(ROWID > ?)"
+    ) in
+  String.concat_array ~sep:" AND " strings
+let read_sql ~search =
+  let open Persistence in
+  match Array.is_empty search.filters with
+  | true -> Printf.sprintf "SELECT raw, ROWID FROM MESSAGES ORDER BY ROWID ASC LIMIT %Ld;" search.limit
+  | false -> Printf.sprintf "SELECT raw, ROWID FROM MESSAGES WHERE %s ORDER BY ROWID ASC LIMIT %Ld;" (make_filters search.filters) search.limit
 let count_sql = "SELECT COUNT(*) FROM MESSAGES;"
 let begin_sql = "BEGIN;"
 let commit_sql = "COMMIT;"
@@ -174,6 +193,9 @@ let insert_sql count =
   let arr = Array.create ~len:count "(?,?,?)" in
   Printf.sprintf "INSERT OR IGNORE INTO MESSAGES (uuid,timens,raw) VALUES %s;" (String.concat_array ~sep:"," arr)
 
+(*******************
+   HIGH LEVEL FUNCTIONS
+ *******************)
 let create file ~avg_read =
   let%lwt db = wrap (fun () -> S3.db_open file) in
 
@@ -184,12 +206,11 @@ let create file ~avg_read =
   let%lwt (_ : int) = wrap (fun () -> exec_sync db ~destroy:false create_timens_index) in
 
   let%lwt count = prepare db count_sql in
-  let%lwt read_one = prepare db read_one_sql in
   let%lwt begin_transaction = prepare db begin_sql in
   let%lwt commit_transaction = prepare db commit_sql in
   let%lwt rollback_transaction = prepare db rollback_sql in
 
-  let stmts = {count; read_one; begin_transaction; commit_transaction; rollback_transaction} in
+  let stmts = {count; begin_transaction; commit_transaction; rollback_transaction} in
   let instance = {db; file; avg_read; stmts} in
   return instance
 
@@ -216,10 +237,10 @@ let push db ~msgs ~ids =
         [| ((pos + 1), Data.BLOB id); ((pos + 2), Data.INT time); ((pos + 3), Data.BLOB raw) |]
       )
     in
-    let%lwt () = bind db st args in
+    let%lwt () = bind st args in
     return stmt
   in
-  match%lwt Util.zip_group ~size:batch_size msgs ids with
+  match%lwt Util.zip_group ~size:insert_batch_size msgs ids with
   | (group::[]) ->
     let%lwt stmt = make_stmt group in
     execute db ~destroy:true stmt
@@ -227,20 +248,19 @@ let push db ~msgs ~ids =
     let%lwt stmts = Lwt_list.map_s make_stmt groups in
     transaction db ~destroy:true stmts
 
-let pull db max_read ~mode =
-  match mode with
-  | `One ->
-    begin match%lwt query db ~destroy:false db.stmts.read_one FBlob with
-      | ([| |] as x) | ([| _ |] as x) -> return x
-      | dataset -> failwith (Printf.sprintf "Select One failed for %s, dataset size: %d" db.file (Array.length dataset))
-    end
-  | `Many count ->
-    let%lwt stmt = prepare db.db (read_many_sql (min max_read count)) in
-    query db ~destroy:true stmt FBlob
-  | `After_id _ -> fail_with "Unimplemented mode: After_id"
-  | `After_ts _ -> fail_with "Unimplemented mode: After_ts"
+let pull db ~search =
+  let open Persistence in
+  let%lwt ((st, _) as stmt) = prepare db.db (read_sql ~search) in
+  let args = Array.init (Array.length search.filters) ~f:(fun i ->
+      match Array.get search.filters i with
+      | `After_id id -> ((i + 1), Data.BLOB id)
+      | `After_ts ts -> ((i + 1), Data.INT ts)
+      | `After_rowid rowid -> ((i + 1), Data.INT rowid)
+    ) in
+  let%lwt () = bind st args in
+  query db ~destroy:true stmt FBlob
 
 let size db =
   match%lwt query db ~destroy:false db.stmts.count FInt64 with
-  | [| x |] -> return x
-  | dataset -> failwith (Printf.sprintf "Count failed for %s, dataset size: %d" db.file (Array.length dataset))
+  | [| x |], _ -> return x
+  | dataset, _ -> failwith (Printf.sprintf "Count failed for %s, dataset size: %d" db.file (Array.length dataset))

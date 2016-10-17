@@ -2,7 +2,9 @@ open Core.Std
 
 val split : sep:string -> string -> string list
 
-val parse_int : string -> int option
+val parse_int64 : string -> int64 option
+
+val stream_map_array_s: batch_size:int -> mapper:('a array -> 'b array) -> 'a array Lwt_stream.t -> 'b Lwt_stream.t
 
 val zip_group : size:int -> 'a array -> 'b array -> ('a * 'b) array list Lwt.t
 

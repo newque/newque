@@ -6,6 +6,7 @@ val close : t -> unit Lwt.t
 
 val push : t -> msgs:string array -> ids:string array -> int Lwt.t
 
-val pull : t -> int -> mode:Mode.Read.t -> string array Lwt.t
+(* Returns the last rowid *)
+val pull : t -> search:Persistence.search -> (string array * int64) Lwt.t
 
 val size : t -> int64 Lwt.t

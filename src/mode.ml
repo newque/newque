@@ -15,15 +15,15 @@ end
 module Read = struct
   type t = [
     | `One
-    | `Many of int
+    | `Many of int64
     | `After_id of string
-    | `After_ts of int
+    | `After_ts of int64
   ]
   let to_string (tag : t) = match tag with
     | `One -> "One"
-    | `Many x -> Printf.sprintf "Many(%d) " x
+    | `Many x -> Printf.sprintf "Many(%Ld) " x
     | `After_id s -> Printf.sprintf "After_id(%s)" s
-    | `After_ts ts -> Printf.sprintf "After_ts(%d)" ts
+    | `After_ts ts -> Printf.sprintf "After_ts(%Ld)" ts
 end
 
 module Count = struct
@@ -54,7 +54,7 @@ let of_string str : ([Write.t | Read.t], string) Result.t =
   | s -> begin match Util.split ~sep:" " s with
       | ["after_id"; id] -> Ok (`After_id id)
       | [name; v] ->
-        begin match (name, (Util.parse_int v)) with
+        begin match (name, (Util.parse_int64 v)) with
           | "many", Some n -> Ok (`Many n)
           | "after_ts", Some ts -> Ok (`After_ts ts)
           | _ -> Error str

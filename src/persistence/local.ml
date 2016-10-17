@@ -12,9 +12,9 @@ type local_t = {
 } [@@deriving sexp]
 
 #ifdef DEBUG
-let batch_size = 2
+let read_batch_size = 2
   #else
-let batch_size = 100
+let read_batch_size = 500
   #endif
 
 let create ~file ~chan_name ~avg_read =
@@ -72,26 +72,36 @@ module M = struct
         handle_failure instance ex ~errstr:(Printf.sprintf "Failed to write to %s (%s) with error %s. Restarting." instance.file instance.chan_name (Exn.to_string ex))
     )
 
-  let pull_slice instance max_read ~mode =
+  let pull_data instance ~search =
     Lwt_mutex.with_lock instance.mutex (fun () ->
       try%lwt
-        Sqlite.pull instance.db max_read mode
+        Sqlite.pull instance.db ~search
       with
       | ex ->
         handle_failure instance ex ~errstr:(Printf.sprintf "Failed to fetch from %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex))
     )
 
-  let pull_stream instance max_read ~mode =
-    let (stream, push) = Lwt_stream.create () in
-    let rec run left =
-      if left = 0 then return_unit else
-      let took = min left batch_size in
-      let%lwt payloads = pull_slice instance max_read ~mode in
-      Array.iter payloads ~f:(fun x -> push (Some x));
-      run (left - took)
-    in
-    async (fun () -> run max_read);
-    return stream
+  let pull_slice instance ~search = map fst (pull_data instance ~search)
+
+  let pull_stream instance ~search =
+    let open Persistence in
+    (* Imperative code for simplicity here *)
+    let left = ref search.limit in
+    let next_search = ref {search with limit = Int64.min !left (Int.to_int64 read_batch_size)} in
+    wrap (fun () ->
+      Lwt_stream.from (fun () ->
+        if !next_search.limit <= Int64.zero then return_none else
+        let%lwt (payloads, last_rowid) = pull_data instance ~search:!next_search in
+        if Array.is_empty payloads then return_none else
+        let payloads_count = Int.to_int64 (Array.length payloads) in
+        left := Int64.(-) !left payloads_count;
+        let () = next_search := {
+            limit = Int64.min !left (Int.to_int64 read_batch_size);
+            filters = Array.append [|`After_rowid last_rowid|] search.filters;
+          } in
+        return (Some payloads)
+      )
+    )
 
   let size instance =
     Lwt_mutex.with_lock instance.mutex (fun () ->
