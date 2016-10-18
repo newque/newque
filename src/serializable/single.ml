@@ -23,7 +23,7 @@ let contents single = single.raw
 
 let array_of_stream ~sep ?(init=(Some "")) stream =
   let%lwt (msgs, last) = Lwt_stream.fold_s (fun read (acc, leftover) ->
-      let chunk = Option.value_map leftover ~default:read ~f:(fun a -> a ^ read) in
+      let chunk = Option.value_map leftover ~default:read ~f:(fun a -> Printf.sprintf "%s%s" a read) in
       Util.split ~sep chunk
       |> (fun lines -> List.split_n lines (List.length lines))
       |> (fun (fulls, partial) ->

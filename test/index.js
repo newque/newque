@@ -27,5 +27,8 @@ Proc.pathExists(newquePath)
 
   require('./sections/pull')('disk1')
   require('./sections/pull')('memory1')
+
+  require('./sections/ack')('disk1')
+  require('./sections/ack')('memory1')
   run()
 })

@@ -34,7 +34,6 @@ let stream_map_array_s ~batch_size ~mapper arr_stream =
     | None ->
       begin match%lwt Lwt_stream.get arr_stream with
         | Some arr ->
-          (* Array.iter (mapper arr) ~f:(fun inner -> Array.iter inner ~f:(Queue.enqueue queue)); *)
           Array.iter (mapper arr) ~f:(Queue.enqueue queue);
           return (Queue.dequeue queue)
         | None -> return_none

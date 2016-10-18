@@ -18,16 +18,19 @@ type standard_routing = {
     id_header:string option ->
     mode:Mode.Write.t ->
     string Lwt_stream.t ->
-    (int, string list) Result.t Lwt.t);
+    (* Number saved or None if Ack == Instant *)
+    (int option, string list) Result.t Lwt.t);
   read_slice: (
     chan_name:string ->
     id_header:string option ->
     mode:Mode.Read.t ->
+    (* Array of messages * separator *)
     (string array * string, string list) Result.t Lwt.t);
   read_stream: (
     chan_name:string ->
     id_header:string option ->
     mode:Mode.Read.t ->
+    (* Stream of messages * separator *)
     (string Lwt_stream.t * string, string list) Result.t Lwt.t);
   count: (
     chan_name:string ->

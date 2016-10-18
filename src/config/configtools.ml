@@ -9,7 +9,7 @@ let parse_main path =
   with
   | Ag_oj_run.Error str ->
     let%lwt _ = Log.stdout Lwt_log.Fatal str in
-    fail_with ("Error while parsing " ^ path)
+    fail_with (Printf.sprintf "Error while parsing %s" path)
 
 let apply_main config watcher =
   (* Set global log level *)

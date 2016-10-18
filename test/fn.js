@@ -48,6 +48,23 @@ var shouldHaveWritten = exports.shouldHaveWritten = function (count) {
   }
 }
 
+var shouldHaveWrittenAsync = exports.shouldHaveWrittenAsync = function () {
+  return function (result) {
+    return new Promise(function (resolve, reject) {
+      assert(result.res.statusCode === 202)
+      assert(result.body.code === 202)
+      assert(result.body.errors.length === 0)
+      assert(result.body.saved == null)
+      return resolve(result)
+    })
+    .catch(function (err) {
+      console.log(result.res.statusCode)
+      console.log(result.body)
+      throw err
+    })
+  }
+}
+
 var shouldHaveCounted = exports.shouldHaveCounted = function (count) {
   return function (result) {
     return new Promise(function (resolve, reject) {
@@ -82,14 +99,24 @@ var shouldHaveRead = exports.shouldHaveRead = function (values, separator) {
         assert(arr.length === values.length * 2)
         arr.pop()
         var buf = Buffer.concat(arr)
-        // console.log('Expecting', buf.toString('utf8'))
-        // console.log('Got', result.res.buffer.toString('utf8'))
+        // console.log('Expecting', JSON.stringify(buf.toString('utf8')))
+        // console.log('Got', JSON.stringify(result.res.buffer.toString('utf8')))
         assert(Buffer.compare(buf, result.res.buffer) === 0)
       }
-      // console.log(JSON.stringify(buf.toString('utf8')))
-      // console.log(JSON.stringify(result.res.buffer.toString('utf8')))
-      assert(parseInt(result.res.headers[C.lengthHeader], 10) === values.length)
 
+      // Check HTTP headers
+      if (result.res.headers['transfer-encoding'] === 'chunked') {
+        assert(result.res.headers['content-length'] == null)
+        assert(result.res.headers[C.lengthHeader] == null)
+      } else {
+        if (result.res.statusCode === 200) {
+          assert(parseInt(result.res.headers[C.lengthHeader], 10) === values.length)
+          assert(parseInt(result.res.headers['content-length'], 10) === result.res.buffer.length)
+        } else if (result.res.statusCode === 204) {
+          assert(result.res.headers['content-length'] == null)
+          assert(parseInt(result.res.headers[C.lengthHeader], 10) === 0)
+        }
+      }
       return resolve(result)
     })
   }

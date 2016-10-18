@@ -48,7 +48,6 @@ type config_persistence = [
 type config_acknowledgement = [
   | Instant <json name="none">
   | Saved <json name="saved">
-  | Read <json name="read">
 ] <ocaml repr="classic">
 
 (* TODO: Validate that the separators are non-empty *)

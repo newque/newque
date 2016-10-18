@@ -76,7 +76,7 @@ let execute db ~destroy stmt =
   ) ()
 
 type _ repr =
-  | FBlob : string repr
+  | FBlobRowid : string repr
   | FInt64 : int64 repr
   | Wrapped : Data.t array repr
 
@@ -88,22 +88,18 @@ let query : type a. t -> ?retry:int -> destroy:bool -> S3.stmt * string -> a rep
       let rec run count last_rowid =
         match S3.step stmt with
         | Rc.ROW ->
-          begin match repr with
-            | FBlob ->
-              begin match S3.column stmt 0 with
-                | Data.BLOB blob -> Queue.enqueue queue blob
-                | datatype -> failwith (Printf.sprintf "Querying failed, invalid datatype %s, expected BLOB" (Data.to_string_debug datatype))
+          let last_rowid = begin match repr with
+            | FBlobRowid ->
+              begin match ((S3.column stmt 0), (S3.column stmt 1)) with
+                | ((Data.BLOB blob), Data.INT rowid) -> Queue.enqueue queue blob; rowid
+                | (data1, data2) -> failwith (Printf.sprintf "Querying failed, invalid datatypes %s and %s, expected BLOB and INT" (Data.to_string_debug data1) (Data.to_string_debug data2))
               end
             | FInt64 ->
               begin match S3.column stmt 0 with
-                | Data.INT i -> Queue.enqueue queue i
+                | Data.INT i -> Queue.enqueue queue i; last_rowid
                 | datatype -> failwith (Printf.sprintf "Querying failed, invalid datatype %s, expected INT" (Data.to_string_debug datatype))
               end
-            | Wrapped -> Queue.enqueue queue (S3.row_data stmt)
-          end;
-          let last_rowid = begin match S3.column stmt 1 with
-            | Data.INT x -> x
-            | datatype -> failwith (Printf.sprintf "Querying failed, invalid last rowid check: %s" (Data.to_string_debug datatype))
+            | Wrapped -> Queue.enqueue queue (S3.row_data stmt); last_rowid
           end in
           run 1 last_rowid
         | Rc.DONE ->
@@ -251,14 +247,14 @@ let push db ~msgs ~ids =
 let pull db ~search =
   let open Persistence in
   let%lwt ((st, _) as stmt) = prepare db.db (read_sql ~search) in
-  let args = Array.init (Array.length search.filters) ~f:(fun i ->
-      match Array.get search.filters i with
+  let args = Array.mapi search.filters ~f:(fun i filter ->
+      match filter with
       | `After_id id -> ((i + 1), Data.BLOB id)
       | `After_ts ts -> ((i + 1), Data.INT ts)
       | `After_rowid rowid -> ((i + 1), Data.INT rowid)
     ) in
   let%lwt () = bind st args in
-  query db ~destroy:true stmt FBlob
+  query db ~destroy:true stmt FBlobRowid
 
 let size db =
   match%lwt query db ~destroy:false db.stmts.count FInt64 with

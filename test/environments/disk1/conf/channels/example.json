@@ -1,5 +1,5 @@
 {
   "listeners": ["http8000"],
   "persistence": "disk",
-  "acknowledgement": "none"
+  "acknowledgement": "saved"
 }

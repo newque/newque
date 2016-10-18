@@ -32,7 +32,7 @@ type standard_routing = {
     id_header:string option ->
     mode:Mode.Write.t ->
     string Lwt_stream.t ->
-    (int, string list) Result.t Lwt.t);
+    (int option, string list) Result.t Lwt.t);
   read_slice: (
     chan_name:string ->
     id_header:string option ->
@@ -91,11 +91,18 @@ let default_filter _ req _ =
   return result
 
 let json_write_body code errors saved =
-  `Assoc [
-    ("code", `Int code);
-    ("errors", `List (List.map errors ~f:(fun x -> `String x)));
-    ("saved", `Int saved);
-  ]
+  match saved with
+  | Some saved ->
+    `Assoc [
+      ("code", `Int code);
+      ("errors", `List (List.map errors ~f:(fun x -> `String x)));
+      ("saved", `Int saved);
+    ]
+  | None ->
+    `Assoc [
+      ("code", `Int code);
+      ("errors", `List (List.map errors ~f:(fun x -> `String x)));
+    ]
 
 let json_count_body code errors count =
   let count = if List.is_empty errors then `Int count else `Null in
@@ -129,8 +136,9 @@ let handler http routing ((ch, _) as conn) req body =
             let id_header = Header.get (Request.headers req) id_header_name in
             let%lwt (code, errors, saved) =
               begin match%lwt routing.write ~chan_name ~id_header ~mode stream with
-                | Ok count -> return (201, [], count)
-                | Error errors -> return (400, errors, 0)
+                | Ok ((Some _) as count) -> return (201, [], count)
+                | Ok None -> return (202, [], None)
+                | Error errors -> return (400, errors, (Some 0))
               end in
             let headers = json_response_header in
             let status = Code.status_of_code code in
@@ -144,11 +152,19 @@ let handler http routing ((ch, _) as conn) req body =
                 begin match%lwt routing.read_stream ~chan_name ~id_header ~mode with
                   | Error errors -> handle_errors 400 errors
                   | Ok (stream, sep) ->
-                    let%lwt status = match%lwt Lwt_stream.is_empty stream with
-                      | false -> return (Code.status_of_code 200)
-                      | true -> return (Code.status_of_code 204)
+                    let%lwt status, headers = match%lwt Lwt_stream.is_empty stream with
+                      | false -> return (
+                          (Code.status_of_code 200),
+                          (Header.add_list (Header.init ()) [("Content-Type", "application/octet-stream")])
+                        )
+                      | true -> return (
+                          (Code.status_of_code 204),
+                          (Header.add_list (Header.init ()) [
+                              ("Content-Type", "application/octet-stream");
+                              (length_header_name, "0");
+                            ])
+                        )
                     in
-                    let headers = Header.add (Header.init ()) "Content-Type" "application/octet-stream" in
                     let body_stream = Lwt_stream.map_list_s (fun raw ->
                         begin match%lwt Lwt_stream.is_empty stream with
                           | true -> return [raw]

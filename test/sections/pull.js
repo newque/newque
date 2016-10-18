@@ -21,64 +21,54 @@ module.exports = function (id) {
       })
     })
 
-    it('Without header, secondary channel', function () {
-      return Fn.call('GET', 8000, '/v1/secondary')
-      .then(Fn.shouldFail(400))
-    })
+    var transports = [
+      {name: 'Fixed-Length', headers: []},
+      {name: 'Chunked', headers: [['Transfer-Encoding', 'chunked']]}
+    ]
+    for (var i = 0; i < 2; i++) {
+      describe('Transfer-Encoding: ' + transports[i].name, function () {
+        var ii = i
+        it('Without header, secondary channel', function () {
+          return Fn.call('GET', 8000, '/v1/secondary', null, transports[ii].headers)
+          .then(Fn.shouldFail(400))
+        })
 
-    it('Without header', function () {
-      return Fn.call('GET', 8000, '/v1/example')
-      .then(Fn.shouldFail(400))
-    })
+        it('Without header', function () {
+          return Fn.call('GET', 8000, '/v1/example', null, transports[ii].headers)
+          .then(Fn.shouldFail(400))
+        })
 
-    it('One', function () {
-      return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'one']])
-      .then(Fn.shouldHaveRead(['M abc'], '\n'))
-    })
+        it('One', function () {
+          return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'one']].concat(transports[ii].headers))
+          .then(Fn.shouldHaveRead(['M abc'], '\n'))
+        })
 
-    it('One, secondary channel', function () {
-      return Fn.call('GET', 8000, '/v1/secondary', null, [[C.modeHeader, 'one']])
-      .then(Fn.shouldHaveRead(['XYZ'], '\n'))
-    })
+        it('One, secondary channel', function () {
+          return Fn.call('GET', 8000, '/v1/secondary', null, [[C.modeHeader, 'one']].concat(transports[ii].headers))
+          .then(Fn.shouldHaveRead(['XYZ'], '\n'))
+        })
 
-    it('Many, smaller than count', function () {
-      return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'Many 3']])
-      .then(Fn.shouldHaveRead(['M abc', 'M def', 'M ghi'], '\n'))
-    })
+        it('Many, smaller than count', function () {
+          return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'Many 3']].concat(transports[ii].headers))
+          .then(Fn.shouldHaveRead(['M abc', 'M def', 'M ghi'], '\n'))
+        })
 
-    it('Many, greater than count', function () {
-      return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'Many 30']])
-      .then(Fn.shouldHaveRead(['M abc', 'M def', 'M ghi', 'M jkl'], '\n'))
-    })
+        it('Many, greater than count', function () {
+          return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'Many 30']].concat(transports[ii].headers))
+          .then(Fn.shouldHaveRead(['M abc', 'M def', 'M ghi', 'M jkl'], '\n'))
+        })
 
-    it('Many, secondary channel (max read, different separator)', function () {
-      return Fn.call('GET', 8000, '/v1/secondary', null, [[C.modeHeader, 'many 3']])
-      .then(Fn.shouldHaveRead(['XYZ', 'ABCD'], '--'))
-    })
+        it('Many, secondary channel (max read, different separator)', function () {
+          return Fn.call('GET', 8000, '/v1/secondary', null, [[C.modeHeader, 'many 3']].concat(transports[ii].headers))
+          .then(Fn.shouldHaveRead(['XYZ', 'ABCD'], '--'))
+        })
 
-    it('Many, empty channel', function () {
-      return Fn.call('GET', 8000, '/v1/empty', null, [[C.modeHeader, 'many 10']])
-      .then(Fn.shouldHaveRead([], '\n'))
-    })
-
-    describe('HTTP Transport', function () {
-      it('Fixed length by default', function () {
-        return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'many 30']])
-        .then(Fn.shouldHaveRead(['M abc', 'M def', 'M ghi', 'M jkl'], '\n'))
-        .then(function (result) {
-          Fn.assert(parseInt(result.res.headers['content-length'], 10) === result.res.buffer.length)
+        it('Many, empty channel', function () {
+          return Fn.call('GET', 8000, '/v1/empty', null, [[C.modeHeader, 'many 10']].concat(transports[ii].headers))
+          .then(Fn.shouldHaveRead([], '\n'))
         })
       })
-
-      it('Chunked when requested', function () {
-        return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'many 30'], ['Transfer-Encoding', 'chunked']])
-        .then(Fn.shouldHaveRead(['M abc', 'M def', 'M ghi', 'M jkl'], '\n'))
-        .then(function (result) {
-          Fn.assert(result.res.headers['content-length'] == null)
-          Fn.assert(result.res.headers['transfer-encoding'] == 'chunked')
-        })
-      })
-    })
+    }
 
     after(function () {
       return Proc.stopExecutable(p)

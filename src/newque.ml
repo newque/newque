@@ -7,7 +7,7 @@ open Lwt
 open Http
 
 let () = Lwt_engine.set ~transfer:true ~destroy:true (new Lwt_engine.libev)
-let () = Lwt.async_exception_hook := fun ex -> print_endline ("UNCAUGHT EXCEPTION: " ^ (Exn.to_string ex))
+let () = Lwt.async_exception_hook := fun ex -> print_endline (Printf.sprintf "UNCAUGHT EXCEPTION: %s" (Exn.to_string ex))
 let () = Lwt_preemptive.init 4 25 (fun str -> async (fun () -> Log.stdout Lwt_log.Info str))
 
 (* Only for startup, replaced by newque.json settings later *)
@@ -19,7 +19,7 @@ let start config_path =
   let check_directory path =
     let dir = Fs.is_directory ~create:true path in
     if%lwt dir then return_unit else
-      Log.stderr Lwt_log.Error (path ^ " is not a directory or can't be created as one")
+      Log.stderr Lwt_log.Error (Printf.sprintf "%s is not a directory or can't be created as one" path)
   in
   let%lwt () = Lwt_list.iter_s check_directory [
       Fs.log_dir;

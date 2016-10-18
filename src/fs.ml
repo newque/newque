@@ -28,7 +28,7 @@ let is_directory ?(create = false) path =
 let list_files path =
   Lwt_unix.files_of_directory path
   |> Lwt_stream.filter_s (fun file ->
-    let%lwt stats = Lwt_unix.stat (path ^ file) in
+    let%lwt stats = Lwt_unix.stat (Printf.sprintf "%s%s" path file) in
     let open Lwt_unix in
     match stats.st_kind with
     | S_REG -> return_true
