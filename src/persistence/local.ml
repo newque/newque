@@ -44,23 +44,18 @@ module M = struct
   let close instance = Lwt_mutex.with_lock instance.mutex (fun () -> close_nolock instance)
 
   let restart_nolock instance =
-    try%lwt
-      let%lwt () = close_nolock instance in
-      let%lwt restarted = create ~file:instance.file ~chan_name:instance.chan_name ~avg_read:instance.avg_read in
-      return (Ok restarted)
-    with
-    | ex ->
-      return (Error (Printf.sprintf "Failed to restart %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex)))
+    let%lwt () = try%lwt
+        close_nolock instance
+      with
+      | ex ->
+        Logger.error (Printf.sprintf "Failed to restart %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex))
+    in
+    create ~file:instance.file ~chan_name:instance.chan_name ~avg_read:instance.avg_read
 
   let handle_failure instance ex ~errstr =
     let%lwt () = Logger.error errstr in
-    let%lwt () = match%lwt restart_nolock instance with
-      | Ok restarted ->
-        instance.db <- restarted.db;
-        return_unit
-      | Error str ->
-        Logger.error str
-    in
+    let%lwt restarted = restart_nolock instance in
+    instance.db <- restarted.db;
     fail ex
 
   let push instance ~msgs ~ids ack =
@@ -78,28 +73,48 @@ module M = struct
         Sqlite.pull instance.db ~search
       with
       | ex ->
-        handle_failure instance ex ~errstr:(Printf.sprintf "Failed to fetch from %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex))
+        handle_failure instance ex ~errstr:(Printf.sprintf "Failed to query from %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex))
     )
 
-  let pull_slice instance ~search = map fst (pull_data instance ~search)
+  let single instance ~rowid =
+    Lwt_mutex.with_lock instance.mutex (fun () ->
+      try%lwt
+        Sqlite.single instance.db ~rowid
+      with
+      | ex ->
+        handle_failure instance ex ~errstr:(Printf.sprintf "Failed to fetch single from %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex))
+    )
+
+  let pull_slice instance ~search =
+    let%lwt (payloads, last_rowid) = pull_data instance ~search in
+    let open Persistence in
+    match last_rowid with
+    | None ->
+      return { metadata = None; payloads }
+    | Some last_internal_id ->
+      let%lwt (last_id, last_timens) = single instance ~rowid:last_internal_id in
+      return { metadata = (Some {last_internal_id; last_id; last_timens}); payloads }
 
   let pull_stream instance ~search =
     let open Persistence in
-    (* Imperative code for simplicity here *)
+    (* Ugly imperative code for performance here *)
     let left = ref search.limit in
     let next_search = ref {search with limit = Int64.min !left (Int.to_int64 read_batch_size)} in
     wrap (fun () ->
       Lwt_stream.from (fun () ->
         if !next_search.limit <= Int64.zero then return_none else
         let%lwt (payloads, last_rowid) = pull_data instance ~search:!next_search in
-        if Array.is_empty payloads then return_none else
-        let payloads_count = Int.to_int64 (Array.length payloads) in
-        left := Int64.(-) !left payloads_count;
-        let () = next_search := {
-            limit = Int64.min !left (Int.to_int64 read_batch_size);
-            filters = Array.append [|`After_rowid last_rowid|] search.filters;
-          } in
-        return (Some payloads)
+        match last_rowid with
+        | None -> return_none
+        | Some rowid ->
+          if Array.is_empty payloads then return_none else
+          let payloads_count = Int.to_int64 (Array.length payloads) in
+          left := Int64.(-) !left payloads_count;
+          let () = next_search := {
+              limit = Int64.min !left (Int.to_int64 read_batch_size);
+              filters = Array.append [|`After_rowid rowid|] search.filters;
+            } in
+          return (Some payloads)
       )
     )
 

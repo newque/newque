@@ -8,6 +8,7 @@ module Data = Sqlite3.Data
 module Logger = Log.Make (struct let path = Log.outlog let section = "Sqlite" end)
 
 type statements = {
+  single: Sqlite3.stmt * string;
   count: Sqlite3.stmt * string;
   begin_transaction: Sqlite3.stmt * string;
   commit_transaction: Sqlite3.stmt * string;
@@ -22,7 +23,7 @@ type t = {
 (* Ridiculously high number of retries by default,
    because it is only retried when the db is locked.
    We only want it to fail in catastrophic cases. *)
-let default_retries = 10
+let default_retries = 3
 
   #ifdef DEBUG
 let insert_batch_size = 2
@@ -77,10 +78,11 @@ let execute db ~destroy stmt =
 
 type _ repr =
   | FBlobRowid : string repr
+  | FBlobInt64 : (string * int64) repr
   | FInt64 : int64 repr
   | Wrapped : Data.t array repr
 
-let query : type a. t -> ?retry:int -> destroy:bool -> S3.stmt * string -> a repr -> (a array * int64) Lwt.t =
+let query : type a. t -> ?retry:int -> destroy:bool -> S3.stmt * string -> a repr -> (a array * int64 option) Lwt.t =
   fun db ?(retry=default_retries) ~destroy (stmt, sql) repr ->
     Lwt_preemptive.detach (fun () ->
       async (fun () -> Logger.debug_lazy (lazy (Printf.sprintf "Querying %s" sql)));
@@ -91,8 +93,13 @@ let query : type a. t -> ?retry:int -> destroy:bool -> S3.stmt * string -> a rep
           let last_rowid = begin match repr with
             | FBlobRowid ->
               begin match ((S3.column stmt 0), (S3.column stmt 1)) with
-                | ((Data.BLOB blob), Data.INT rowid) -> Queue.enqueue queue blob; rowid
-                | (data1, data2) -> failwith (Printf.sprintf "Querying failed, invalid datatypes %s and %s, expected BLOB and INT" (Data.to_string_debug data1) (Data.to_string_debug data2))
+                | ((Data.BLOB blob), Data.INT rowid) -> Queue.enqueue queue blob; (Some rowid)
+                | (data1, data2) -> failwith (Printf.sprintf "Querying failed (FBlobRowid, invalid datatypes %s and %s, expected BLOB and INT" (Data.to_string_debug data1) (Data.to_string_debug data2))
+              end
+            | FBlobInt64 ->
+              begin match ((S3.column stmt 0), (S3.column stmt 1)) with
+                | ((Data.BLOB id), Data.INT timens) -> Queue.enqueue queue (id, timens); last_rowid
+                | (data1, data2) -> failwith (Printf.sprintf "Querying failed (FBlobInt64), invalid datatypes %s and %s, expected BLOB and INT" (Data.to_string_debug data1) (Data.to_string_debug data2))
               end
             | FInt64 ->
               begin match S3.column stmt 0 with
@@ -117,7 +124,7 @@ let query : type a. t -> ?retry:int -> destroy:bool -> S3.stmt * string -> a rep
         | code ->
           failwith (Printf.sprintf "Querying failed with code %s" (Rc.to_string code))
       in
-      let last_rowid = run 1 Int64.max_value in
+      let last_rowid = run 1 None in
       ((Queue.to_array queue), last_rowid)
     ) ()
 
@@ -181,6 +188,7 @@ let read_sql ~search =
   match Array.is_empty search.filters with
   | true -> Printf.sprintf "SELECT raw, ROWID FROM MESSAGES ORDER BY ROWID ASC LIMIT %Ld;" search.limit
   | false -> Printf.sprintf "SELECT raw, ROWID FROM MESSAGES WHERE %s ORDER BY ROWID ASC LIMIT %Ld;" (make_filters search.filters) search.limit
+let single_sql = "SELECT uuid, timens FROM MESSAGES WHERE ROWID = ?;"
 let count_sql = "SELECT COUNT(*) FROM MESSAGES;"
 let begin_sql = "BEGIN;"
 let commit_sql = "COMMIT;"
@@ -201,12 +209,13 @@ let create file ~avg_read =
   let%lwt create_timens_index = prepare db create_timens_index_sql in
   let%lwt (_ : int) = wrap (fun () -> exec_sync db ~destroy:false create_timens_index) in
 
+  let%lwt single = prepare db single_sql in
   let%lwt count = prepare db count_sql in
   let%lwt begin_transaction = prepare db begin_sql in
   let%lwt commit_transaction = prepare db commit_sql in
   let%lwt rollback_transaction = prepare db rollback_sql in
 
-  let stmts = {count; begin_transaction; commit_transaction; rollback_transaction} in
+  let stmts = {single; count; begin_transaction; commit_transaction; rollback_transaction} in
   let instance = {db; file; avg_read; stmts} in
   return instance
 
@@ -227,7 +236,7 @@ let close db =
 let push db ~msgs ~ids =
   let time = Id.time_ns () in
   let make_stmt slice =
-    let%lwt ((st, _) as stmt) = prepare db.db (insert_sql (Array.length slice)) in
+    let%lwt (st, _) as stmt = prepare db.db (insert_sql (Array.length slice)) in
     let args = Array.concat_mapi slice ~f:(fun i (raw, id) ->
         let pos = i * 3 in
         [| ((pos + 1), Data.BLOB id); ((pos + 2), Data.INT time); ((pos + 3), Data.BLOB raw) |]
@@ -246,7 +255,7 @@ let push db ~msgs ~ids =
 
 let pull db ~search =
   let open Persistence in
-  let%lwt ((st, _) as stmt) = prepare db.db (read_sql ~search) in
+  let%lwt (st, _) as stmt = prepare db.db (read_sql ~search) in
   let args = Array.mapi search.filters ~f:(fun i filter ->
       match filter with
       | `After_id id -> ((i + 1), Data.BLOB id)
@@ -256,7 +265,17 @@ let pull db ~search =
   let%lwt () = bind st args in
   query db ~destroy:true stmt FBlobRowid
 
-let size db =
-  match%lwt query db ~destroy:false db.stmts.count FInt64 with
+let single db ~rowid =
+  let (st, sql) as stmt = db.stmts.single in
+  let args = [| (1, Data.INT rowid) |] in
+  let%lwt () = bind st args in
+  match%lwt query db ~destroy:false stmt FBlobInt64 with
   | [| x |], _ -> return x
-  | dataset, _ -> failwith (Printf.sprintf "Count failed for %s, dataset size: %d" db.file (Array.length dataset))
+  (* | dataset, _ -> fail_with (Printf.sprintf "Single failed (dataset size: %d) for [%s]" (Array.length dataset) sql) *)
+  | dataset, _ -> fail_with (Int64.to_string rowid)
+
+let size db =
+  let (_, sql) as stmt = db.stmts.count in
+  match%lwt query db ~destroy:false stmt FInt64 with
+  | [| x |], _ -> return x
+  | dataset, _ -> fail_with (Printf.sprintf "Count failed (dataset size: %d) for [%s]" (Array.length dataset) sql)

@@ -25,7 +25,7 @@ val read_slice :
   chan_name:string ->
   id_header:string option ->
   mode:Mode.Read.t ->
-  (string array * string, string list) Result.t Lwt.t
+  (Persistence.slice * string, string list) Result.t Lwt.t
 
 val read_stream :
   t ->

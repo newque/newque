@@ -44,6 +44,16 @@ type t = [
   | Count.t
 ]
 
+let wrap (tag : Any.t) : t = match tag with
+  | `Single -> `Write `Single
+  | `Multiple -> `Write `Multiple
+  | `Atomic -> `Write `Atomic
+  | `One -> `Read `One
+  | (`Many _) as x -> `Read x
+  | (`After_id _) as x -> `Read x
+  | (`After_ts _) as x-> `Read x
+  | `Count -> `Count
+
 (* Efficient, not pretty. *)
 let of_string str : ([Write.t | Read.t], string) Result.t =
   match String.lowercase str with
@@ -62,12 +72,8 @@ let of_string str : ([Write.t | Read.t], string) Result.t =
       | _ -> Error str
     end
 
-let wrap (tag : Any.t) : t = match tag with
-  | `Single -> `Write `Single
-  | `Multiple -> `Write `Multiple
-  | `Atomic -> `Write `Atomic
-  | `One -> `Read `One
-  | (`Many _) as x -> `Read x
-  | (`After_id _) as x -> `Read x
-  | (`After_ts _) as x-> `Read x
-  | `Count -> `Count
+let to_string mode =
+  match wrap mode with
+  | `Write m -> Write.to_string m
+  | `Read m -> Read.to_string m
+  | `Count -> "Count"

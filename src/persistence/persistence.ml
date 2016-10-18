@@ -13,6 +13,16 @@ let create_search max_read ~mode =
   | `After_id id -> {limit = max_read; filters = [|`After_id id|]}
   | `After_ts ts -> {limit = max_read; filters = [|`After_ts ts|]}
 
+type slice_metadata = {
+  last_internal_id: int64;
+  last_id: string;
+  last_timens: int64;
+}
+type slice = {
+  metadata: slice_metadata option;
+  payloads: string array;
+}
+
 module type Template = sig
   type t [@@deriving sexp]
 
@@ -20,7 +30,7 @@ module type Template = sig
 
   val push : t -> msgs:string array -> ids:string array -> Ack.t -> int Lwt.t
 
-  val pull_slice : t -> search:search -> string array Lwt.t
+  val pull_slice : t -> search:search -> slice Lwt.t
 
   val pull_stream : t -> search:search -> string array Lwt_stream.t Lwt.t
 
@@ -38,7 +48,7 @@ module type S = sig
 
   val push : Message.t array -> Id.t array -> Ack.t -> int Lwt.t
 
-  val pull_slice : int64 -> mode:Mode.Read.t -> string array Lwt.t
+  val pull_slice : int64 -> mode:Mode.Read.t -> slice Lwt.t
 
   val pull_stream : int64 -> mode:Mode.Read.t -> string Lwt_stream.t Lwt.t
 
@@ -62,8 +72,13 @@ module Make (Argument: Argument) : S = struct
   let pull_slice max_read ~mode =
     let%lwt instance = instance in
     let search = create_search max_read ~mode in
-    let%lwt raw = Argument.IO.pull_slice instance ~search in
-    wrap (fun () -> Array.concat_map raw ~f:(fun x -> Message.contents (Message.parse_exn x)))
+    let%lwt slice = Argument.IO.pull_slice instance ~search in
+    wrap (fun () ->
+      {
+        slice with payloads =
+                     Array.concat_map slice.payloads ~f:(fun x -> Message.contents (Message.parse_exn x))
+      }
+    )
 
   let pull_stream max_read ~mode =
     let%lwt instance = instance in

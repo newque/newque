@@ -7,7 +7,7 @@ type t = {
   name: string;
   endpoint_names: string list;
   push: Message.t array -> Id.t array -> Ack.t -> int Lwt.t sexp_opaque;
-  pull_slice: int64 -> mode:Mode.Read.t -> string array Lwt.t sexp_opaque;
+  pull_slice: int64 -> mode:Mode.Read.t -> Persistence.slice Lwt.t sexp_opaque;
   pull_stream: int64 -> mode:Mode.Read.t -> string Lwt_stream.t Lwt.t sexp_opaque;
   size: unit -> int64 Lwt.t sexp_opaque;
   ack: Ack.t;

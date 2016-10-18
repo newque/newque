@@ -4,7 +4,7 @@ type t = string
 
 let time_ns () = Time_ns.now () |> Time_ns.to_int63_ns_since_epoch |> Int63.to_int64
 
-let uuid () = Uuidm.v `V4 |> Uuidm.to_bytes
+let uuid () = Uuidm.v `V4 |> Uuidm.to_string
 
 let array_of_header ?(sep=",") ~mode ~msgs header_option =
   match header_option with

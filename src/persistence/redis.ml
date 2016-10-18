@@ -27,11 +27,9 @@ module M = struct
   let push instance ~msgs ~ids ack =
     return 1
 
-  let pull_slice instance ~search =
-    return [| |]
+  let pull_slice instance ~search = fail_with "Unimplemented: Redis pull_slice"
 
-  let pull_stream instance ~search =
-    wrap (fun () -> Lwt_stream.of_list [ [| "x"; "y"; "z" |] ])
+  let pull_stream instance ~search = fail_with "Unimplemented: Redis pull_stream"
 
   let size instance =
     return (Int.to_int64 20)

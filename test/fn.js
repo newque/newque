@@ -5,15 +5,14 @@ var base = 'http://127.0.0.1:'
 var call = exports.call = function (method, port, path, buf, headers) {
   return new Promise(function (resolve, reject) {
     var req = request(method, base+port+path)
-
     if (headers) {
-      req = headers.reduce(((r, h) => r.set(h[0], h[1])), req)
+      headers.forEach(function (pair) {
+        req.set(pair[0], pair[1])
+      })
     }
-
     if (buf) {
       req.send(buf)
     }
-
     req.end(function (err, result) {
       if (result.res.headers['content-type'] === 'application/octet-stream') {
         var arr = []
@@ -84,6 +83,8 @@ var shouldHaveCounted = exports.shouldHaveCounted = function (count) {
 
 var shouldHaveRead = exports.shouldHaveRead = function (values, separator) {
   return function (result) {
+    // console.log(result.res.statusCode)
+    // console.log(result.res.text)
     return new Promise(function (resolve, reject) {
       if (values.length === 0) {
         assert(result.res.statusCode === 204)
@@ -112,6 +113,8 @@ var shouldHaveRead = exports.shouldHaveRead = function (values, separator) {
         if (result.res.statusCode === 200) {
           assert(parseInt(result.res.headers[C.lengthHeader], 10) === values.length)
           assert(parseInt(result.res.headers['content-length'], 10) === result.res.buffer.length)
+          assert(result.res.headers[C.lastIdHeader].length > 0)
+          assert(parseInt(result.res.headers[C.lastTsHeader], 10) > 0)
         } else if (result.res.statusCode === 204) {
           assert(result.res.headers['content-length'] == null)
           assert(parseInt(result.res.headers[C.lengthHeader], 10) === 0)

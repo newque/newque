@@ -37,7 +37,7 @@ type standard_routing = {
     chan_name:string ->
     id_header:string option ->
     mode:Mode.Read.t ->
-    (string array * string, string list) Result.t Lwt.t);
+    (Persistence.slice * string, string list) Result.t Lwt.t);
   read_stream: (
     chan_name:string ->
     id_header:string option ->
@@ -56,7 +56,9 @@ type http_routing =
 let mode_header_name = "newque-mode"
 let id_header_name = "newque-msg-id"
 let length_header_name = "newque-response-length"
-let json_response_header = Header.init_with "Content-Type" "application/json"
+let last_id_header_name = "newque-response-last-id"
+let last_ts_header_name = "newque-response-last-ts"
+let json_response_header = Header.init_with "content-type" "application/json"
 
 let default_filter _ req _ =
   let path = Request.uri req |> Uri.path in
@@ -81,6 +83,9 @@ let default_filter _ req _ =
         | `GET, Ok ((`Many _) as m)
         | `GET, Ok ((`After_id _) as m)
         | `GET, Ok ((`After_ts _) as m) -> Ok (chan_name, m)
+        | (`POST as meth), Ok m
+        | (`GET as meth), Ok m ->
+          Error (400, [Printf.sprintf "Invalid {Method, Mode} pair: {%s, %s}" (Code.string_of_method meth) (Mode.to_string (m :> Mode.Any.t))])
         | _, Error str ->
           Error (400, [Printf.sprintf "Invalid %s header value: %s" mode_header_name str])
         | meth, _ ->
@@ -155,12 +160,12 @@ let handler http routing ((ch, _) as conn) req body =
                     let%lwt status, headers = match%lwt Lwt_stream.is_empty stream with
                       | false -> return (
                           (Code.status_of_code 200),
-                          (Header.add_list (Header.init ()) [("Content-Type", "application/octet-stream")])
+                          (Header.add_list (Header.init ()) [("content-type", "application/octet-stream")])
                         )
                       | true -> return (
                           (Code.status_of_code 204),
                           (Header.add_list (Header.init ()) [
-                              ("Content-Type", "application/octet-stream");
+                              ("content-type", "application/octet-stream");
                               (length_header_name, "0");
                             ])
                         )
@@ -179,13 +184,25 @@ let handler http routing ((ch, _) as conn) req body =
               | Transfer.Unknown | Transfer.Fixed _ ->
                 begin match%lwt routing.read_slice ~chan_name ~id_header ~mode with
                   | Error errors -> handle_errors 400 errors
-                  | Ok (arr, sep) ->
-                    let status = Code.status_of_code (if Array.is_empty arr then 204 else 200) in
-                    let headers = Header.add_list (Header.init ()) [
-                        ("Content-Type", "application/octet-stream");
-                        (length_header_name, Int.to_string (Array.length arr));
-                      ] in
-                    let body = String.concat_array ~sep arr in
+                  | Ok (slice, sep) ->
+                    let open Persistence in
+                    let payloads = slice.payloads in
+                    let status = Code.status_of_code (if Array.is_empty payloads then 204 else 200) in
+                    let headers = match slice.metadata with
+                      | None ->
+                        Header.add_list (Header.init ()) [
+                          ("content-type", "application/octet-stream");
+                          (length_header_name, Int.to_string (Array.length payloads));
+                        ]
+                      | Some metadata ->
+                        Header.add_list (Header.init ()) [
+                          ("content-type", "application/octet-stream");
+                          (length_header_name, Int.to_string (Array.length payloads));
+                          (last_id_header_name, metadata.last_id);
+                          (last_ts_header_name, Int64.to_string (metadata.last_timens));
+                        ]
+                    in
+                    let body = String.concat_array ~sep payloads in
                     let encoding = Transfer.Fixed (Int.to_int64 (String.length body)) in
                     let response = Response.make ~status ~flush:true ~encoding ~headers () in
                     return (response, (Cohttp_lwt_body.of_string body))
