@@ -1,7 +1,5 @@
 {
   "listeners": ["http8000"],
   "persistence": "disk",
-  "writeSettings": {
-    "acknowledgement": "none"
-  }
+  "writeSettings": null
 }

@@ -28,7 +28,7 @@ module type Template = sig
 
   val close : t -> unit Lwt.t
 
-  val push : t -> msgs:string array -> ids:string array -> Ack.t -> int Lwt.t
+  val push : t -> msgs:string array -> ids:string array -> Write_settings.t option -> int Lwt.t
 
   val pull_slice : t -> search:search -> slice Lwt.t
 
@@ -46,7 +46,7 @@ end
 module type S = sig
   type t [@@deriving sexp]
 
-  val push : Message.t array -> Id.t array -> Ack.t -> int Lwt.t
+  val push : Message.t array -> Id.t array -> Write_settings.t option -> int Lwt.t
 
   val pull_slice : int64 -> mode:Mode.Read.t -> slice Lwt.t
 

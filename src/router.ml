@@ -56,22 +56,26 @@ let write router ~listen_name ~chan_name ~id_header ~mode stream =
   | (Error _) as err -> return err
   | Ok chan ->
     let open Channel in
-    let save_t =
-      let%lwt msgs = Message.of_stream ~mode ~sep:chan.separator ~buffer_size:chan.buffer_size stream in
-      begin match Id.array_of_header ~mode ~msgs id_header with
-        | Error str -> return (Error [str])
-        | Ok ids ->
-          let%lwt count = Channel.push chan msgs ids in
-          ignore_result (Logger.debug_lazy (lazy (
-              Printf.sprintf "Wrote: %s (length: %d) %s from %s" (Mode.Write.to_string mode) count chan_name listen_name
-            )));
-          return (Ok (Some count))
-      end
-    in
-    let open Config_t in
-    begin match chan.ack with
-      | Saved -> save_t
-      | Instant -> return (Ok None)
+    begin match chan.write with
+      | None -> return (Error [Printf.sprintf "Channel %s is Read Only" chan_name])
+      | Some write ->
+        let%lwt msgs = Message.of_stream ~mode ~sep:chan.separator ~buffer_size:chan.buffer_size stream in
+        begin match Id.array_of_header ~mode ~msgs id_header with
+          | Error str -> return (Error [str])
+          | Ok ids ->
+            let save_t =
+              let%lwt count = Channel.push chan msgs ids in
+              ignore_result (Logger.debug_lazy (lazy (
+                  Printf.sprintf "Wrote: %s (length: %d) %s from %s" (Mode.Write.to_string mode) count chan_name listen_name
+                )));
+              return (Ok (Some count))
+            in
+            let open Write_settings in
+            begin match write.ack with
+              | Saved -> save_t
+              | Instant -> return (Ok None)
+            end
+        end
     end
 
 let read_slice router ~listen_name ~chan_name ~id_header ~mode =

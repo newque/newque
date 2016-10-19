@@ -70,6 +70,42 @@ module.exports = function (id) {
       })
     }
 
+    // These 2 calls only work on non-stream
+    it('After_id', function () {
+      return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'one']])
+      .then(Fn.shouldHaveRead(['M abc'], '\n'))
+      .then(function (result) {
+        var lastId = result.res.headers[C.lastIdHeader]
+        return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'after_id ' + lastId]])
+      })
+      .then(Fn.shouldHaveRead(['M def', 'M ghi', 'M jkl'], '\n'))
+    })
+
+    it('After_ts', function () {
+      var lastTs = null
+      return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'one']])
+      .then(Fn.shouldHaveRead(['M abc'], '\n'))
+      .then(function (result) {
+        lastTs = parseInt(result.res.headers[C.lastTsHeader], 10)
+        // All added in the same batch, so it should return nothing
+        return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'After_ts ' + lastTs]])
+      })
+      .then(Fn.shouldHaveRead([], '\n'))
+      .then(function () {
+        // Removing a 1 nanosecond will return all of them, but JS numbers don't have enough precision
+        // at that scale, so we remove more
+        return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'After_ts ' + (lastTs - 1000)]])
+      })
+      .then(Fn.shouldHaveRead(['M abc', 'M def', 'M ghi', 'M jkl'], '\n'))
+    })
+
+    describe('Read only', function () {
+      it('Should pull', function () {
+        return Fn.call('GET', 8000, '/v1/readonly', null, [[C.modeHeader, 'one']])
+        .then(Fn.shouldHaveRead([], '\n'))
+      })
+    })
+
     after(function () {
       return Proc.stopExecutable(p)
     })

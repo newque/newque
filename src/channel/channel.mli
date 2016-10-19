@@ -1,11 +1,11 @@
 type t = {
   name : string;
   endpoint_names : string list;
-  push : Message.t array -> Id.t array -> Ack.t -> int Lwt.t;
+  push : Message.t array -> Id.t array -> Write_settings.t option -> int Lwt.t;
   pull_slice : int64 -> mode:Mode.Read.t -> Persistence.slice Lwt.t;
   pull_stream : int64 -> mode:Mode.Read.t -> string Lwt_stream.t Lwt.t;
   size : unit -> int64 Lwt.t;
-  ack : Ack.t;
+  write : Write_settings.t option;
   separator : string;
   buffer_size : int;
   max_read: int64;

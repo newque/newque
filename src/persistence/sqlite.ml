@@ -271,8 +271,7 @@ let single db ~rowid =
   let%lwt () = bind st args in
   match%lwt query db ~destroy:false stmt FBlobInt64 with
   | [| x |], _ -> return x
-  (* | dataset, _ -> fail_with (Printf.sprintf "Single failed (dataset size: %d) for [%s]" (Array.length dataset) sql) *)
-  | dataset, _ -> fail_with (Int64.to_string rowid)
+  | dataset, _ -> fail_with (Printf.sprintf "Single failed (dataset size: %d) for [%s]" (Array.length dataset) sql)
 
 let size db =
   let (_, sql) as stmt = db.stmts.count in

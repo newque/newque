@@ -1,7 +1,9 @@
 {
   "listeners": ["http8000"],
   "persistence": "memory",
-  "acknowledgement": "saved",
   "separator": "--",
-  "maxRead": 2
+  "maxRead": 2,
+  "writeSettings": {
+    "acknowledgement": "saved"
+  }
 }

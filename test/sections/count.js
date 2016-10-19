@@ -16,33 +16,35 @@ module.exports = function (id) {
     })
 
     it('Valid', function () {
-      var buf = ''
-      return Fn.call('GET', 8000, '/v1/example/count', buf)
+      return Fn.call('GET', 8000, '/v1/example/count')
       .then(Fn.shouldHaveCounted(4))
     })
 
     it('Valid, empty', function () {
-      var buf = ''
-      return Fn.call('GET', 8000, '/v1/empty/count', buf)
+      return Fn.call('GET', 8000, '/v1/empty/count')
       .then(Fn.shouldHaveCounted(0))
     })
 
     it('Invalid path', function () {
-      var buf = ''
-      return Fn.call('GET', 8000, '/v1//count', buf)
+      return Fn.call('GET', 8000, '/v1//count')
       .then(Fn.shouldFail(400))
     })
 
     it('Invalid path 2', function () {
-      var buf = ''
-      return Fn.call('GET', 8000, '/v1/nothing/count', buf)
+      return Fn.call('GET', 8000, '/v1/nothing/count')
       .then(Fn.shouldFail(400))
     })
 
     it('Invalid method', function () {
-      var buf = ''
-      return Fn.call('XYZ', 8000, '/v1/example/count', buf)
+      return Fn.call('XYZ', 8000, '/v1/example/count')
       .then(Fn.shouldFail(405))
+    })
+
+    describe('Read only', function () {
+      it('Should count', function () {
+        return Fn.call('GET', 8000, '/v1/readonly/count')
+      .then(Fn.shouldHaveCounted(0))
+      })
     })
 
     after(function () {

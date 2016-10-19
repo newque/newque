@@ -208,6 +208,14 @@ module.exports = function (id) {
       })
     })
 
+    describe('Read only', function () {
+      it('Should error when trying to write', function () {
+        var buf = 'qwerty'
+        return Fn.call('POST', 8000, '/v1/readonly', buf, [[C.modeHeader, 'single']])
+        .then(Fn.shouldFail(400))
+      })
+    })
+
     after(function () {
       return Proc.stopExecutable(p)
     })
