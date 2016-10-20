@@ -45,19 +45,29 @@ type config_persistence = [
 
 
 (* CHANNELS *)
-type config_acknowledgement = [
+type config_channel_acknowledgement = [
   | C_instant <json name="none">
   | C_saved <json name="saved">
 ] <ocaml repr="classic">
 
 type config_channel_write = {
-  ack <json name="acknowledgement">: config_acknowledgement;
+  ack <json name="acknowledgement">: config_channel_acknowledgement;
+} <ocaml field_prefix="c_">
+
+type config_channel_format = [
+  | C_plaintext <json name="plaintext">
+  | C_json <json name="json">
+] <ocaml repr="classic">
+
+type config_channel_read = {
+  format: config_channel_format;
 } <ocaml field_prefix="c_">
 
 (* TODO: Validate that the separators are non-empty *)
 type config_channel = {
   endpoint_names <json name="listeners">: string list;
   persistence: config_persistence;
+  read_settings <json name="readSettings">: config_channel_read nullable;
   write_settings <json name="writeSettings">: config_channel_write nullable;
   ~separator <ocaml default="\"\n\"">: string;
   ~buffer_size <json name="averageSize"> <ocaml default="256">: int;

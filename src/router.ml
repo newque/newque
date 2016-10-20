@@ -57,7 +57,7 @@ let write router ~listen_name ~chan_name ~id_header ~mode stream =
   | Ok chan ->
     let open Channel in
     begin match chan.write with
-      | None -> return (Error [Printf.sprintf "Channel %s is Read Only" chan_name])
+      | None -> return (Error [Printf.sprintf "Channel %s doesn't support Writing to it." chan_name])
       | Some write ->
         let%lwt msgs = Message.of_stream ~mode ~sep:chan.separator ~buffer_size:chan.buffer_size stream in
         begin match Id.array_of_header ~mode ~msgs id_header with
@@ -82,28 +82,40 @@ let read_slice router ~listen_name ~chan_name ~id_header ~mode =
   match find_chan router ~listen_name ~chan_name with
   | (Error _) as err -> return err
   | Ok chan ->
-    let%lwt slice = Channel.pull_slice chan ~mode in
-    ignore_result (Logger.debug_lazy (lazy (
-        Printf.sprintf "Read: %s (size: %d) from %s" chan_name (Array.length slice.Persistence.payloads) listen_name
-      )));
-    return (Ok (slice, chan.Channel.separator))
+    begin match chan.Channel.read with
+      | None -> return (Error [Printf.sprintf "Channel %s doesn't support Reading from it." chan_name])
+      | Some read ->
+        let%lwt slice = Channel.pull_slice chan ~mode in
+        ignore_result (Logger.debug_lazy (lazy (
+            Printf.sprintf "Read: %s (size: %d) from %s" chan_name (Array.length slice.Persistence.payloads) listen_name
+          )));
+        return (Ok (slice, chan))
+    end
 
 let read_stream router ~listen_name ~chan_name ~id_header ~mode =
   match find_chan router ~listen_name ~chan_name with
   | (Error _) as err -> return err
   | Ok chan ->
-    let%lwt stream = Channel.pull_stream chan ~mode in
-    ignore_result (Logger.debug_lazy (lazy (
-        Printf.sprintf "Reading: %s (stream) from %s" chan_name listen_name
-      )));
-    return (Ok (stream, chan.Channel.separator))
+    begin match chan.Channel.read with
+      | None -> return (Error [Printf.sprintf "Channel %s doesn't support Reading from it." chan_name])
+      | Some read ->
+        let%lwt stream = Channel.pull_stream chan ~mode in
+        ignore_result (Logger.debug_lazy (lazy (
+            Printf.sprintf "Reading: %s (stream) from %s" chan_name listen_name
+          )));
+        return (Ok (stream, chan))
+    end
 
 let count router ~listen_name ~chan_name ~(mode: Mode.Count.t) =
   match find_chan router ~listen_name ~chan_name with
   | (Error _) as err -> return err
   | Ok chan ->
-    let%lwt count = Channel.size chan () in
-    ignore_result (Logger.debug_lazy (lazy (
-        Printf.sprintf "Counted: %s (size: %Ld) from %s" chan_name count listen_name
-      )));
-    return (Ok count)
+    begin match chan.Channel.read with
+      | None -> return (Error [Printf.sprintf "Channel %s doesn't support Reading from it." chan_name])
+      | Some read ->
+        let%lwt count = Channel.size chan () in
+        ignore_result (Logger.debug_lazy (lazy (
+            Printf.sprintf "Counted: %s (size: %Ld) from %s" chan_name count listen_name
+          )));
+        return (Ok count)
+    end

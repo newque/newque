@@ -6,17 +6,18 @@ let log_path name = Fs.conf_chan_dir ^ name
 type t = {
   name: string;
   endpoint_names: string list;
-  push: Message.t array -> Id.t array -> Write_settings.t option -> int Lwt.t sexp_opaque;
+  push: Message.t array -> Id.t array -> int Lwt.t sexp_opaque;
   pull_slice: int64 -> mode:Mode.Read.t -> Persistence.slice Lwt.t sexp_opaque;
   pull_stream: int64 -> mode:Mode.Read.t -> string Lwt_stream.t Lwt.t sexp_opaque;
   size: unit -> int64 Lwt.t sexp_opaque;
+  read: Read_settings.t option;
   write: Write_settings.t option;
   separator: string;
   buffer_size: int;
   max_read: int64;
 } [@@deriving sexp]
 
-let create ?redis name (conf_channel : Config_t.config_channel) =
+let create ?redis name conf_channel =
   let open Config_t in
   let module Persist = (val (match conf_channel.persistence with
     | `Memory ->
@@ -53,13 +54,14 @@ let create ?redis name (conf_channel : Config_t.config_channel) =
     pull_slice = Persist.pull_slice;
     pull_stream = Persist.pull_stream;
     size = Persist.size;
+    read = Option.map conf_channel.read_settings ~f:Read_settings.create;
     write = Option.map conf_channel.write_settings ~f:Write_settings.create;
     separator = conf_channel.separator;
     buffer_size = conf_channel.buffer_size;
     max_read = Int.to_int64 (conf_channel.max_read);
   }
 
-let push chan msgs ids = chan.push msgs ids chan.write
+let push chan msgs ids = chan.push msgs ids
 
 let pull_slice chan ~mode = chan.pull_slice chan.max_read ~mode
 

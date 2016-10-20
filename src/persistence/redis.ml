@@ -24,7 +24,7 @@ module M = struct
 
   let close instance = return_unit
 
-  let push instance ~msgs ~ids ack =
+  let push instance ~msgs ~ids =
     return 1
 
   let pull_slice instance ~search = fail_with "Unimplemented: Redis pull_slice"

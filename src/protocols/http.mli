@@ -13,7 +13,7 @@ type t = {
 
 (* TODO: Clean this up.. *)
 type standard_routing = {
-  write: (
+  push: (
     chan_name:string ->
     id_header:string option ->
     mode:Mode.Write.t ->
@@ -24,14 +24,12 @@ type standard_routing = {
     chan_name:string ->
     id_header:string option ->
     mode:Mode.Read.t ->
-    (* Slice * separator *)
-    (Persistence.slice * string, string list) Result.t Lwt.t);
+    (Persistence.slice * Channel.t, string list) Result.t Lwt.t);
   read_stream: (
     chan_name:string ->
     id_header:string option ->
     mode:Mode.Read.t ->
-    (* Stream of messages * separator *)
-    (string Lwt_stream.t * string, string list) Result.t Lwt.t);
+    (string Lwt_stream.t * Channel.t, string list) Result.t Lwt.t);
   count: (
     chan_name:string ->
     mode:Mode.Count.t ->

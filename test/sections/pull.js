@@ -19,6 +19,11 @@ module.exports = function (id) {
         return Fn.call('POST', 8000, '/v1/secondary', buf, [[C.modeHeader, 'multiple']])
         .then(Fn.shouldHaveWritten(3))
       })
+      .then(function () {
+        var buf = '123\n456\n'
+        return Fn.call('POST', 8000, '/v1/json', buf, [[C.modeHeader, 'multiple']])
+        .then(Fn.shouldHaveWritten(3))
+      })
     })
 
     var transports = [
@@ -67,8 +72,35 @@ module.exports = function (id) {
           return Fn.call('GET', 8000, '/v1/empty', null, [[C.modeHeader, 'many 10']].concat(transports[ii].headers))
           .then(Fn.shouldHaveRead([], '\n'))
         })
+
+
+        describe('Read only', function () {
+          it('Should pull', function () {
+            return Fn.call('GET', 8000, '/v1/readonly', null, [[C.modeHeader, 'one']].concat(transports[ii].headers))
+            .then(Fn.shouldHaveRead([], '\n'))
+          })
+        })
+
+        describe('Write only', function () {
+          it('Should not pull', function () {
+            return Fn.call('GET', 8000, '/v1/writeonly', null, [[C.modeHeader, 'one']].concat(transports[ii].headers))
+            .then(Fn.shouldFail(400))
+          })
+        })
       })
     }
+
+    describe('JSON format', function () {
+      it('Many', function () {
+        return Fn.call('GET', 8000, '/v1/json', null, [[C.modeHeader, 'many 3']])
+        .then(Fn.shouldHaveRead(['123', '456', ''], null))
+      })
+
+      it('Empty', function () {
+        return Fn.call('GET', 8000, '/v1/json', null, [[C.modeHeader, 'after_id thisdoesntexist']])
+        .then(Fn.shouldHaveRead([], null))
+      })
+    })
 
     // These 2 calls only work on non-stream
     it('After_id', function () {
@@ -97,13 +129,6 @@ module.exports = function (id) {
         return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'After_ts ' + (lastTs - 1000)]])
       })
       .then(Fn.shouldHaveRead(['M abc', 'M def', 'M ghi', 'M jkl'], '\n'))
-    })
-
-    describe('Read only', function () {
-      it('Should pull', function () {
-        return Fn.call('GET', 8000, '/v1/readonly', null, [[C.modeHeader, 'one']])
-        .then(Fn.shouldHaveRead([], '\n'))
-      })
     })
 
     after(function () {

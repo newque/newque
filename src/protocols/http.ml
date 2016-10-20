@@ -27,7 +27,7 @@ let sexp_of_t http =
   ]
 
 type standard_routing = {
-  write: (
+  push: (
     chan_name:string ->
     id_header:string option ->
     mode:Mode.Write.t ->
@@ -37,12 +37,12 @@ type standard_routing = {
     chan_name:string ->
     id_header:string option ->
     mode:Mode.Read.t ->
-    (Persistence.slice * string, string list) Result.t Lwt.t);
+    (Persistence.slice * Channel.t, string list) Result.t Lwt.t);
   read_stream: (
     chan_name:string ->
     id_header:string option ->
     mode:Mode.Read.t ->
-    (string Lwt_stream.t * string, string list) Result.t Lwt.t);
+    (string Lwt_stream.t * Channel.t, string list) Result.t Lwt.t);
   count: (
     chan_name:string ->
     mode:Mode.Count.t ->
@@ -109,6 +109,15 @@ let json_write_body code errors saved =
       ("errors", `List (List.map errors ~f:(fun x -> `String x)));
     ]
 
+let json_read_body code errors messages =
+  (* TODO: optimize this *)
+  let ll = Array.to_list (Array.map ~f:(fun x -> `String x) messages) in
+  `Assoc [
+    ("code", `Int code);
+    ("errors", `List (List.map errors ~f:(fun x -> `String x)));
+    ("messages", `List ll);
+  ]
+
 let json_count_body code errors count =
   let count = if List.is_empty errors then `Int count else `Null in
   `Assoc [
@@ -140,7 +149,7 @@ let handler http routing ((ch, _) as conn) req body =
             let stream = Cohttp_lwt_body.to_stream body in
             let id_header = Header.get (Request.headers req) id_header_name in
             let%lwt (code, errors, saved) =
-              begin match%lwt routing.write ~chan_name ~id_header ~mode stream with
+              begin match%lwt routing.push ~chan_name ~id_header ~mode stream with
                 | Ok ((Some _) as count) -> return (201, [], count)
                 | Ok None -> return (202, [], None)
                 | Error errors -> return (400, errors, (Some 0))
@@ -156,7 +165,7 @@ let handler http routing ((ch, _) as conn) req body =
               | Transfer.Chunked ->
                 begin match%lwt routing.read_stream ~chan_name ~id_header ~mode with
                   | Error errors -> handle_errors 400 errors
-                  | Ok (stream, sep) ->
+                  | Ok (stream, channel) ->
                     let%lwt status, headers = match%lwt Lwt_stream.is_empty stream with
                       | false -> return (
                           (Code.status_of_code 200),
@@ -170,6 +179,7 @@ let handler http routing ((ch, _) as conn) req body =
                             ])
                         )
                     in
+                    let sep = channel.Channel.separator in
                     let body_stream = Lwt_stream.map_list_s (fun raw ->
                         begin match%lwt Lwt_stream.is_empty stream with
                           | true -> return [raw]
@@ -184,10 +194,11 @@ let handler http routing ((ch, _) as conn) req body =
               | Transfer.Unknown | Transfer.Fixed _ ->
                 begin match%lwt routing.read_slice ~chan_name ~id_header ~mode with
                   | Error errors -> handle_errors 400 errors
-                  | Ok (slice, sep) ->
+                  | Ok (slice, channel) ->
                     let open Persistence in
                     let payloads = slice.payloads in
-                    let status = Code.status_of_code (if Array.is_empty payloads then 204 else 200) in
+                    let code = if Array.is_empty payloads then 204 else 200 in
+                    let status = Code.status_of_code code in
                     let headers = match slice.metadata with
                       | None ->
                         Header.add_list (Header.init ()) [
@@ -202,7 +213,17 @@ let handler http routing ((ch, _) as conn) req body =
                           (last_ts_header_name, Int64.to_string (metadata.last_timens));
                         ]
                     in
-                    let body = String.concat_array ~sep payloads in
+                    let open Read_settings in
+                    let body = match channel.Channel.read with
+                      | None ->
+                        let err = Printf.sprintf "Impossible case: Missing readSettings for channel %s" chan_name in
+                        async (fun () -> Logger.error err);
+                        Yojson.Basic.to_string (json_read_body 500 [err] [| |])
+                      | Some { format = Plaintext } ->
+                        String.concat_array ~sep:channel.Channel.separator payloads
+                      | Some { format = Json } ->
+                        Yojson.Basic.to_string (json_read_body code [] payloads)
+                    in
                     let encoding = Transfer.Fixed (Int.to_int64 (String.length body)) in
                     let response = Response.make ~status ~flush:true ~encoding ~headers () in
                     return (response, (Cohttp_lwt_body.of_string body))

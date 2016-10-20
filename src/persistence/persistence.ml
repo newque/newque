@@ -28,7 +28,7 @@ module type Template = sig
 
   val close : t -> unit Lwt.t
 
-  val push : t -> msgs:string array -> ids:string array -> Write_settings.t option -> int Lwt.t
+  val push : t -> msgs:string array -> ids:string array -> int Lwt.t
 
   val pull_slice : t -> search:search -> slice Lwt.t
 
@@ -46,7 +46,7 @@ end
 module type S = sig
   type t [@@deriving sexp]
 
-  val push : Message.t array -> Id.t array -> Write_settings.t option -> int Lwt.t
+  val push : Message.t array -> Id.t array -> int Lwt.t
 
   val pull_slice : int64 -> mode:Mode.Read.t -> slice Lwt.t
 
@@ -63,11 +63,11 @@ module Make (Argument: Argument) : S = struct
 
   let instance = Argument.create ()
 
-  let push msgs ids ack =
+  let push msgs ids =
     let%lwt instance = instance in
     let ids = Array.map ~f:Id.to_string ids in
     let msgs = Array.map ~f:Message.serialize msgs in
-    Argument.IO.push instance ~msgs ~ids ack
+    Argument.IO.push instance ~msgs ~ids
 
   let pull_slice max_read ~mode =
     let%lwt instance = instance in
@@ -75,8 +75,11 @@ module Make (Argument: Argument) : S = struct
     let%lwt slice = Argument.IO.pull_slice instance ~search in
     wrap (fun () ->
       {
-        slice with payloads =
-                     Array.concat_map slice.payloads ~f:(fun x -> Message.contents (Message.parse_exn x))
+        slice with
+        payloads =
+          Array.concat_map slice.payloads ~f:(fun x ->
+            Message.contents (Message.parse_exn x)
+          )
       }
     )
 

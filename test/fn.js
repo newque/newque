@@ -90,16 +90,29 @@ var shouldHaveRead = exports.shouldHaveRead = function (values, separator) {
         assert(result.res.statusCode === 204)
       } else {
         assert(result.res.statusCode === 200)
-        var sep = new Buffer(separator, 'utf8')
-        var arr = []
-        if (Buffer.isBuffer(values[0])) {
-          values.forEach(v => arr.push(v, sep))
+
+        if (separator !== null) {
+          // PLAINTEXT BODY
+          var sep = new Buffer(separator, 'utf8')
+          var arr = []
+          if (Buffer.isBuffer(values[0])) {
+            values.forEach(v => arr.push(v, sep))
+          } else {
+            values.forEach(v => arr.push(new Buffer(v, 'utf8'), sep))
+          }
+          assert(arr.length === values.length * 2)
+          arr.pop()
+          var buf = Buffer.concat(arr)
         } else {
-          values.forEach(v => arr.push(new Buffer(v, 'utf8'), sep))
+          // JSON BODY
+          var json = {
+            code: 200,
+            errors: [],
+            messages: values
+          }
+          var buf = new Buffer(JSON.stringify(json), 'utf8')
         }
-        assert(arr.length === values.length * 2)
-        arr.pop()
-        var buf = Buffer.concat(arr)
+
         // console.log('Expecting', JSON.stringify(buf.toString('utf8')))
         // console.log('Got', JSON.stringify(result.res.buffer.toString('utf8')))
         assert(Buffer.compare(buf, result.res.buffer) === 0)
@@ -131,7 +144,7 @@ var shouldFail = exports.shouldFail = function (code) {
       assert(result.res.statusCode === code)
       assert(result.body.code === code)
       assert(result.body.errors.length > 0)
-      return resolve()
+      return resolve(result)
     })
     .catch(function (err) {
       console.log(result.res.statusCode)

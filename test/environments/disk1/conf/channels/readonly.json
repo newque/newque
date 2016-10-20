@@ -1,5 +1,8 @@
 {
   "listeners": ["http8000"],
   "persistence": "disk",
+  "readSettings": {
+    "format":"plaintext"
+  },
   "writeSettings": null
 }

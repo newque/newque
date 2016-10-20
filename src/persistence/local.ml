@@ -58,7 +58,7 @@ module M = struct
     instance.db <- restarted.db;
     fail ex
 
-  let push instance ~msgs ~ids ack =
+  let push instance ~msgs ~ids =
     Lwt_mutex.with_lock instance.mutex (fun () ->
       try%lwt
         Sqlite.push instance.db msgs ids

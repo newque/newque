@@ -216,6 +216,14 @@ module.exports = function (id) {
       })
     })
 
+    describe('Write only', function () {
+      it('Should push', function () {
+        var buf = 'qwerty'
+        return Fn.call('POST', 8000, '/v1/writeonly', buf, [[C.modeHeader, 'single']])
+        .then(Fn.shouldHaveWritten(1))
+      })
+    })
+
     after(function () {
       return Proc.stopExecutable(p)
     })

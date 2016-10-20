@@ -3,6 +3,9 @@
   "persistence": "disk",
   "separator": "--",
   "maxRead": 2,
+  "readSettings": {
+    "format":"plaintext"
+  },
   "writeSettings": {
     "acknowledgement": "saved"
   }

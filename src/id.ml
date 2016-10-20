@@ -2,9 +2,9 @@ open Core.Std
 
 type t = string
 
-let time_ns () = Time_ns.now () |> Time_ns.to_int63_ns_since_epoch |> Int63.to_int64
+let time_ns () = Int63.to_int64 (Time_ns.to_int63_ns_since_epoch (Time_ns.now ()))
 
-let uuid () = Uuidm.v `V4 |> Uuidm.to_string
+let uuid () = Uuidm.to_string (Uuidm.v `V4)
 
 let array_of_header ?(sep=",") ~mode ~msgs header_option =
   match header_option with

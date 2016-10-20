@@ -47,6 +47,13 @@ module.exports = function (id) {
       })
     })
 
+    describe('Write only', function () {
+      it('Should not count', function () {
+        return Fn.call('GET', 8000, '/v1/writeonly/count')
+        .then(Fn.shouldFail(400))
+      })
+    })
+
     after(function () {
       return Proc.stopExecutable(p)
     })

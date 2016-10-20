@@ -25,7 +25,7 @@ val read_slice :
   chan_name:string ->
   id_header:string option ->
   mode:Mode.Read.t ->
-  (Persistence.slice * string, string list) Result.t Lwt.t
+  (Persistence.slice * Channel.t, string list) Result.t Lwt.t
 
 val read_stream :
   t ->
@@ -33,7 +33,7 @@ val read_stream :
   chan_name:string ->
   id_header:string option ->
   mode:Mode.Read.t ->
-  (string Lwt_stream.t * string, string list) Result.t Lwt.t
+  (string Lwt_stream.t * Channel.t, string list) Result.t Lwt.t
 
 val count :
   t ->
