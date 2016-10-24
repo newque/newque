@@ -3,7 +3,7 @@ var spawn = require('child_process').spawn
 var exec = require('child_process').exec
 
 var localExecutable = __dirname + '/newque'
-var environmentsDir = __dirname + '/environments'
+var confDir = __dirname + '/conf'
 var runningDir = __dirname + '/running'
 
 var pathExists = exports.pathExists = function (path) {
@@ -37,6 +37,10 @@ var readFile = function (path) {
       throw new Error('Nothing to read at ' + path)
     }
   })
+}
+
+var writeFile = function (path, data) {
+  return Promise.promisify(fs.writeFile)(path, data)
 }
 
 var copyFile = exports.copyFile = function (from, to) {
@@ -87,15 +91,15 @@ exports.cleanDirectories = function (arr) {
   ])
 }
 
-var getEnvironment = function (id) {
-  var path = environmentsDir + '/' + id + '/conf'
+var getEnvironment = function () {
+  var path = runningDir + '/conf/'
   var env = {
     channels: {}
   }
-  return readFile(path + '/newque.json')
+  return readFile(path + 'newque.json')
   .then(function (contents) {
     env.newque = JSON.parse(contents)
-    return Promise.map(readDirectory(path + '/channels'), c => readFile(path + '/channels/' + c))
+    return Promise.map(readDirectory(path + 'channels'), c => readFile(path + 'channels/' + c))
   })
   .then(function (channels) {
     channels.forEach(c => env.channels[c] = JSON.parse(c))
@@ -103,10 +107,23 @@ var getEnvironment = function (id) {
   })
 }
 
-exports.setupEnvironment = function (id) {
+exports.setupEnvironment = function (persistence) {
+  var path = runningDir + '/conf'
   return rm(runningDir)
-  .then(() => copyDir(environmentsDir + '/' + id, runningDir))
-  .then(() => getEnvironment(id))
+  .then(() => createDir(runningDir))
+  .then(() => copyDir(confDir, path))
+  .then(() => readDirectory(confDir + '/channels'))
+  .then(function (channels) {
+    return Promise.all(channels.map(function (channel) {
+      return readFile(confDir + '/channels/' + channel)
+      .then(function (contents) {
+        var parsed = JSON.parse(contents.toString('utf8'))
+        parsed.persistence = persistence
+        return writeFile(path + '/channels/' + channel, JSON.stringify(parsed, null, 2))
+      })
+    }))
+  })
+  .then(() => getEnvironment())
 }
 
 exports.spawnExecutable = function () {

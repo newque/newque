@@ -1,8 +1,0 @@
-{
-  "listeners": ["http8000"],
-  "persistence": "memory",
-  "readSettings": null,
-  "writeSettings": {
-    "acknowledgement": "saved"
-  }
-}

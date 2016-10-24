@@ -2,9 +2,10 @@
   "listeners": ["http8000"],
   "persistence": "disk",
   "readSettings": {
-    "format":"plaintext"
+    "format":"json"
   },
   "writeSettings": {
-    "acknowledgement": "saved"
+    "acknowledgement": "saved",
+    "copyToChannels": []
   }
 }

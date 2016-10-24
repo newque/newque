@@ -1,10 +1,11 @@
 {
   "listeners": ["http8000"],
-  "persistence": "memory",
+  "persistence": "disk",
   "readSettings": {
     "format":"plaintext"
   },
   "writeSettings": {
-    "acknowledgement": "saved"
+    "acknowledgement": "none",
+    "copyToChannels": []
   }
 }

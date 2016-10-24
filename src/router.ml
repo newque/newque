@@ -8,13 +8,16 @@ type t = {
 } [@@deriving sexp]
 
 let create () =
-  let table = String.Table.create ~size:5 () in
+  let table = String.Table.create () in
+  (* Register the catch-all private listener *)
+  let data = String.Table.create () in
+  String.Table.add_exn table ~key:Listener.(private_listener.id) ~data;
   {table}
 
 let register_listeners router listeners =
   let open Listener in
   List.filter_map listeners ~f:(fun listen ->
-    let entry = String.Table.create ~size:5 () in
+    let entry = String.Table.create () in
     match String.Table.add router.table ~key:listen.id ~data:entry with
     | `Ok -> None
     | `Duplicate -> Some (Printf.sprintf "Cannot register listener %s because it already exists" listen.id)
@@ -25,7 +28,9 @@ let register_listeners router listeners =
 let register_channels router channels =
   let open Channel in
   List.concat_map channels ~f:(fun chan ->
-    List.filter_map chan.endpoint_names ~f:(fun listen_name ->
+    (* Every channel also registers with the private listener *)
+    let chan_endpoints = Listener.(private_listener.id) :: chan.endpoint_names in
+    List.filter_map chan_endpoints ~f:(fun listen_name ->
       match String.Table.find router.table listen_name with
       | Some chan_table ->
         begin match String.Table.add chan_table ~key:chan.name ~data:chan with
@@ -63,14 +68,26 @@ let write router ~listen_name ~chan_name ~id_header ~mode stream =
         begin match Id.array_of_header ~mode ~msgs id_header with
           | Error str -> return (Error [str])
           | Ok ids ->
+            let open Write_settings in
             let save_t =
               let%lwt count = Channel.push chan msgs ids in
               ignore_result (Logger.debug_lazy (lazy (
                   Printf.sprintf "Wrote: %s (length: %d) %s from %s" (Mode.Write.to_string mode) count chan_name listen_name
                 )));
+              (* Copy to other channels if needed. *)
+              let%lwt () = Lwt_list.iter_p (fun copy_chan_name ->
+                  begin match find_chan router ~listen_name:Listener.(private_listener.id) ~chan_name:copy_chan_name with
+                    | Error _ -> Logger.warning_lazy (lazy (Printf.sprintf "Cannot copy from %s to %s because %s doesn't exist." chan_name copy_chan_name copy_chan_name))
+                    | Ok copy_chan ->
+                      let%lwt copy_count = Channel.push copy_chan msgs ids in
+                      if copy_count <> count then async (fun () ->
+                          Logger.warning_lazy (lazy (Printf.sprintf "Mismatch while copying from %s (wrote %d) to %s (wrote %d). Possible ID collision(s)." chan_name count copy_chan_name copy_count)
+                          ));
+                      return_unit
+                  end
+                ) write.copy_to in
               return (Ok (Some count))
             in
-            let open Write_settings in
             begin match write.ack with
               | Saved -> save_t
               | Instant -> return (Ok None)

@@ -7,6 +7,7 @@ type ack =
 
 type t = {
   ack: ack;
+  copy_to: string list;
 } [@@deriving sexp]
 
 let create config_channel_write =
@@ -15,4 +16,5 @@ let create config_channel_write =
     | C_instant -> Instant
     | C_saved -> Saved
   in
-  { ack }
+  let copy_to = config_channel_write.c_copy_to in
+  { ack; copy_to; }

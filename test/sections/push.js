@@ -1,8 +1,8 @@
-module.exports = function (id) {
-  describe('Push ' + id, function () {
+module.exports = function (persistence) {
+  describe('Push ' + persistence, function () {
     var p, env
     before(function () {
-      return Proc.setupEnvironment(id)
+      return Proc.setupEnvironment(persistence)
       .then(function (environment) {
         env = environment
         p = Proc.spawnExecutable()
@@ -185,6 +185,29 @@ module.exports = function (id) {
         .then(() => Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'after_id ' + lastID]]))
         .then(Fn.shouldHaveRead(['I abc'], '\n'))
         .then(result => Fn.assert(result.res.headers[C.lastIdHeader] === 'id70'))
+      })
+    })
+
+    describe('Copy to channels', function () {
+      it ('Should also write to sinks (2 sinks, ack)', function () {
+        var buf = 'Copying 1 abc\nCopying 1 def\nCopying 1 ghi\nCopying 1 jkl'
+        return Fn.call('POST', 8000, '/v1/copyingAck', buf, [[C.modeHeader, 'multiple']])
+        .then(Fn.shouldHaveWritten(4))
+        .then(() => Fn.call('GET', 8000, '/v1/sink1/count'))
+        .then(Fn.shouldHaveCounted(4))
+        .then(() => Fn.call('GET', 8000, '/v1/sink2/count'))
+        .then(Fn.shouldHaveCounted(4))
+      })
+
+      it ('Should also write to sinks (1 sink, no ack)', function () {
+        var buf = 'Copying 2 abc\nCopying 2 def\nCopying 2 ghi\nCopying 2 jkl'
+        return Fn.call('POST', 8000, '/v1/copyingNoAck', buf, [[C.modeHeader, 'multiple']])
+        .then(Fn.shouldHaveWrittenAsync())
+        // .then((result) => console.log(result.res.body))
+        .then(() => Fn.call('GET', 8000, '/v1/sink1/count'))
+        .then(Fn.shouldHaveCounted(8))
+        .then(() => Fn.call('GET', 8000, '/v1/sink2/count'))
+        .then(Fn.shouldHaveCounted(4))
       })
     })
 

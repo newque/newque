@@ -5,6 +5,7 @@
     "format":"plaintext"
   },
   "writeSettings": {
-    "acknowledgement": "saved"
+    "acknowledgement": "saved",
+    "copyToChannels": []
   }
 }

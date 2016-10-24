@@ -55,6 +55,7 @@ let rec monitor watcher listen =
         monitor watcher {id=listen.id; server=(HTTP (restarted, new_wakener))}
     end
   | ZMQ (zmq, wakener) -> fail_with "Unimplemented"
+  | Private -> return_unit
 
 let create_listeners watcher endpoints =
   let open Config_t in
@@ -63,6 +64,7 @@ let create_listeners watcher endpoints =
     let%lwt () = match Int.Table.find_and_remove watcher.table generic.port with
       | Some {server=(HTTP (existing, _));_} -> Http.stop existing
       | Some {server=(ZMQ (existing, _));_} -> fail_with "Unimplemented"
+      | Some {server=Private}
       | None -> return_unit
     in
     (* Now start the new listeners *)

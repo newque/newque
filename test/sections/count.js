@@ -1,8 +1,8 @@
-module.exports = function (id) {
-  describe('Count ' + id, function () {
+module.exports = function (persistence) {
+  describe('Count ' + persistence, function () {
     var p, env
     before(function () {
-      return Proc.setupEnvironment(id)
+      return Proc.setupEnvironment(persistence)
       .then(function (environment) {
         env = environment
         p = Proc.spawnExecutable()

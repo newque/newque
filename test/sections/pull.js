@@ -1,9 +1,9 @@
-module.exports = function (id) {
-  describe('Pull ' + id, function () {
+module.exports = function (persistence) {
+  describe('Pull ' + persistence, function () {
     var p, env
     before(function () {
       this.timeout(10000)
-      return Proc.setupEnvironment(id)
+      return Proc.setupEnvironment(persistence)
       .then(function (environment) {
         env = environment
         p = Proc.spawnExecutable()
