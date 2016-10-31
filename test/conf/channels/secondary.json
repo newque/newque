@@ -8,6 +8,7 @@
   },
   "writeSettings": {
     "acknowledgement": "saved",
+    "format": "plaintext",
     "copyToChannels": []
   }
 }

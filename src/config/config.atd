@@ -30,6 +30,13 @@ type config_listener = {
 }
 
 
+(* INPUT MESSAGE *)
+type input_message = {
+  ~atomic <ocaml default="false">: bool;
+  messages: string list;
+  ?ids: string list <ocaml repr="array"> option;
+}
+
 (* PERSISTENCE *)
 type config_redis = {
   host <json name="host">: string;
@@ -52,6 +59,7 @@ type config_channel_acknowledgement = [
 
 type config_channel_write = {
   ack <json name="acknowledgement">: config_channel_acknowledgement;
+  ~format <ocaml default="C_json">: config_channel_format;
   copy_to <json name="copyToChannels">: string list;
 } <ocaml field_prefix="c_">
 
@@ -61,7 +69,7 @@ type config_channel_format = [
 ] <ocaml repr="classic">
 
 type config_channel_read = {
-  format: config_channel_format;
+  ~format <ocaml default="C_json">: config_channel_format;
 } <ocaml field_prefix="c_">
 
 (* TODO: Validate that the separators are non-empty *)

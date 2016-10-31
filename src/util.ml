@@ -40,6 +40,29 @@ let stream_map_array_s ~batch_size ~mapper arr_stream =
       end
   )
 
+let stream_to_string ~buffer_size ?(init=(Some "")) stream =
+  let buffer = Bigbuffer.create buffer_size in
+  Option.iter init ~f:(Bigbuffer.add_string buffer);
+  let%lwt () = Lwt_stream.iter_s
+      (fun chunk -> Bigbuffer.add_string buffer chunk; return_unit)
+      stream
+  in
+  return (Bigbuffer.contents buffer)
+
+let stream_to_array ~mapper ~sep ?(init=(Some "")) stream =
+  let queue = Queue.create () in
+  let split = split ~sep in
+  let%lwt (msgs, last) = Lwt_stream.fold_s (fun read ((), leftover) ->
+      let chunk = Option.value_map leftover ~default:read ~f:(fun a -> Printf.sprintf "%s%s" a read) in
+      let lines = split chunk in
+      let (fulls, partial) = List.split_n lines (List.length lines) in
+      List.iter fulls ~f:(fun raw -> Queue.enqueue queue (mapper raw));
+      return ((), List.hd partial)
+    ) stream ((), init)
+  in
+  Option.iter last ~f:(fun raw -> Queue.enqueue queue (mapper raw));
+  return (Queue.to_array queue)
+
 (* TODO: Decide what to do with these "impossible" synchronous exceptions *)
 let is_assoc sexp =
   match sexp with

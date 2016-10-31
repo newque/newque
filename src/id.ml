@@ -6,8 +6,8 @@ let time_ns () = Int63.to_int64 (Time_ns.to_int63_ns_since_epoch (Time_ns.now ()
 
 let uuid () = Uuidm.to_string (Uuidm.v `V4)
 
-let array_of_header ?(sep=",") ~mode ~msgs header_option =
-  match header_option with
+let array_of_string_opt ?(sep=",") ~mode ~msgs opt =
+  match opt with
   | None ->
     begin match mode with
       | `Single | `Atomic -> Ok [| uuid () |]
@@ -20,13 +20,12 @@ let array_of_header ?(sep=",") ~mode ~msgs header_option =
       | `Single | `Atomic -> Ok [| header |]
       | `Multiple ->
         let ids = Array.of_list (Util.split ~sep header) in
-        let empty_strings = Array.exists ~f:String.is_empty ids in
-        begin match (empty_strings, (Array.length ids), (Array.length msgs)) with
-          | (true, _, _) -> Error "IDs cannot be empty strings."
-          | (false, id_count, msg_count) when id_count = msg_count -> Ok ids
-          | (false, id_count, msg_count) ->
-            Error (Printf.sprintf "Mismatch between the number of IDs (%d) and the number of messages (%d)" id_count msg_count)
+        begin match Array.exists ~f:String.is_empty ids with
+          | true -> Error "IDs cannot be empty strings."
+          | false -> Ok ids
         end
     end
 
 let to_string x = x
+
+let of_string x = x

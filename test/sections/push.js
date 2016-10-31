@@ -12,9 +12,9 @@ module.exports = function (persistence) {
 
     describe('Single', function () {
       it('No header', function () {
-        var buf = 'abcdef'
+        var buf = 'abc\ndef'
         return Fn.call('POST', 8000, '/v1/example', buf)
-        .then(Fn.shouldFail(400))
+        .then(Fn.shouldHaveWritten(1))
       })
 
       it('No data', function () {
@@ -202,8 +202,8 @@ module.exports = function (persistence) {
       it ('Should also write to sinks (1 sink, no ack)', function () {
         var buf = 'Copying 2 abc\nCopying 2 def\nCopying 2 ghi\nCopying 2 jkl'
         return Fn.call('POST', 8000, '/v1/copyingNoAck', buf, [[C.modeHeader, 'multiple']])
+        .delay(25)
         .then(Fn.shouldHaveWrittenAsync())
-        // .then((result) => console.log(result.res.body))
         .then(() => Fn.call('GET', 8000, '/v1/sink1/count'))
         .then(Fn.shouldHaveCounted(8))
         .then(() => Fn.call('GET', 8000, '/v1/sink2/count'))
@@ -245,6 +245,35 @@ module.exports = function (persistence) {
         return Fn.call('POST', 8000, '/v1/writeonly', buf, [[C.modeHeader, 'single']])
         .then(Fn.shouldHaveWritten(1))
       })
+    })
+
+    describe('JSON', function () {
+      it('Should push multiple (ignores header)', function () {
+        var buf = Fn.makeJsonBuffer(['zxc', 'vbn'])
+        return Fn.call('POST', 8000, '/v1/json', buf, [[C.modeHeader, 'single']])
+        .then(Fn.shouldHaveWritten(2))
+      })
+
+      it('Should push atomic (ignores header)', function () {
+        var buf = Fn.makeJsonBuffer(['asd', 'fgh'], null, true)
+        return Fn.call('POST', 8000, '/v1/json', buf, [[C.modeHeader, 'single']])
+        .then(Fn.shouldHaveWritten(1))
+      })
+
+      it('Should push multiple (with IDs)', function () {
+        var buf = Fn.makeJsonBuffer(['qwe', 'rty'], ['idA', 'idB'])
+        return Fn.call('POST', 8000, '/v1/json', buf)
+        .then(Fn.shouldHaveWritten(2))
+        .then(() => Fn.call('POST', 8000, '/v1/json', buf))
+        .then(Fn.shouldHaveWritten(0))
+      })
+
+      it('Should push multiple (incorrect IDs)', function () {
+        var buf = Fn.makeJsonBuffer(['qwe', 'rty'], ['idB'])
+        return Fn.call('POST', 8000, '/v1/json', buf)
+        .then(Fn.shouldFail(400))
+      })
+
     })
 
     after(function () {

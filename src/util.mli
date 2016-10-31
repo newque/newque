@@ -4,7 +4,24 @@ val split : sep:string -> string -> string list
 
 val parse_int64 : string -> int64 option
 
-val stream_map_array_s: batch_size:int -> mapper:('a array -> 'b array) -> 'a array Lwt_stream.t -> 'b Lwt_stream.t
+val stream_map_array_s :
+  batch_size:int ->
+  mapper:('a array -> 'b array) ->
+  'a array Lwt_stream.t ->
+  'b Lwt_stream.t
+
+val stream_to_string :
+  buffer_size:int ->
+  ?init:string option ->
+  string Lwt_stream.t ->
+  string Lwt.t
+
+val stream_to_array :
+  mapper:(string -> 'a) ->
+  sep:string ->
+  ?init:string option ->
+  string Lwt_stream.t ->
+  'a array Lwt.t
 
 val zip_group : size:int -> 'a array -> 'b array -> ('a * 'b) array list Lwt.t
 

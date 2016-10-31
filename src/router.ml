@@ -64,33 +64,56 @@ let write router ~listen_name ~chan_name ~id_header ~mode stream =
     begin match chan.write with
       | None -> return (Error [Printf.sprintf "Channel %s doesn't support Writing to it." chan_name])
       | Some write ->
-        let%lwt msgs = Message.of_stream ~mode ~sep:chan.separator ~buffer_size:chan.buffer_size stream in
-        begin match Id.array_of_header ~mode ~msgs id_header with
-          | Error str -> return (Error [str])
-          | Ok ids ->
-            let open Write_settings in
-            let save_t =
-              let%lwt count = Channel.push chan msgs ids in
-              ignore_result (Logger.debug_lazy (lazy (
-                  Printf.sprintf "Wrote: %s (length: %d) %s from %s" (Mode.Write.to_string mode) count chan_name listen_name
-                )));
-              (* Copy to other channels if needed. *)
-              let%lwt () = Lwt_list.iter_p (fun copy_chan_name ->
-                  begin match find_chan router ~listen_name:Listener.(private_listener.id) ~chan_name:copy_chan_name with
-                    | Error _ -> Logger.warning_lazy (lazy (Printf.sprintf "Cannot copy from %s to %s because %s doesn't exist." chan_name copy_chan_name copy_chan_name))
-                    | Ok copy_chan ->
-                      let%lwt copy_count = Channel.push copy_chan msgs ids in
-                      if copy_count <> count then async (fun () ->
-                          Logger.warning_lazy (lazy (Printf.sprintf "Mismatch while copying from %s (wrote %d) to %s (wrote %d). Possible ID collision(s)." chan_name count copy_chan_name copy_count)
-                          ));
-                      return_unit
-                  end
-                ) write.copy_to in
-              return (Ok (Some count))
-            in
-            begin match write.ack with
-              | Saved -> save_t
-              | Instant -> return (Ok None)
+        let open Write_settings in
+
+        (* For JSON: Read the whole body, then generate IDs if needed *)
+        (* For Plaintext: Use the stream parser *)
+        let%lwt parsed = begin match write.format with
+          | Io_format.Json ->
+            let%lwt str = Util.stream_to_string ~buffer_size:chan.buffer_size stream in
+            let open Config_j in
+            let { atomic; messages; ids } = input_message_of_string str in
+            let msgs = Message.of_string_list ~atomic messages in
+            let mode = if Bool.(=) atomic true then `Atomic else `Multiple in
+            begin match ids with
+              | Some ids -> return (msgs, Ok (Array.map ~f:Id.of_string ids))
+              | None -> return (msgs, (Id.array_of_string_opt ~mode ~msgs None))
+            end
+          | Io_format.Plaintext ->
+            let%lwt msgs = Message.of_stream ~format:write.format ~mode ~sep:chan.separator ~buffer_size:chan.buffer_size stream in
+            let ids = Id.array_of_string_opt ~mode ~msgs id_header in
+            return (msgs, ids)
+        end in
+        begin match parsed with
+          | (msgs, Error str) -> return (Error [str])
+          | (msgs, Ok ids) ->
+            begin match ((Array.length msgs), (Array.length ids)) with
+              | (msgs_l, ids_l) when Int.(<>) msgs_l ids_l -> return (Error [Printf.sprintf "Length mismatch between messages (%d) and IDs (%d)" msgs_l ids_l])
+              | _ ->
+                (* Now write to the channel *)
+                let save_t =
+                  let%lwt count = Channel.push chan msgs ids in
+                  ignore_result (Logger.debug_lazy (lazy (
+                      Printf.sprintf "Wrote: %s (length: %d) %s from %s" (Mode.Write.to_string mode) count chan_name listen_name
+                    )));
+                  (* Copy to other channels if needed. *)
+                  let%lwt () = Lwt_list.iter_p (fun copy_chan_name ->
+                      begin match find_chan router ~listen_name:Listener.(private_listener.id) ~chan_name:copy_chan_name with
+                        | Error _ -> Logger.warning_lazy (lazy (Printf.sprintf "Cannot copy from %s to %s because %s doesn't exist." chan_name copy_chan_name copy_chan_name))
+                        | Ok copy_chan ->
+                          let%lwt copy_count = Channel.push copy_chan msgs ids in
+                          if copy_count <> count then async (fun () ->
+                              Logger.warning_lazy (lazy (Printf.sprintf "Mismatch while copying from %s (wrote %d) to %s (wrote %d). Possible ID collision(s)." chan_name count copy_chan_name copy_count)
+                              ));
+                          return_unit
+                      end
+                    ) write.copy_to in
+                  return (Ok (Some count))
+                in
+                begin match write.ack with
+                  | Saved -> save_t
+                  | Instant -> return (Ok None)
+                end
             end
         end
     end

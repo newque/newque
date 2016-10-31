@@ -20,7 +20,7 @@ module.exports = function (persistence) {
         .then(Fn.shouldHaveWritten(3))
       })
       .then(function () {
-        var buf = '123\n456\n'
+        var buf = Fn.makeJsonBuffer(['123', '456', ''])
         return Fn.call('POST', 8000, '/v1/json', buf, [[C.modeHeader, 'multiple']])
         .then(Fn.shouldHaveWritten(3))
       })
@@ -90,7 +90,7 @@ module.exports = function (persistence) {
       })
     }
 
-    describe('JSON format', function () {
+    describe('JSON', function () {
       it('Many', function () {
         return Fn.call('GET', 8000, '/v1/json', null, [[C.modeHeader, 'many 3']])
         .then(Fn.shouldHaveRead(['123', '456', ''], null))

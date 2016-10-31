@@ -5,6 +5,7 @@ type ack =
 
 type t = {
   ack: ack;
+  format: Io_format.t;
   copy_to: string list;
 } [@@deriving sexp]
 

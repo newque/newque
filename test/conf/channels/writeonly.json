@@ -4,6 +4,7 @@
   "readSettings": null,
   "writeSettings": {
     "acknowledgement": "saved",
+    "format": "plaintext",
     "copyToChannels": []
   }
 }

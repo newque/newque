@@ -6,6 +6,7 @@
   },
   "writeSettings": {
     "acknowledgement": "saved",
+    "format":"json",
     "copyToChannels": []
   }
 }

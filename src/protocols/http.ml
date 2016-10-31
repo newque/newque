@@ -83,6 +83,7 @@ let default_filter _ req _ =
         | `GET, Ok ((`Many _) as m)
         | `GET, Ok ((`After_id _) as m)
         | `GET, Ok ((`After_ts _) as m) -> Ok (chan_name, m)
+        | `POST, Error "<no header>" -> Ok (chan_name, `Single)
         | (`POST as meth), Ok m
         | (`GET as meth), Ok m ->
           Error (400, [Printf.sprintf "Invalid {Method, Mode} pair: {%s, %s}" (Code.string_of_method meth) (Mode.to_string (m :> Mode.Any.t))])
@@ -219,9 +220,9 @@ let handler http routing ((ch, _) as conn) req body =
                         let err = Printf.sprintf "Impossible case: Missing readSettings for channel %s" chan_name in
                         async (fun () -> Logger.error err);
                         Yojson.Basic.to_string (json_read_body 500 [err] [| |])
-                      | Some { format = Plaintext } ->
+                      | Some { format = Io_format.Plaintext } ->
                         String.concat_array ~sep:channel.Channel.separator payloads
-                      | Some { format = Json } ->
+                      | Some { format = Io_format.Json } ->
                         Yojson.Basic.to_string (json_read_body code [] payloads)
                     in
                     let encoding = Transfer.Fixed (Int.to_int64 (String.length body)) in

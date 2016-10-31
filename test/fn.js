@@ -84,7 +84,6 @@ var shouldHaveCounted = exports.shouldHaveCounted = function (count) {
 var shouldHaveRead = exports.shouldHaveRead = function (values, separator) {
   return function (result) {
     // console.log(result.res.statusCode)
-    // console.log(result.res.text)
     return new Promise(function (resolve, reject) {
       if (values.length === 0) {
         assert(result.res.statusCode === 204)
@@ -152,4 +151,13 @@ var shouldFail = exports.shouldFail = function (code) {
       throw err
     })
   }
+}
+
+var makeJsonBuffer = exports.makeJsonBuffer = function (arr, ids, atomic) {
+  var payload = {
+    messages: arr
+  }
+  if (ids && ids.length > 0) { payload.ids = ids }
+  if (atomic) { payload.atomic = true }
+  return JSON.stringify(payload)
 }

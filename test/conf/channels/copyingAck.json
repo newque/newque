@@ -6,6 +6,7 @@
   },
   "writeSettings": {
     "acknowledgement": "saved",
+    "format": "plaintext",
     "copyToChannels": ["sink1", "sink2"]
   }
 }

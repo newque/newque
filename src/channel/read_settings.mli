@@ -1,10 +1,5 @@
-type format =
-  | Plaintext
-  | Json
-[@@deriving sexp]
-
 type t = {
-  format: format;
+  format: Io_format.t;
 } [@@deriving sexp]
 
 val create : Config_t.config_channel_read -> t
