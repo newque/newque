@@ -274,6 +274,18 @@ module.exports = function (persistence) {
         .then(Fn.shouldFail(400))
       })
 
+      it('Invalid JSON', function () {
+        var buf = '{"messages":]}'
+        return Fn.call('POST', 8000, '/v1/json', buf)
+        .then(Fn.shouldFail(400))
+      })
+
+      it('Invalid format', function () {
+        var buf = '{"message":[]}'
+        return Fn.call('POST', 8000, '/v1/json', buf)
+        .then(Fn.shouldFail(400))
+      })
+
     })
 
     after(function () {

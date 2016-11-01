@@ -118,3 +118,13 @@ let sexp_of_atdgen str =
   match Yojson.Basic.from_string str with
   | `String s -> Sexp.Atom s
   | _ -> Sexp.Atom str
+
+let json_error_regexp = Str.regexp "[ \\\n]"
+let parse_json parser str =
+  try
+    Ok (parser str)
+  with
+  | Ag_oj_run.Error str
+  | Yojson.Json_error str ->
+    let replaced = Str.global_replace json_error_regexp " " str in
+    Error replaced

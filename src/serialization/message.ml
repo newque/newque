@@ -21,22 +21,29 @@ let of_string ~format ~mode ~sep str =
   match format with
   | Json ->
     let open Config_j in
-    let { atomic; messages } = input_message_of_string str in
-    of_string_list ~atomic messages
+    begin match Util.parse_json input_message_of_string str with
+      | (Error _) as err -> err
+      | Ok { atomic; messages } -> Ok (of_string_list ~atomic messages)
+    end
   | Plaintext ->
     let split = Util.split ~sep in
-    begin match mode with
+    let arr = begin match mode with
       | `Single -> [| Single (Single.of_string str) |]
       | `Multiple -> of_string_list ~atomic:false (split str)
       | `Atomic -> of_string_list ~atomic:true (split str)
-    end
+    end in
+    Ok arr
 
 let of_stream ~format ~mode ~sep ~buffer_size stream =
   let open Io_format in
   match format with
   | Json ->
     let%lwt str = Util.stream_to_string ~buffer_size stream in
-    return (of_string ~format ~mode ~sep str)
+    begin match of_string ~format ~mode ~sep str with
+      | Error str -> failwith str
+      (* | Error str -> fail (Util.UserInput str) *)
+      | Ok messages -> return messages
+    end
   | Plaintext ->
     begin match mode with
       | `Single ->

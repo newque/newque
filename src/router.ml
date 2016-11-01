@@ -72,12 +72,15 @@ let write router ~listen_name ~chan_name ~id_header ~mode stream =
           | Io_format.Json ->
             let%lwt str = Util.stream_to_string ~buffer_size:chan.buffer_size stream in
             let open Config_j in
-            let { atomic; messages; ids } = input_message_of_string str in
-            let msgs = Message.of_string_list ~atomic messages in
-            let mode = if Bool.(=) atomic true then `Atomic else `Multiple in
-            begin match ids with
-              | Some ids -> return (msgs, Ok (Array.map ~f:Id.of_string ids))
-              | None -> return (msgs, (Id.array_of_string_opt ~mode ~msgs None))
+            begin match Util.parse_json input_message_of_string str with
+              | (Error _) as err -> return ([| |], err)
+              | Ok { atomic; messages; ids } ->
+                let msgs = Message.of_string_list ~atomic messages in
+                let mode = if Bool.(=) atomic true then `Atomic else `Multiple in
+                begin match ids with
+                  | Some ids -> return (msgs, Ok (Array.map ~f:Id.of_string ids))
+                  | None -> return (msgs, (Id.array_of_string_opt ~mode ~msgs None))
+                end
             end
           | Io_format.Plaintext ->
             let%lwt msgs = Message.of_stream ~format:write.format ~mode ~sep:chan.separator ~buffer_size:chan.buffer_size stream in

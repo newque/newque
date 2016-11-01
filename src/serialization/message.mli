@@ -1,3 +1,5 @@
+open Core.Std
+
 type t [@@deriving sexp]
 
 val of_string_list :
@@ -10,7 +12,7 @@ val of_string :
   mode:Mode.Write.t ->
   sep:string ->
   string ->
-  t array
+  ((t array), string) Result.t
 
 val of_stream :
   format:Io_format.t ->

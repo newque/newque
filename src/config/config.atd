@@ -58,7 +58,7 @@ type config_channel_acknowledgement = [
 ] <ocaml repr="classic">
 
 type config_channel_write = {
-  ack <json name="acknowledgement">: config_channel_acknowledgement;
+  ~ack <json name="acknowledgement"><ocaml default="C_saved">: config_channel_acknowledgement;
   ~format <ocaml default="C_json">: config_channel_format;
   copy_to <json name="copyToChannels">: string list;
 } <ocaml field_prefix="c_">
