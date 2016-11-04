@@ -18,15 +18,15 @@ type config_zmq_settings = {
 }
 
 type config_proto = [
-  | Http_proto <json name="HTTP"> of config_http_settings
-  | Zmq_proto <json name="ZMQ"> of config_zmq_settings
+  | Http_proto <json name="http"> of config_http_settings
+  | Zmq_proto <json name="zmq"> of config_zmq_settings
 ] <ocaml repr="classic">
 
 type config_listener = {
   name: string;
   host: string;
   port: int;
-  settings <json tag_field="protocol">: config_proto;
+  listener_settings <json name="protocolSettings" tag_field="protocol">: config_proto;
 }
 
 
@@ -42,12 +42,19 @@ type config_redis = {
   host <json name="host">: string;
   port <json name="port">: int;
   ?auth <json name="auth">: string nullable;
-} <ocaml field_prefix="r_">
+} <ocaml field_prefix="redis_">
+
+type config_remote_http = {
+  base_urls <json name="baseUrls">: string list <ocaml repr="array">;
+  ~input_format <json name="inputFormat"><ocaml default="C_json">: config_channel_format;
+  ~output_format <json name="outputFormat"><ocaml default="C_json">: config_channel_format;
+}
 
 type config_persistence = [
   | Memory <json name="memory">
   | Disk <json name="disk">
-  | Redis <json name="redis">
+  | Remote_http <json name="http"> of config_remote_http
+  | Redis <json name="redis"> of config_redis
 ]
 
 
@@ -75,7 +82,7 @@ type config_channel_read = {
 (* TODO: Validate that the separators are non-empty *)
 type config_channel = {
   endpoint_names <json name="listeners">: string list;
-  persistence: config_persistence;
+  persistence_settings <json name="persistenceSettings" tag_field="persistence">: config_persistence;
   read_settings <json name="readSettings">: config_channel_read nullable;
   write_settings <json name="writeSettings">: config_channel_write nullable;
   ~separator <ocaml default="\"\n\"">: string;
@@ -95,5 +102,4 @@ type config_newque = {
   log_level <json name="logLevel">: config_log_level;
   admin: config_admin;
   endpoints <json name="listeners">: config_listener list;
-  ?redis: config_redis nullable;
 }

@@ -17,9 +17,6 @@ let create config_channel_write =
     | C_instant -> Instant
     | C_saved -> Saved
   in
-  let format = match config_channel_write.c_format with
-    | C_plaintext -> Io_format.Plaintext
-    | C_json -> Io_format.Json
-  in
+  let format = Io_format.create config_channel_write.c_format in
   let copy_to = config_channel_write.c_copy_to in
   { ack; format; copy_to; }

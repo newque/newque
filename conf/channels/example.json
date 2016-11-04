@@ -1,6 +1,9 @@
 {
   "listeners": ["http8000"],
-  "persistence": "disk",
+  "persistence": "http",
+  "persistenceSettings": {
+    "baseUrls": ["http://127.0.0.1:6000/"]
+  },
   "acknowledgement": "saved",
   "readSettings": {
   },

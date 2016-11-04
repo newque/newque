@@ -6,8 +6,4 @@ type t = {
 
 let create config_channel_read =
   let open Config_t in
-  let format = match config_channel_read.c_format with
-    | C_plaintext -> Io_format.Plaintext
-    | C_json -> Io_format.Json
-  in
-  { format }
+  { format = Io_format.create config_channel_read.c_format }

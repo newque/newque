@@ -38,21 +38,18 @@ let parse_channels config path =
       else return_unit
     in
     let filepath = Printf.sprintf "%s%s" path filename in
-    try%lwt
-      let%lwt contents =
-        (* TODO: make more efficient? *)
-        Lwt_io.chars_of_file filepath
-        |> Lwt_stream.to_string
-      in
-      let parsed = Config_j.config_channel_of_string contents in
+    (* TODO: make more efficient? *)
+    let%lwt contents = Lwt_stream.to_string (Lwt_io.chars_of_file filepath) in
+    let mapper = fun str ->
+      let parsed = Config_j.config_channel_of_string str in
       let name = List.slice fragments 0 (-1) |> String.concat ~sep:"." in
-      match (parsed.persistence, config.redis) with
-      | (`Redis, None) -> fail_with (Printf.sprintf "Missing Redis configuration in newque.json for channel %s" name)
-      | (_, redis) -> return (Channel.create ?redis name parsed)
-    with
-    | Ag_oj_run.Error str ->
-      let%lwt _ = Log.stdout Lwt_log.Fatal str in
-      fail_with (Printf.sprintf "Error while parsing %s" filepath)
+      Channel.create name parsed
+    in
+    match Util.parse_json mapper contents with
+    | Ok chan -> return chan
+    | Error err ->
+      let%lwt _ = Log.stdout Lwt_log.Fatal err in
+      fail_with (Printf.sprintf "Error while parsing %s: %s" filepath err)
   ) files
 
 let apply_channels w channels =
@@ -69,7 +66,7 @@ let create_admin_server watcher config =
     name = "newque_admin";
     host = config.admin.a_host;
     port = config.admin.a_port;
-    settings = Http_proto admin_spec_conf;
+    listener_settings = Http_proto admin_spec_conf;
   } in
   let%lwt admin_server = Http.start admin_conf admin_spec_conf Http.Admin in
   let (_, wakener) = wait () in

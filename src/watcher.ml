@@ -68,7 +68,7 @@ let create_listeners watcher endpoints =
       | None -> return_unit
     in
     (* Now start the new listeners *)
-    let%lwt started = match generic.settings with
+    let%lwt started = match generic.listener_settings with
       | Http_proto specific ->
         let%lwt () = Logger.notice (Printf.sprintf "Starting %s on HTTP %s:%s" generic.name generic.host (Int.to_string generic.port)) in
         let%lwt http = start_http watcher generic specific in

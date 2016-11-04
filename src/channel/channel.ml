@@ -17,9 +17,9 @@ type t = {
   max_read: int64;
 } [@@deriving sexp]
 
-let create ?redis name conf_channel =
+let create name conf_channel =
   let open Config_t in
-  let module Persist = (val (match conf_channel.persistence with
+  let module Persist = (val (match conf_channel.persistence_settings with
     | `Memory ->
       let module Arg = struct
         module IO = Local.M
@@ -36,12 +36,18 @@ let create ?redis name conf_channel =
       end in
       (module Persistence.Make (Arg) : Persistence.S)
 
-    | `Redis ->
-      (* Option.value_exn is safe here because of the check in Configtools *)
-      let {r_host; r_port; r_auth;} = Option.value_exn redis in
+    | `Remote_http remote ->
+      let module Arg = struct
+        module IO = Remote.M
+        let create () = Remote.create remote.base_urls ~input:remote.input_format ~output:remote.output_format
+        let read_batch_size = Remote.read_batch_size
+      end in
+      (module Persistence.Make (Arg) : Persistence.S)
+
+    | `Redis redis ->
       let module Arg = struct
         module IO = Redis.M
-        let create () = Redis.create r_host r_port r_auth
+        let create () = Redis.create redis.redis_host redis.redis_port redis.redis_auth
         let read_batch_size = Redis.read_batch_size
       end in
       (module Persistence.Make (Arg) : Persistence.S)

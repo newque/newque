@@ -12,7 +12,7 @@ type t = {
   max_read: int64;
 } [@@deriving sexp]
 
-val create : ?redis:Config_t.config_redis -> string -> Config_t.config_channel -> t
+val create : string -> Config_t.config_channel -> t
 
 val push : t -> Message.t array -> Id.t array -> int Lwt.t
 

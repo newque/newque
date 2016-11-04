@@ -6,11 +6,11 @@
   },
   "listeners": [
     {
-      "protocol": "HTTP",
+      "protocol": "http",
       "name": "http8000",
       "host": "0.0.0.0",
       "port": 8000,
-      "settings": {
+      "protocolSettings": {
         "backlog": 20
       }
     }
