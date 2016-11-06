@@ -8,7 +8,7 @@ module Data = Sqlite3.Data
 module Logger = Log.Make (struct let path = Log.outlog let section = "Sqlite" end)
 
 type statements = {
-  single: Sqlite3.stmt * string;
+  last_row: Sqlite3.stmt * string;
   count: Sqlite3.stmt * string;
   begin_transaction: Sqlite3.stmt * string;
   commit_transaction: Sqlite3.stmt * string;
@@ -183,22 +183,26 @@ let make_filters filters =
       | `After_id _ -> "(ROWID > (SELECT ROWID FROM MESSAGES WHERE uuid = ?))"
       | `After_ts _ -> "(timens > ?)"
       | `After_rowid _ -> "(ROWID > ?)"
+      | `Tag _ -> "(tag = ?)"
     ) in
   String.concat_array ~sep:" AND " strings
 
 let read_sql ~search =
   let open Persistence in
   match Array.is_empty search.filters with
-  | true -> Printf.sprintf "SELECT raw, ROWID FROM MESSAGES ORDER BY ROWID ASC LIMIT %Ld;" search.limit
-  | false -> Printf.sprintf "SELECT raw, ROWID FROM MESSAGES WHERE %s ORDER BY ROWID ASC LIMIT %Ld;" (make_filters search.filters) search.limit
+  | true -> Printf.sprintf "SELECT raw, ROWID FROM MESSAGES LIMIT %Ld;" search.limit
+  | false -> Printf.sprintf "SELECT raw, ROWID FROM MESSAGES WHERE %s LIMIT %Ld;" (make_filters search.filters) search.limit
 
-(* let add_tag_sql ~search =
-   let open Persistence in
-   match Array.is_empty search.filters with
-   | true -> Printf.sprintf "UPDATE MESSAGES SET tag = ? ORDER BY ROWID ASC LIMIT %Ld;" search.limit
-   | false -> Printf.sprintf "SELECT raw, ROWID FROM MESSAGES WHERE %s ORDER BY ROWID ASC LIMIT %Ld;" (make_filters search.filters) search.limit *)
+let add_tag_sql ~search =
+  let open Persistence in
+  match Array.is_empty search.filters with
+  | true -> Printf.sprintf "UPDATE MESSAGES SET tag = ? LIMIT %Ld;" search.limit
+  | false -> Printf.sprintf "UPDATE MESSAGES SET tag = ? WHERE %s LIMIT %Ld;" (make_filters search.filters) search.limit
 
-let single_sql = "SELECT uuid, timens FROM MESSAGES WHERE ROWID = ?;"
+let read_tag_sql = "SELECT raw, ROWID FROM MESSAGES INDEXED BY MESSAGES_TAG_IDX WHERE (tag = ?);"
+let delete_tag_sql = "DELETE FROM MESSAGES INDEXED BY MESSAGES_TAG_IDX WHERE (tag = ?);"
+
+let last_row_sql = "SELECT uuid, timens FROM MESSAGES WHERE ROWID = ?;"
 let count_sql = "SELECT COUNT(*) FROM MESSAGES;"
 let begin_sql = "BEGIN;"
 let commit_sql = "COMMIT;"
@@ -221,15 +225,13 @@ let create file ~avg_read =
   let%lwt create_tag_index = prepare db create_tag_index_sql in
   let%lwt (_ : int) = wrap (fun () -> exec_sync db ~destroy:false create_tag_index) in
 
-  (* let%lwt test_sql = prepare db "UPDATE MESSAGES SET tag = 'abc' LIMIT 10" in *)
-
-  let%lwt single = prepare db single_sql in
+  let%lwt last_row = prepare db last_row_sql in
   let%lwt count = prepare db count_sql in
   let%lwt begin_transaction = prepare db begin_sql in
   let%lwt commit_transaction = prepare db commit_sql in
   let%lwt rollback_transaction = prepare db rollback_sql in
 
-  let stmts = {single; count; begin_transaction; commit_transaction; rollback_transaction} in
+  let stmts = {last_row; count; begin_transaction; commit_transaction; rollback_transaction} in
   let instance = {db; file; avg_read; stmts} in
   return instance
 
@@ -267,28 +269,80 @@ let push db ~msgs ~ids =
     let%lwt stmts = Lwt_list.map_s make_stmt groups in
     transaction db ~destroy:true stmts
 
-let pull db ~search =
-  let open Persistence in
-  match search.only_once with
-  | true -> failwith "derp"
-  | false ->
-    let%lwt (st, _) as stmt = prepare db.db (read_sql ~search) in
-    let args = Array.mapi search.filters ~f:(fun i filter ->
-        match filter with
-        | `After_id id -> ((i + 1), Data.BLOB id)
-        | `After_ts ts -> ((i + 1), Data.INT ts)
-        | `After_rowid rowid -> ((i + 1), Data.INT rowid)
-      ) in
-    let%lwt () = bind st args in
-    query db ~destroy:true stmt FBlobRowid
+let make_args filters =
+  Array.mapi filters ~f:(fun i filter ->
+    match filter with
+    | `After_id id -> ((i + 1), Data.BLOB id)
+    | `After_ts ts -> ((i + 1), Data.INT ts)
+    | `After_rowid rowid -> ((i + 1), Data.INT rowid)
+    | `Tag tag -> ((i + 1), Data.BLOB tag)
+  )
 
-let single db ~rowid =
-  let (st, sql) as stmt = db.stmts.single in
+let fetch_last_row db ~rowid =
+  let (st, sql) as stmt = db.stmts.last_row in
   let args = [| (1, Data.INT rowid) |] in
   let%lwt () = bind st args in
   match%lwt query db ~destroy:false stmt FBlobInt64 with
   | [| x |], _ -> return x
-  | dataset, _ -> fail_with (Printf.sprintf "Single failed (dataset size: %d) for [%s]" (Array.length dataset) sql)
+  | dataset, _ -> fail_with (Printf.sprintf "Last_row failed (dataset size: %d) for [%s]" (Array.length dataset) sql)
+
+let pull db ~search ~fetch_last =
+  let open Persistence in
+  match search.only_once with
+  | true ->
+    let tag = Id.uuid () in
+
+    (* Add tag *)
+    let%lwt (st, _) as stmt = prepare db.db (add_tag_sql ~search) in
+    let args = make_args (Array.append [| `Tag tag |] search.filters) in
+    let%lwt () = bind st args in
+    let%lwt cnt1 = execute db ~destroy:true stmt in
+
+    (* Select tag *)
+    let%lwt (st, _) as stmt = prepare db.db read_tag_sql in
+    let args = make_args [| `Tag tag |] in
+    let%lwt () = bind st args in
+    let%lwt (rows, last_rowid) = query db ~destroy:false stmt FBlobRowid in
+    let cnt2 = Array.length rows in
+
+    (* Get last row if necessary *)
+    let%lwt last_row_data = begin match (fetch_last, last_rowid) with
+      | (false, _) | (true, None) -> return_none
+      | (true, Some rowid) ->
+        let%lwt x = fetch_last_row db ~rowid in
+        return (Some x)
+    end
+    in
+
+    (* Delete tag *)
+    let%lwt (st, _) as stmt = prepare db.db delete_tag_sql in
+    let args = make_args [| `Tag tag |] in
+    let%lwt () = bind st args in
+    let%lwt cnt3 = execute db ~destroy:false stmt in
+
+    if cnt1 <> cnt2 || cnt2 <> cnt3 then
+      let err = (Printf.sprintf "Impossible state, returned counts differ: %d %d %d. This bug should be reported." cnt1 cnt2 cnt3) in
+      let%lwt () = Logger.fatal err in
+      fail_with err
+    else
+      return (rows, last_rowid, last_row_data)
+
+  | false ->
+    (* Just SELECT *)
+    let%lwt (st, _) as stmt = prepare db.db (read_sql ~search) in
+    let args = make_args search.filters in
+    let%lwt () = bind st args in
+    let%lwt (rows, last_rowid) = query db ~destroy:true stmt FBlobRowid in
+
+    (* Get last row if necessary *)
+    let%lwt last_row_data = begin match (fetch_last, last_rowid) with
+      | (false, _) | (true, None) -> return_none
+      | (true, Some rowid) ->
+        let%lwt x = fetch_last_row db ~rowid in
+        return (Some x)
+    end
+    in
+    return (rows, last_rowid, last_row_data)
 
 let size db =
   let (_, sql) as stmt = db.stmts.count in

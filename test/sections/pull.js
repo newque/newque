@@ -102,7 +102,7 @@ module.exports = function (persistence) {
       })
     })
 
-    // These 2 calls only work on non-stream
+    // This only works on non-stream
     it('After_id', function () {
       return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'one']])
       .then(Fn.shouldHaveRead(['M abc'], '\n'))
@@ -113,6 +113,7 @@ module.exports = function (persistence) {
       .then(Fn.shouldHaveRead(['M def', 'M ghi', 'M jkl'], '\n'))
     })
 
+    // This only works on non-stream
     it('After_ts', function () {
       var lastTs = null
       return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'one']])
@@ -129,6 +130,55 @@ module.exports = function (persistence) {
         return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'After_ts ' + (lastTs - 1000)]])
       })
       .then(Fn.shouldHaveRead(['M abc', 'M def', 'M ghi', 'M jkl'], '\n'))
+    })
+
+    describe('Only Once', function () {
+      it('Should delete after reading (sync)', function () {
+        var buf = Fn.makeJsonBuffer(['abc', 'def', 'ghi', 'jkl'])
+        return Fn.call('POST', 8000, '/v1/onlyOnce', buf, null)
+        .then(Fn.shouldHaveWritten(4))
+        .then(() => Fn.call('GET', 8000, '/v1/onlyOnce', null, [[C.modeHeader, 'One']]))
+        .then(Fn.shouldHaveRead(['abc'], null))
+        .then(() => Fn.call('GET', 8000, '/v1/onlyOnce', null, [[C.modeHeader, 'One']]))
+        .then(Fn.shouldHaveRead(['def'], null))
+        .then(() => Fn.call('GET', 8000, '/v1/onlyOnce', null, [[C.modeHeader, 'Many 2']]))
+        .then(Fn.shouldHaveRead(['ghi', 'jkl'], null))
+        .then(() => Fn.call('GET', 8000, '/v1/onlyOnce', null, [[C.modeHeader, 'One']]))
+        .then(Fn.shouldHaveRead([], null))
+      })
+
+      it('Should delete after reading (async)', function () {
+        var buf = Fn.makeJsonBuffer(['ABC', 'DEF', 'GHI', 'JKL'])
+        return Fn.call('POST', 8000, '/v1/onlyOnce', buf, null)
+        .then(function () {
+          return Promise.map([
+            // maxRead for the channel is set to 2
+            Fn.call('GET', 8000, '/v1/onlyOnce', null, [[C.modeHeader, 'Many 5']]),
+            Fn.call('GET', 8000, '/v1/onlyOnce', null, [[C.modeHeader, 'Many 5']]),
+            Fn.call('GET', 8000, '/v1/onlyOnce', null, [[C.modeHeader, 'Many 5']]),
+            Fn.call('GET', 8000, '/v1/onlyOnce', null, [[C.modeHeader, 'Many 5']])
+          ],
+          function (result) {
+            if (result.res.buffer.length > 0) {
+              var msgs = JSON.parse(result.res.buffer.toString('utf8')).messages
+              if (JSON.stringify(msgs) === JSON.stringify(['ABC', 'DEF'])) {
+                return Fn.shouldHaveRead(['ABC', 'DEF'], null)(result)
+                .then(() => msgs)
+              } else {
+                return Fn.shouldHaveRead(['GHI', 'JKL'], null)(result)
+                .then(() => msgs)
+              }
+            } else {
+              return Fn.shouldHaveRead([], null)(result)
+              .then(() => [])
+            }
+          })
+        })
+        .then(function (arrays) {
+          var arr = Array.prototype.concat.apply([], arrays).sort()
+          Fn.assert(JSON.stringify(arr) === JSON.stringify(['ABC', 'DEF', 'GHI', 'JKL']))
+        })
+      })
     })
 
     after(function () {

@@ -67,32 +67,22 @@ module M = struct
         handle_failure instance ex ~errstr:(Printf.sprintf "Failed to write to %s (%s) with error %s. Restarting." instance.file instance.chan_name (Exn.to_string ex))
     )
 
-  let pull_data instance ~search =
+  let pull_data instance ~search ~fetch_last =
     Lwt_mutex.with_lock instance.mutex (fun () ->
       try%lwt
-        Sqlite.pull instance.db ~search
+        Sqlite.pull instance.db ~search ~fetch_last
       with
       | ex ->
         handle_failure instance ex ~errstr:(Printf.sprintf "Failed to query from %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex))
     )
 
-  let single instance ~rowid =
-    Lwt_mutex.with_lock instance.mutex (fun () ->
-      try%lwt
-        Sqlite.single instance.db ~rowid
-      with
-      | ex ->
-        handle_failure instance ex ~errstr:(Printf.sprintf "Failed to fetch single from %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex))
-    )
-
   let pull_slice instance ~search =
-    let%lwt (payloads, last_rowid) = pull_data instance ~search in
+    let%lwt (payloads, last_rowid, last_row_data) = pull_data instance ~search ~fetch_last:true in
     let open Persistence in
-    match last_rowid with
-    | None ->
+    match (last_rowid, last_row_data) with
+    | (None, _) | (_, None) ->
       return { metadata = None; payloads }
-    | Some last_internal_id ->
-      let%lwt (last_id, last_timens) = single instance ~rowid:last_internal_id in
+    | (Some last_internal_id), (Some (last_id, last_timens)) ->
       return { metadata = (Some {last_internal_id; last_id; last_timens}); payloads }
 
   let pull_stream instance ~search =
@@ -103,7 +93,7 @@ module M = struct
     wrap (fun () ->
       Lwt_stream.from (fun () ->
         if !next_search.limit <= Int64.zero then return_none else
-        let%lwt (payloads, last_rowid) = pull_data instance ~search:!next_search in
+        let%lwt (payloads, last_rowid, _) = pull_data instance ~search:!next_search ~fetch_last:false in
         match last_rowid with
         | None -> return_none
         | Some rowid ->

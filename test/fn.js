@@ -3,6 +3,7 @@ var assert = exports.assert = require('assert')
 var base = 'http://127.0.0.1:'
 
 var call = exports.call = function (method, port, path, buf, headers) {
+  var t0 = Date.now()
   return new Promise(function (resolve, reject) {
     var req = request(method, base+port+path)
     if (headers) {
@@ -18,6 +19,10 @@ var call = exports.call = function (method, port, path, buf, headers) {
         var arr = []
         result.res.on('data', data => arr.push(data))
         result.res.on('end', function () {
+          result.res.time = Date.now() - t0
+          if (result.res.time > 10) {
+            // console.log(result.res.time, method, port, path, headers)
+          }
           result.res.buffer = Buffer.concat(arr)
           return resolve(result)
         })
