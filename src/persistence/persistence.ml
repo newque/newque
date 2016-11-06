@@ -4,14 +4,15 @@ open Lwt
 type search = {
   limit: int64;
   filters: [ `After_id of string | `After_ts of int64 | `After_rowid of int64 ] array;
+  only_once: bool;
 } [@@deriving sexp]
 
-let create_search max_read ~mode =
+let create_search max_read ~mode ~only_once =
   match mode with
-  | `One -> {limit = Int64.one; filters = [| |]}
-  | `Many x -> {limit = (Int64.min max_read x); filters = [| |]}
-  | `After_id id -> {limit = max_read; filters = [|`After_id id|]}
-  | `After_ts ts -> {limit = max_read; filters = [|`After_ts ts|]}
+  | `One -> { limit = Int64.one; filters = [| |]; only_once; }
+  | `Many x -> { limit = (Int64.min max_read x); filters = [| |]; only_once; }
+  | `After_id id -> { limit = max_read; filters = [|`After_id id|]; only_once; }
+  | `After_ts ts -> { limit = max_read; filters = [|`After_ts ts|]; only_once; }
 
 type slice_metadata = {
   last_internal_id: int64;
@@ -48,9 +49,9 @@ module type S = sig
 
   val push : Message.t array -> Id.t array -> int Lwt.t
 
-  val pull_slice : int64 -> mode:Mode.Read.t -> slice Lwt.t
+  val pull_slice : int64 -> mode:Mode.Read.t -> only_once:bool -> slice Lwt.t
 
-  val pull_stream : int64 -> mode:Mode.Read.t -> string Lwt_stream.t Lwt.t
+  val pull_stream : int64 -> mode:Mode.Read.t -> only_once:bool -> string Lwt_stream.t Lwt.t
 
   val size : unit -> int64 Lwt.t
 end
@@ -69,9 +70,9 @@ module Make (Argument: Argument) : S = struct
     let msgs = Array.map ~f:Message.serialize msgs in
     Argument.IO.push instance ~msgs ~ids
 
-  let pull_slice max_read ~mode =
+  let pull_slice max_read ~mode ~only_once =
     let%lwt instance = instance in
-    let search = create_search max_read ~mode in
+    let search = create_search max_read ~mode ~only_once in
     let%lwt slice = Argument.IO.pull_slice instance ~search in
     wrap (fun () ->
       {
@@ -83,9 +84,9 @@ module Make (Argument: Argument) : S = struct
       }
     )
 
-  let pull_stream max_read ~mode =
+  let pull_stream max_read ~mode ~only_once =
     let%lwt instance = instance in
-    let search = create_search max_read ~mode in
+    let search = create_search max_read ~mode ~only_once in
     let%lwt data = Argument.IO.pull_stream instance ~search in
     let mapper = fun raw ->
       Array.concat_map raw ~f:(fun x -> Message.contents (Message.parse_exn x))

@@ -4,7 +4,8 @@
   "separator": "--",
   "maxRead": 2,
   "readSettings": {
-    "format":"plaintext"
+    "format":"plaintext",
+    "onlyOnce": false
   },
   "writeSettings": {
     "acknowledgement": "saved",

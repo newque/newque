@@ -2,9 +2,9 @@ open Core.Std
 
 type t [@@deriving sexp]
 
-val of_string_list :
+val of_string_array :
   atomic:bool ->
-  string list ->
+  string array ->
   t array
 
 val of_string :

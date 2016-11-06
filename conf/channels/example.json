@@ -1,11 +1,9 @@
 {
   "listeners": ["http8000"],
-  "persistence": "http",
-  "persistenceSettings": {
-    "baseUrls": ["http://127.0.0.1:6000/"]
-  },
+  "persistence": "disk",
   "acknowledgement": "saved",
   "readSettings": {
+    "onlyOnce": false
   },
   "writeSettings": {
     "copyToChannels": []

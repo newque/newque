@@ -6,6 +6,6 @@ type t = {
 
 let of_singles msgs = {msgs}
 
-let of_string_list strs = {msgs = Array.of_list_map ~f:Single.of_string strs}
+let of_string_array strs = {msgs = Array.map ~f:Single.of_string strs}
 
 let contents atomic = Array.map atomic.msgs ~f:Single.contents

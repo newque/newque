@@ -7,8 +7,8 @@ type t = {
   name: string;
   endpoint_names: string list;
   push: Message.t array -> Id.t array -> int Lwt.t sexp_opaque;
-  pull_slice: int64 -> mode:Mode.Read.t -> Persistence.slice Lwt.t sexp_opaque;
-  pull_stream: int64 -> mode:Mode.Read.t -> string Lwt_stream.t Lwt.t sexp_opaque;
+  pull_slice: int64 -> mode:Mode.Read.t -> only_once:bool -> Persistence.slice Lwt.t sexp_opaque;
+  pull_stream: int64 -> mode:Mode.Read.t -> only_once:bool -> string Lwt_stream.t Lwt.t sexp_opaque;
   size: unit -> int64 Lwt.t sexp_opaque;
   read: Read_settings.t option;
   write: Write_settings.t option;

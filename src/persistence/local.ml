@@ -110,10 +110,11 @@ module M = struct
           if Array.is_empty payloads then return_none else
           let payloads_count = Int.to_int64 (Array.length payloads) in
           left := Int64.(-) !left payloads_count;
-          let () = next_search := {
-              limit = Int64.min !left (Int.to_int64 read_batch_size);
-              filters = Array.append [|`After_rowid rowid|] search.filters;
-            } in
+          next_search := {
+            !next_search with
+            limit = Int64.min !left (Int.to_int64 read_batch_size);
+            filters = Array.append [|`After_rowid rowid|] search.filters;
+          };
           return (Some payloads)
       )
     )

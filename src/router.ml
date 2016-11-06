@@ -75,7 +75,7 @@ let write router ~listen_name ~chan_name ~id_header ~mode stream =
             begin match Util.parse_json input_message_of_string str with
               | (Error _) as err -> return ([| |], err)
               | Ok { atomic; messages; ids } ->
-                let msgs = Message.of_string_list ~atomic messages in
+                let msgs = Message.of_string_array ~atomic messages in
                 let mode = if Bool.(=) atomic true then `Atomic else `Multiple in
                 begin match ids with
                   | Some ids -> return (msgs, Ok (Array.map ~f:Id.of_string ids))
@@ -128,7 +128,7 @@ let read_slice router ~listen_name ~chan_name ~id_header ~mode =
     begin match chan.Channel.read with
       | None -> return (Error [Printf.sprintf "Channel %s doesn't support Reading from it." chan_name])
       | Some read ->
-        let%lwt slice = Channel.pull_slice chan ~mode in
+        let%lwt slice = Channel.pull_slice chan ~mode ~only_once:read.Read_settings.only_once in
         ignore_result (Logger.debug_lazy (lazy (
             Printf.sprintf "Read: %s (size: %d) from %s" chan_name (Array.length slice.Persistence.payloads) listen_name
           )));
@@ -142,7 +142,7 @@ let read_stream router ~listen_name ~chan_name ~id_header ~mode =
     begin match chan.Channel.read with
       | None -> return (Error [Printf.sprintf "Channel %s doesn't support Reading from it." chan_name])
       | Some read ->
-        let%lwt stream = Channel.pull_stream chan ~mode in
+        let%lwt stream = Channel.pull_stream chan ~mode ~only_once:read.Read_settings.only_once in
         ignore_result (Logger.debug_lazy (lazy (
             Printf.sprintf "Reading: %s (stream) from %s" chan_name listen_name
           )));

@@ -33,7 +33,7 @@ type config_listener = {
 (* INPUT MESSAGE *)
 type input_message = {
   ~atomic <ocaml default="false">: bool;
-  messages: string list;
+  messages: string list <ocaml repr="array">;
   ?ids: string list <ocaml repr="array"> option;
 }
 
@@ -77,6 +77,7 @@ type config_channel_format = [
 
 type config_channel_read = {
   ~format <ocaml default="C_json">: config_channel_format;
+  only_once <json name="onlyOnce">: bool;
 } <ocaml field_prefix="c_">
 
 (* TODO: Validate that the separators are non-empty *)

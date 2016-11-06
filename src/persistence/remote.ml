@@ -18,14 +18,21 @@ let create base ~input ~output =
 
 let read_batch_size = 0
 
+let get_base instance =
+  let arr = instance.base_urls in
+  Array.get arr (Random.int (Array.length arr))
+
 module M = struct
 
   type t = remote_t [@@deriving sexp]
 
   let close instance = return_unit
 
-  let push instance ~msgs ~ids =
-    return 1
+  let push instance ~msgs ~ids = return 1
+  (* let open Config_t in
+     let payload = {
+     messages = 
+     } *)
 
   let pull_slice instance ~search = fail_with "Unimplemented: Remote HTTP pull_slice"
 

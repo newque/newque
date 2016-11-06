@@ -128,7 +128,7 @@ let query : type a. t -> ?retry:int -> destroy:bool -> S3.stmt * string -> a rep
       ((Queue.to_array queue), last_rowid)
     ) ()
 
-let transaction db ~destroy stmts =
+let transaction db ~destroy ?query stmts =
   Lwt_preemptive.detach (fun () ->
     ignore (exec_sync db.db ~destroy:false db.stmts.begin_transaction);
     try
@@ -173,8 +173,10 @@ let bind ?(retry=default_retries) stmt args =
 (***********
    SQL BUILDERS
  ***********)
-let create_table_sql = "CREATE TABLE IF NOT EXISTS MESSAGES (uuid BLOB NOT NULL, timens BIGINT NOT NULL, raw BLOB NOT NULL, PRIMARY KEY(uuid));"
+let create_table_sql = "CREATE TABLE IF NOT EXISTS MESSAGES (uuid BLOB NOT NULL, timens BIGINT NOT NULL, raw BLOB NOT NULL, tag BLOB NULL, PRIMARY KEY(uuid));"
 let create_timens_index_sql = "CREATE INDEX IF NOT EXISTS MESSAGES_TIMENS_IDX ON MESSAGES (timens);"
+let create_tag_index_sql = "CREATE INDEX IF NOT EXISTS MESSAGES_TAG_IDX ON MESSAGES (tag);"
+
 let make_filters filters =
   let strings = Array.map filters ~f:(fun filter ->
       match filter with
@@ -183,11 +185,19 @@ let make_filters filters =
       | `After_rowid _ -> "(ROWID > ?)"
     ) in
   String.concat_array ~sep:" AND " strings
+
 let read_sql ~search =
   let open Persistence in
   match Array.is_empty search.filters with
   | true -> Printf.sprintf "SELECT raw, ROWID FROM MESSAGES ORDER BY ROWID ASC LIMIT %Ld;" search.limit
   | false -> Printf.sprintf "SELECT raw, ROWID FROM MESSAGES WHERE %s ORDER BY ROWID ASC LIMIT %Ld;" (make_filters search.filters) search.limit
+
+(* let add_tag_sql ~search =
+   let open Persistence in
+   match Array.is_empty search.filters with
+   | true -> Printf.sprintf "UPDATE MESSAGES SET tag = ? ORDER BY ROWID ASC LIMIT %Ld;" search.limit
+   | false -> Printf.sprintf "SELECT raw, ROWID FROM MESSAGES WHERE %s ORDER BY ROWID ASC LIMIT %Ld;" (make_filters search.filters) search.limit *)
+
 let single_sql = "SELECT uuid, timens FROM MESSAGES WHERE ROWID = ?;"
 let count_sql = "SELECT COUNT(*) FROM MESSAGES;"
 let begin_sql = "BEGIN;"
@@ -208,6 +218,10 @@ let create file ~avg_read =
   let%lwt (_ : int) = wrap (fun () -> exec_sync db ~destroy:false create_table) in
   let%lwt create_timens_index = prepare db create_timens_index_sql in
   let%lwt (_ : int) = wrap (fun () -> exec_sync db ~destroy:false create_timens_index) in
+  let%lwt create_tag_index = prepare db create_tag_index_sql in
+  let%lwt (_ : int) = wrap (fun () -> exec_sync db ~destroy:false create_tag_index) in
+
+  (* let%lwt test_sql = prepare db "UPDATE MESSAGES SET tag = 'abc' LIMIT 10" in *)
 
   let%lwt single = prepare db single_sql in
   let%lwt count = prepare db count_sql in
@@ -255,15 +269,18 @@ let push db ~msgs ~ids =
 
 let pull db ~search =
   let open Persistence in
-  let%lwt (st, _) as stmt = prepare db.db (read_sql ~search) in
-  let args = Array.mapi search.filters ~f:(fun i filter ->
-      match filter with
-      | `After_id id -> ((i + 1), Data.BLOB id)
-      | `After_ts ts -> ((i + 1), Data.INT ts)
-      | `After_rowid rowid -> ((i + 1), Data.INT rowid)
-    ) in
-  let%lwt () = bind st args in
-  query db ~destroy:true stmt FBlobRowid
+  match search.only_once with
+  | true -> failwith "derp"
+  | false ->
+    let%lwt (st, _) as stmt = prepare db.db (read_sql ~search) in
+    let args = Array.mapi search.filters ~f:(fun i filter ->
+        match filter with
+        | `After_id id -> ((i + 1), Data.BLOB id)
+        | `After_ts ts -> ((i + 1), Data.INT ts)
+        | `After_rowid rowid -> ((i + 1), Data.INT rowid)
+      ) in
+    let%lwt () = bind st args in
+    query db ~destroy:true stmt FBlobRowid
 
 let single db ~rowid =
   let (st, sql) as stmt = db.stmts.single in

@@ -2,8 +2,8 @@ type t = {
   name : string;
   endpoint_names : string list;
   push : Message.t array -> Id.t array -> int Lwt.t;
-  pull_slice : int64 -> mode:Mode.Read.t -> Persistence.slice Lwt.t;
-  pull_stream : int64 -> mode:Mode.Read.t -> string Lwt_stream.t Lwt.t;
+  pull_slice : int64 -> mode:Mode.Read.t -> only_once:bool -> Persistence.slice Lwt.t;
+  pull_stream : int64 -> mode:Mode.Read.t -> only_once:bool -> string Lwt_stream.t Lwt.t;
   size : unit -> int64 Lwt.t;
   read: Read_settings.t option;
   write : Write_settings.t option;
@@ -16,8 +16,8 @@ val create : string -> Config_t.config_channel -> t
 
 val push : t -> Message.t array -> Id.t array -> int Lwt.t
 
-val pull_slice : t -> mode:Mode.Read.t -> Persistence.slice Lwt.t
+val pull_slice : t -> mode:Mode.Read.t -> only_once:bool -> Persistence.slice Lwt.t
 
-val pull_stream : t -> mode:Mode.Read.t -> string Lwt_stream.t Lwt.t
+val pull_stream : t -> mode:Mode.Read.t -> only_once:bool -> string Lwt_stream.t Lwt.t
 
 val size : t -> unit -> int64 Lwt.t

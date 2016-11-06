@@ -8,12 +8,12 @@ type t =
   | Atomic of Atomic.t [@key 2]
 [@@deriving protobuf, sexp]
 
-let of_string_list ~atomic messages =
+let of_string_array ~atomic messages =
   begin match atomic with
     | false ->
-      Array.of_list_map ~f:(fun raw -> Single (Single.of_string raw)) messages
+      Array.map ~f:(fun raw -> Single (Single.of_string raw)) messages
     | true ->
-      [| Atomic (Atomic.of_string_list messages) |]
+      [| Atomic (Atomic.of_string_array messages) |]
   end
 
 let of_string ~format ~mode ~sep str =
@@ -23,14 +23,14 @@ let of_string ~format ~mode ~sep str =
     let open Config_j in
     begin match Util.parse_json input_message_of_string str with
       | (Error _) as err -> err
-      | Ok { atomic; messages } -> Ok (of_string_list ~atomic messages)
+      | Ok { atomic; messages } -> Ok (of_string_array ~atomic messages)
     end
   | Plaintext ->
     let split = Util.split ~sep in
     let arr = begin match mode with
       | `Single -> [| Single (Single.of_string str) |]
-      | `Multiple -> of_string_list ~atomic:false (split str)
-      | `Atomic -> of_string_list ~atomic:true (split str)
+      | `Multiple -> of_string_array ~atomic:false (Array.of_list (split str))
+      | `Atomic -> of_string_array ~atomic:true (Array.of_list (split str))
     end in
     Ok arr
 
@@ -41,7 +41,6 @@ let of_stream ~format ~mode ~sep ~buffer_size stream =
     let%lwt str = Util.stream_to_string ~buffer_size stream in
     begin match of_string ~format ~mode ~sep str with
       | Error str -> failwith str
-      (* | Error str -> fail (Util.UserInput str) *)
       | Ok messages -> return messages
     end
   | Plaintext ->

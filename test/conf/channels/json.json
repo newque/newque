@@ -2,7 +2,8 @@
   "listeners": ["http8000"],
   "persistence": "disk",
   "readSettings": {
-    "format":"json"
+    "format":"json",
+    "onlyOnce": false
   },
   "writeSettings": {
     "acknowledgement": "saved",
