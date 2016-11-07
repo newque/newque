@@ -107,7 +107,7 @@ var getEnvironment = function () {
   })
 }
 
-exports.setupEnvironment = function (persistence) {
+exports.setupEnvironment = function (persistence, persistenceSettings) {
   var path = runningDir + '/conf'
   return rm(runningDir)
   .then(() => createDir(runningDir))
@@ -119,6 +119,13 @@ exports.setupEnvironment = function (persistence) {
       .then(function (contents) {
         var parsed = JSON.parse(contents.toString('utf8'))
         parsed.persistence = persistence
+        if (parsed.persistenceSettings == null) {
+          parsed.persistenceSettings = persistenceSettings
+        } else {
+          for (var key in persistenceSettings) {
+            parsed.persistenceSettings[key] = persistenceSettings[key]
+          }
+        }
         return writeFile(path + '/channels/' + channel, JSON.stringify(parsed, null, 2))
       })
     }))
@@ -152,6 +159,6 @@ exports.spawnExecutable = function () {
   return p
 }
 
-exports.stopExecutable = function (p) {
-  p.kill()
+exports.teardown = function (processes) {
+  processes.forEach((p) => p.kill())
 }

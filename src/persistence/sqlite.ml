@@ -189,15 +189,15 @@ let make_filters filters =
 
 let read_sql ~search =
   let open Persistence in
-  match Array.is_empty search.filters with
-  | true -> Printf.sprintf "SELECT raw, ROWID FROM MESSAGES LIMIT %Ld;" search.limit
-  | false -> Printf.sprintf "SELECT raw, ROWID FROM MESSAGES WHERE %s LIMIT %Ld;" (make_filters search.filters) search.limit
+  match search.filters with
+  | [| |] -> Printf.sprintf "SELECT raw, ROWID FROM MESSAGES LIMIT %Ld;" search.limit
+  | _ -> Printf.sprintf "SELECT raw, ROWID FROM MESSAGES WHERE %s LIMIT %Ld;" (make_filters search.filters) search.limit
 
 let add_tag_sql ~search =
   let open Persistence in
-  match Array.is_empty search.filters with
-  | true -> Printf.sprintf "UPDATE MESSAGES SET tag = ? LIMIT %Ld;" search.limit
-  | false -> Printf.sprintf "UPDATE MESSAGES SET tag = ? WHERE %s LIMIT %Ld;" (make_filters search.filters) search.limit
+  match search.filters with
+  | [| |] -> Printf.sprintf "UPDATE MESSAGES SET tag = ? LIMIT %Ld;" search.limit
+  | _ -> Printf.sprintf "UPDATE MESSAGES SET tag = ? WHERE %s LIMIT %Ld;" (make_filters search.filters) search.limit
 
 let read_tag_sql = "SELECT raw, ROWID FROM MESSAGES INDEXED BY MESSAGES_TAG_IDX WHERE (tag = ?);"
 let delete_tag_sql = "DELETE FROM MESSAGES INDEXED BY MESSAGES_TAG_IDX WHERE (tag = ?);"
@@ -309,8 +309,7 @@ let pull db ~search ~fetch_last =
     let%lwt last_row_data = begin match (fetch_last, last_rowid) with
       | (false, _) | (true, None) -> return_none
       | (true, Some rowid) ->
-        let%lwt x = fetch_last_row db ~rowid in
-        return (Some x)
+        map Option.some (fetch_last_row db ~rowid)
     end
     in
 
@@ -338,8 +337,7 @@ let pull db ~search ~fetch_last =
     let%lwt last_row_data = begin match (fetch_last, last_rowid) with
       | (false, _) | (true, None) -> return_none
       | (true, Some rowid) ->
-        let%lwt x = fetch_last_row db ~rowid in
-        return (Some x)
+        map Option.some (fetch_last_row db ~rowid)
     end
     in
     return (rows, last_rowid, last_row_data)

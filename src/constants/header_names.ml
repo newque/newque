@@ -1,0 +1,5 @@
+let mode = "newque-mode"
+let id = "newque-msg-id"
+let length = "newque-response-length"
+let last_id = "newque-response-last-id"
+let last_ts = "newque-response-last-ts"

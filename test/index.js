@@ -18,17 +18,22 @@ Proc.pathExists(newquePath)
   return Proc.chmod(localExecutable, '755')
 })
 .then(Proc.cleanDirectories)
-.then(function () {
-  require('./sections/count')('disk')
-  require('./sections/count')('memory')
+.then(function (server) {
 
-  require('./sections/push')('disk')
-  require('./sections/push')('memory')
+  require('./sections/count')('disk', {})
+  require('./sections/count')('memory', {})
 
-  require('./sections/pull')('disk')
-  require('./sections/pull')('memory')
+  require('./sections/push')('disk', {})
+  require('./sections/push')('memory', {})
 
-  require('./sections/ack')('disk')
-  require('./sections/ack')('memory')
+  require('./sections/pull')('disk', {})
+  require('./sections/pull')('memory', {})
+
+  require('./sections/ack')('disk', {})
+  require('./sections/ack')('memory', {})
+  // require('./sections/ack')('http', {
+  //   'baseUrls': ['http://127.0.0.1:' + C.remotePort],
+  //   'baseHeaders': [{key: 'secret-token', value: 'supersecret'}]
+  // })
   run()
 })

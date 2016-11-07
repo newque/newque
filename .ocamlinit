@@ -38,6 +38,7 @@ open Cohttp_lwt_unix
 #mod_use "tmp/config_j.ml"
 #mod_use "tmp/admin.ml"
 #mod_use "tmp/mode.ml"
+#mod_use "tmp/header_names.ml"
 #mod_use "tmp/io_format.ml"
 #mod_use "tmp/read_settings.ml"
 #mod_use "tmp/write_settings.ml"

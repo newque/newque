@@ -1,6 +1,10 @@
 {
   "listeners": ["http8000"],
-  "persistence": "disk",
+  "persistence": "http",
+  "persistenceSettings": {
+    "baseUrls": [],
+    "baseHeaders": []
+  },
   "acknowledgement": "saved",
   "readSettings": {
     "onlyOnce": true

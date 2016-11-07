@@ -2,6 +2,7 @@ module M : Persistence.Template
 
 val create :
   string array ->
+  Config_t.pair list ->
   input:Config_t.config_channel_format ->
   output:Config_t.config_channel_format ->
   M.t Lwt.t

@@ -1,9 +1,9 @@
-module.exports = function (persistence) {
+module.exports = function (persistence, persistenceSettings) {
   describe('Pull ' + persistence, function () {
     var p, env
     before(function () {
       this.timeout(10000)
-      return Proc.setupEnvironment(persistence)
+      return Proc.setupEnvironment(persistence, persistenceSettings)
       .then(function (environment) {
         env = environment
         p = Proc.spawnExecutable()
@@ -182,7 +182,7 @@ module.exports = function (persistence) {
     })
 
     after(function () {
-      return Proc.stopExecutable(p)
+      return Proc.teardown([p])
     })
   })
 }

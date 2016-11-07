@@ -1,8 +1,8 @@
-module.exports = function (id) {
-  describe('Ack ' + id, function () {
+module.exports = function (persistence, persistenceSettings) {
+  describe('Ack ' + persistence, function () {
     var p, env
     before(function () {
-      return Proc.setupEnvironment(id)
+      return Proc.setupEnvironment(persistence, persistenceSettings)
       .then(function (environment) {
         env = environment
         p = Proc.spawnExecutable()
@@ -28,7 +28,7 @@ module.exports = function (id) {
     })
 
     after(function () {
-      return Proc.stopExecutable(p)
+      return Proc.teardown([p])
     })
   })
 }

@@ -105,7 +105,7 @@ module M = struct
             limit = Int64.min !left (Int.to_int64 read_batch_size);
             filters = Array.append [|`After_rowid rowid|] search.filters;
           };
-          return (Some payloads)
+          return_some payloads
       )
     )
 

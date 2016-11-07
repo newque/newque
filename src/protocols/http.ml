@@ -53,11 +53,6 @@ type http_routing =
   | Admin
   | Standard of standard_routing
 
-let mode_header_name = "newque-mode"
-let id_header_name = "newque-msg-id"
-let length_header_name = "newque-response-length"
-let last_id_header_name = "newque-response-last-id"
-let last_ts_header_name = "newque-response-last-ts"
 let json_response_header = Header.init_with "content-type" "application/json"
 
 let default_filter _ req _ =
@@ -71,7 +66,7 @@ let default_filter _ req _ =
       end
     | ""::"v1"::chan_name::_ ->
       let mode_value =
-        Header.get (Request.headers req) mode_header_name
+        Header.get (Request.headers req) Header_names.mode
         |> Result.of_option ~error:"<no header>"
         |> (Fn.flip Result.bind) Mode.of_string
       in
@@ -88,7 +83,7 @@ let default_filter _ req _ =
         | (`GET as meth), Ok m ->
           Error (400, [Printf.sprintf "Invalid {Method, Mode} pair: {%s, %s}" (Code.string_of_method meth) (Mode.to_string (m :> Mode.Any.t))])
         | _, Error str ->
-          Error (400, [Printf.sprintf "Invalid %s header value: %s" mode_header_name str])
+          Error (400, [Printf.sprintf "Invalid %s header value: %s" Header_names.mode str])
         | meth, _ ->
           Error (405, [Printf.sprintf "Invalid HTTP method %s" (Code.string_of_method meth)])
       end
@@ -148,7 +143,7 @@ let handler http routing ((ch, _) as conn) req body =
 
           | `Write mode ->
             let stream = Cohttp_lwt_body.to_stream body in
-            let id_header = Header.get (Request.headers req) id_header_name in
+            let id_header = Header.get (Request.headers req) Header_names.id in
             let%lwt (code, errors, saved) =
               begin match%lwt routing.push ~chan_name ~id_header ~mode stream with
                 | Ok ((Some _) as count) -> return (201, [], count)
@@ -161,7 +156,7 @@ let handler http routing ((ch, _) as conn) req body =
             Server.respond_string ~headers ~status ~body ()
 
           | `Read mode ->
-            let id_header = Header.get (Request.headers req) id_header_name in
+            let id_header = Header.get (Request.headers req) Header_names.id in
             begin match Request.encoding req with
               | Transfer.Chunked ->
                 begin match%lwt routing.read_stream ~chan_name ~id_header ~mode with
@@ -176,7 +171,7 @@ let handler http routing ((ch, _) as conn) req body =
                           (Code.status_of_code 204),
                           (Header.add_list (Header.init ()) [
                               ("content-type", "application/octet-stream");
-                              (length_header_name, "0");
+                              (Header_names.length, "0");
                             ])
                         )
                     in
@@ -204,14 +199,14 @@ let handler http routing ((ch, _) as conn) req body =
                       | None ->
                         Header.add_list (Header.init ()) [
                           ("content-type", "application/octet-stream");
-                          (length_header_name, Int.to_string (Array.length payloads));
+                          (Header_names.length, Int.to_string (Array.length payloads));
                         ]
                       | Some metadata ->
                         Header.add_list (Header.init ()) [
                           ("content-type", "application/octet-stream");
-                          (length_header_name, Int.to_string (Array.length payloads));
-                          (last_id_header_name, metadata.last_id);
-                          (last_ts_header_name, Int64.to_string (metadata.last_timens));
+                          (Header_names.length, Int.to_string (Array.length payloads));
+                          (Header_names.last_id, metadata.last_id);
+                          (Header_names.last_ts, Int64.to_string (metadata.last_timens));
                         ]
                     in
                     let open Read_settings in
