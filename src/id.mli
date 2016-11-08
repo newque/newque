@@ -2,6 +2,8 @@ open Core.Std
 
 type t
 
+val default_separator : string
+
 val array_of_string_opt :
   ?sep:string ->
   mode:Mode.Write.t ->

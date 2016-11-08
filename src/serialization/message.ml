@@ -20,8 +20,8 @@ let of_string ~format ~mode ~sep str =
   let open Io_format in
   match format with
   | Json ->
-    let open Config_j in
-    begin match Util.parse_json input_message_of_string str with
+    let open Json_obj_j in
+    begin match Util.parse_json message_of_string str with
       | (Error _) as err -> err
       | Ok { atomic; messages } -> Ok (of_string_array ~atomic messages)
     end
@@ -56,14 +56,14 @@ let of_stream ~format ~mode ~sep ~buffer_size stream =
     end
 
 let serialize msg =
-  #ifdef DEBUG
+  #ifdef JSON
     Util.string_of_sexp ~pretty:false (sexp_of_t msg)
     #else
   Protobuf.Encoder.encode_exn to_protobuf msg
     #endif
 
 let parse_exn blob =
-  #ifdef DEBUG
+  #ifdef JSON
     t_of_sexp (Util.sexp_of_json_str_exn blob)
     #else
   Protobuf.Decoder.decode_exn from_protobuf blob

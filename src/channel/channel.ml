@@ -39,7 +39,14 @@ let create name conf_channel =
     | `Remote_http remote ->
       let module Arg = struct
         module IO = Remote.M
-        let create () = Remote.create remote.base_urls remote.base_headers ~input:remote.input_format ~output:remote.output_format
+        let create () = Remote.create
+            (if remote.append_chan_name
+             then Array.map ~f:(fun b -> Printf.sprintf "%s%s" b name) remote.base_urls
+             else remote.base_urls)
+            remote.base_headers
+            ~input:remote.input_format
+            ~output:remote.output_format
+            ~chan_separator:conf_channel.separator
         let read_batch_size = Remote.read_batch_size
       end in
       (module Persistence.Make (Arg) : Persistence.S)

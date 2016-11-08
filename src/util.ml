@@ -128,3 +128,12 @@ let parse_json parser str =
   | Yojson.Json_error str ->
     let replaced = Str.global_replace json_error_regexp " " str in
     Error replaced
+
+let parse_json_lwt parser str =
+  try
+    return (parser str)
+  with
+  | Ag_oj_run.Error str
+  | Yojson.Json_error str ->
+    let replaced = Str.global_replace json_error_regexp " " str in
+    fail_with replaced

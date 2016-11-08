@@ -11,9 +11,9 @@ OASISFormat: 0.4
 BuildTools: ocamlbuild
 Plugins: META (0.4), DevFiles (0.4)
 
-PreBuildCommand: rm -rf tmp && rm -f src/config/config_*.ml* && mkdir tmp && find src -name "*.ml*" | xargs ocp-indent --config align_ops=false,strict_else=auto -i && atdgen -t ./src/config/config.atd && atdgen -j -j-std ./src/config/config.atd && find src -name '*.ml*' -print0 | xargs -0 -I % sh -c 'cppo -D DEBUG % -o tmp/`basename %`'
+PreBuildCommand: rm -rf tmp && rm -f src/config/config_*.ml* && rm -f src/serialization/json_obj_*.ml* && mkdir tmp && find src -name "*.ml*" | xargs ocp-indent --config align_ops=false,strict_else=auto -i && atdgen -t ./src/config/config.atd && atdgen -j -j-std ./src/config/config.atd && atdgen -t ./src/serialization/json_obj.atd && atdgen -j -j-std ./src/serialization/json_obj.atd && find src -name '*.ml*' -print0 | xargs -0 -I % sh -c 'cppo -D DEBUG % -o tmp/`basename %`'
 
-PreCleanCommand: rm -rf tmp src/config/config_*.ml* logs data
+PreCleanCommand: rm -rf tmp src/config/config_*.ml* src/serialization/json_obj_*.ml* logs data
 
 Executable "newque"
   Path: tmp

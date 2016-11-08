@@ -82,8 +82,8 @@ module M = struct
     match (last_rowid, last_row_data) with
     | (None, _) | (_, None) ->
       return { metadata = None; payloads }
-    | (Some last_internal_id), (Some (last_id, last_timens)) ->
-      return { metadata = (Some {last_internal_id; last_id; last_timens}); payloads }
+    | (Some _), (Some (last_id, last_timens)) ->
+      return { metadata = (Some { last_id; last_timens = (Int64.to_string last_timens); }); payloads }
 
   let pull_stream instance ~search =
     let open Persistence in

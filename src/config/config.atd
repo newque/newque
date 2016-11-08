@@ -35,13 +35,6 @@ type config_listener = {
 }
 
 
-(* INPUT MESSAGE *)
-type input_message = {
-  ~atomic <ocaml default="false">: bool;
-  messages: string list <ocaml repr="array">;
-  ?ids: string list <ocaml repr="array"> option;
-}
-
 (* PERSISTENCE *)
 type config_redis = {
   host <json name="host">: string;
@@ -52,8 +45,9 @@ type config_redis = {
 type config_remote_http = {
   base_urls <json name="baseUrls">: string list <ocaml repr="array">;
   base_headers <json name="baseHeaders">: pair list;
-  ~input_format <json name="inputFormat"><ocaml default="C_json">: config_channel_format;
-  ~output_format <json name="outputFormat"><ocaml default="C_json">: config_channel_format;
+  append_chan_name <json name="appendChannelName">: bool;
+  ~input_format <json name="remoteInputFormat"><ocaml default="C_json">: config_channel_format;
+  ~output_format <json name="remoteOutputFormat"><ocaml default="C_json">: config_channel_format;
 }
 
 type config_persistence = [

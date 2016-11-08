@@ -89,6 +89,7 @@ var shouldHaveCounted = exports.shouldHaveCounted = function (count) {
 var shouldHaveRead = exports.shouldHaveRead = function (values, separator) {
   return function (result) {
     // console.log(result.res.statusCode)
+    // console.log(result.res.text)
     return new Promise(function (resolve, reject) {
       if (values.length === 0) {
         assert(result.res.statusCode === 204)
@@ -117,9 +118,11 @@ var shouldHaveRead = exports.shouldHaveRead = function (values, separator) {
           var buf = new Buffer(JSON.stringify(json), 'utf8')
         }
 
-        // console.log('Expecting', JSON.stringify(buf.toString('utf8')))
-        // console.log('Got', JSON.stringify(result.res.buffer.toString('utf8')))
-        assert(Buffer.compare(buf, result.res.buffer) === 0)
+        if (Buffer.compare(buf, result.res.buffer) !== 0) {
+          console.log('Expecting', JSON.stringify(buf.toString('utf8')))
+          console.log('Got', JSON.stringify(result.res.buffer.toString('utf8')))
+          return reject('Invalid response buffer')
+        }
       }
 
       // Check HTTP headers

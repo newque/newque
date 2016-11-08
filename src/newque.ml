@@ -50,7 +50,7 @@ let start config_path =
     | Ok () ->
       Printf.sprintf "Current router state: %s"
         (Watcher.router watcher |> Router.sexp_of_t |> Util.string_of_sexp)
-      |> Logger.info
+      |> Logger.debug
     | Error ll ->
       String.concat ~sep:", " ll
       |> Logger.error

@@ -6,7 +6,9 @@ let time_ns () = Int63.to_int64 (Time_ns.to_int63_ns_since_epoch (Time_ns.now ()
 
 let uuid () = Uuidm.to_string (Uuidm.v `V4)
 
-let array_of_string_opt ?(sep=",") ~mode ~msgs opt =
+let default_separator = ","
+
+let array_of_string_opt ?(sep=default_separator) ~mode ~msgs opt =
   match opt with
   | None ->
     begin match mode with

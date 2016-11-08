@@ -1,12 +1,11 @@
 module.exports = function (persistence, persistenceSettings) {
   describe('Ack ' + persistence, function () {
-    var p, env
+    var processes = []
     before(function () {
       return Proc.setupEnvironment(persistence, persistenceSettings)
-      .then(function (environment) {
-        env = environment
-        p = Proc.spawnExecutable()
-        return Promise.delay(C.spawnDelay)
+      .then(function (procs) {
+        procs.forEach((p) => processes.push(p))
+        return Promise.delay(C.spawnDelay * processes.length)
       })
     })
 
@@ -28,7 +27,7 @@ module.exports = function (persistence, persistenceSettings) {
     })
 
     after(function () {
-      return Proc.teardown([p])
+      return Proc.teardown(processes)
     })
   })
 }

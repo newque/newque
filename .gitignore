@@ -17,6 +17,7 @@ test/node_modules
 test/running
 test/newque
 test/logs
+test/remoteRunning
 
 conduit.0.12.0
 

@@ -53,8 +53,6 @@ type http_routing =
   | Admin
   | Standard of standard_routing
 
-let json_response_header = Header.init_with "content-type" "application/json"
-
 let default_filter _ req _ =
   let path = Request.uri req |> Uri.path in
   let url_fragments = path |> String.split ~on:'/' in
@@ -91,45 +89,12 @@ let default_filter _ req _ =
   in
   return result
 
-let json_write_body code errors saved =
-  match saved with
-  | Some saved ->
-    `Assoc [
-      ("code", `Int code);
-      ("errors", `List (List.map errors ~f:(fun x -> `String x)));
-      ("saved", `Int saved);
-    ]
-  | None ->
-    `Assoc [
-      ("code", `Int code);
-      ("errors", `List (List.map errors ~f:(fun x -> `String x)));
-    ]
-
-let json_read_body code errors messages =
-  (* TODO: optimize this *)
-  let ll = Array.to_list (Array.map ~f:(fun x -> `String x) messages) in
-  `Assoc [
-    ("code", `Int code);
-    ("errors", `List (List.map errors ~f:(fun x -> `String x)));
-    ("messages", `List ll);
-  ]
-
-let json_count_body code errors count =
-  let count = if List.is_empty errors then `Int count else `Null in
-  `Assoc [
-    ("code", `Int code);
-    ("errors", `List (List.map errors ~f:(fun x -> `String x)));
-    ("count", count);
-  ]
+let json_response_header = Header.init_with "content-type" "application/json"
 
 let handle_errors code errors =
   let headers = json_response_header in
   let status = Code.status_of_code code in
-  let body = Yojson.Basic.to_string (`Assoc [
-      ("code", `Int code);
-      ("errors", `List (List.map errors ~f:(fun x -> `String x)));
-    ])
-  in
+  let body = Json_obj_j.(string_of_errors { code; errors; }) in
   Server.respond_string ~headers ~status ~body ()
 
 let handler http routing ((ch, _) as conn) req body =
@@ -152,7 +117,7 @@ let handler http routing ((ch, _) as conn) req body =
               end in
             let headers = json_response_header in
             let status = Code.status_of_code code in
-            let body = Yojson.Basic.to_string (json_write_body code errors saved) in
+            let body = Json_obj_j.(string_of_write { code; errors; saved; }) in
             Server.respond_string ~headers ~status ~body ()
 
           | `Read mode ->
@@ -206,7 +171,7 @@ let handler http routing ((ch, _) as conn) req body =
                           ("content-type", "application/octet-stream");
                           (Header_names.length, Int.to_string (Array.length payloads));
                           (Header_names.last_id, metadata.last_id);
-                          (Header_names.last_ts, Int64.to_string (metadata.last_timens));
+                          (Header_names.last_ts, metadata.last_timens);
                         ]
                     in
                     let open Read_settings in
@@ -214,11 +179,11 @@ let handler http routing ((ch, _) as conn) req body =
                       | None ->
                         let err = Printf.sprintf "Impossible case: Missing readSettings for channel %s" chan_name in
                         async (fun () -> Logger.error err);
-                        Yojson.Basic.to_string (json_read_body 500 [err] [| |])
+                        Json_obj_j.(string_of_read { code = 500; errors = [err]; messages = [| |]; })
                       | Some { format = Io_format.Plaintext } ->
                         String.concat_array ~sep:channel.Channel.separator payloads
                       | Some { format = Io_format.Json } ->
-                        Yojson.Basic.to_string (json_read_body code [] payloads)
+                        Json_obj_j.(string_of_read { code; errors = []; messages = payloads; })
                     in
                     let encoding = Transfer.Fixed (Int.to_int64 (String.length body)) in
                     let response = Response.make ~status ~flush:true ~encoding ~headers () in
@@ -229,12 +194,12 @@ let handler http routing ((ch, _) as conn) req body =
           | `Count as mode ->
             let%lwt (code, errors, count) =
               begin match%lwt routing.count ~chan_name ~mode with
-                | Ok count -> return (200, [], (Int64.to_int_exn count))
-                | Error errors -> return (400, errors, 0)
+                | Ok count -> return (200, [], Some (Int64.to_int_exn count))
+                | Error errors -> return (400, errors, None)
               end in
             let headers = json_response_header in
             let status = Code.status_of_code code in
-            let body = Yojson.Basic.to_string (json_count_body code errors count) in
+            let body = Json_obj_j.(string_of_count { code; errors; count; }) in
             Server.respond_string ~headers ~status ~body ()
         end
       with ex -> handle_errors 500 [Exn.to_string ex]

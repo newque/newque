@@ -1,0 +1,30 @@
+(* Response objects *)
+type write = {
+  code: int;
+  errors: string list;
+  ~saved: int nullable;
+}
+
+type read = {
+  code: int;
+  errors: string list;
+  messages: string list <ocaml repr="array">;
+}
+
+type count = {
+  code: int;
+  errors: string list;
+  count: int nullable;
+}
+
+type errors = {
+  code: int;
+  errors: string list;
+}
+
+(* Request objects *)
+type message = {
+  ~atomic <ocaml default="false">: bool;
+  messages: string list <ocaml repr="array">;
+  ?ids: string list <ocaml repr="array"> option;
+}

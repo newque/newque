@@ -71,8 +71,8 @@ let write router ~listen_name ~chan_name ~id_header ~mode stream =
         let%lwt parsed = begin match write.format with
           | Io_format.Json ->
             let%lwt str = Util.stream_to_string ~buffer_size:chan.buffer_size stream in
-            let open Config_j in
-            begin match Util.parse_json input_message_of_string str with
+            let open Json_obj_j in
+            begin match Util.parse_json message_of_string str with
               | (Error _) as err -> return ([| |], err)
               | Ok { atomic; messages; ids } ->
                 let msgs = Message.of_string_array ~atomic messages in

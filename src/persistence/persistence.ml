@@ -15,9 +15,8 @@ let create_search max_read ~mode ~only_once =
   | `After_ts ts -> { limit = max_read; filters = [|`After_ts ts|]; only_once; }
 
 type slice_metadata = {
-  last_internal_id: int64;
   last_id: string;
-  last_timens: int64;
+  last_timens: string;
 }
 type slice = {
   metadata: slice_metadata option;

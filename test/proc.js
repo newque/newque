@@ -2,9 +2,11 @@ var fs = require('fs')
 var spawn = require('child_process').spawn
 var exec = require('child_process').exec
 
-var localExecutable = __dirname + '/newque'
+var newquePath = exports.newquePath = __dirname + '/../newque.native'
 var confDir = __dirname + '/conf'
 var runningDir = __dirname + '/running'
+var remoteRunningDir = __dirname + '/remoteRunning'
+var remoteConfDir = __dirname + '/remoteConf'
 
 var pathExists = exports.pathExists = function (path) {
   return Promise.promisify(fs.stat)(path)
@@ -108,17 +110,38 @@ var getEnvironment = function () {
 }
 
 exports.setupEnvironment = function (persistence, persistenceSettings) {
-  var path = runningDir + '/conf'
-  return rm(runningDir)
-  .then(() => createDir(runningDir))
-  .then(() => copyDir(confDir, path))
+  var type = persistence.split(' ')[0]
+  var remoteType = persistence.split(' ')[1]
+  return rm(remoteRunningDir)
+  .then(() => createDir(remoteRunningDir))
+  .then(() => copyDir(remoteConfDir, remoteRunningDir + '/conf'))
   .then(() => readDirectory(confDir + '/channels'))
   .then(function (channels) {
     return Promise.all(channels.map(function (channel) {
       return readFile(confDir + '/channels/' + channel)
       .then(function (contents) {
         var parsed = JSON.parse(contents.toString('utf8'))
-        parsed.persistence = persistence
+        parsed.persistence = 'memory'
+        if (parsed.readSettings) {
+          parsed.readSettings.format = remoteType
+        }
+        if (parsed.writeSettings) {
+          parsed.writeSettings.format = remoteType
+        }
+        return writeFile(remoteRunningDir + '/conf/channels/' + channel, JSON.stringify(parsed, null, 2))
+      })
+    }))
+  })
+  .then(() => rm(runningDir))
+  .then(() => createDir(runningDir))
+  .then(() => copyDir(confDir, runningDir + '/conf'))
+  .then(() => readDirectory(confDir + '/channels'))
+  .then(function (channels) {
+    return Promise.all(channels.map(function (channel) {
+      return readFile(confDir + '/channels/' + channel)
+      .then(function (contents) {
+        var parsed = JSON.parse(contents.toString('utf8'))
+        parsed.persistence = type
         if (parsed.persistenceSettings == null) {
           parsed.persistenceSettings = persistenceSettings
         } else {
@@ -126,17 +149,23 @@ exports.setupEnvironment = function (persistence, persistenceSettings) {
             parsed.persistenceSettings[key] = persistenceSettings[key]
           }
         }
-        return writeFile(path + '/channels/' + channel, JSON.stringify(parsed, null, 2))
+        return writeFile(runningDir + '/conf/channels/' + channel, JSON.stringify(parsed, null, 2))
       })
     }))
   })
-  .then(() => getEnvironment())
+  .then(function () {
+    var processes = [spawnExecutable(newquePath, runningDir)]
+    if (type === 'http') {
+      processes.push(spawnExecutable(newquePath, remoteRunningDir))
+    }
+    return Promise.resolve(processes)
+  })
 }
 
-exports.spawnExecutable = function () {
+var spawnExecutable = exports.spawnExecutable = function (execLocation, dirLocation) {
   var debug = process.env.DEBUG === '1'
-  var p = spawn(localExecutable, [], {
-    cwd: runningDir,
+  var p = spawn(execLocation, [], {
+    cwd: dirLocation,
     detached: false
   })
   p.stderr.on('data', function (data) {
