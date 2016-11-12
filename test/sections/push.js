@@ -106,7 +106,7 @@ module.exports = function (persistence, persistenceSettings) {
         var buf = 'A abc\nA def\nA ghi\nA jkl'
         return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'single'], [C.idHeader, 'id1']])
         .then(Fn.shouldHaveWritten(1))
-        // Check if only one was added after the previous lastID, then update the lastID
+        // Check that only one was added after the previous lastID, then update the lastID
         .then(() => Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'after_id ' + lastID]]))
         .then(Fn.shouldHaveRead([buf], '\n'))
         .then(result => lastID = result.res.headers[C.lastIdHeader])
@@ -116,7 +116,7 @@ module.exports = function (persistence, persistenceSettings) {
         var buf = 'B abc\nB def\nB ghi\nB jkl'
         return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'single'], [C.idHeader, 'id1,id2']])
         .then(Fn.shouldHaveWritten(1))
-        // Check if only one was added after the previous lastID, then update the lastID
+        // Check that only one was added after the previous lastID, then update the lastID
         .then(() => Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'after_id ' + lastID]]))
         .then(Fn.shouldHaveRead([buf], '\n'))
         .then(result => lastID = result.res.headers[C.lastIdHeader])
@@ -126,7 +126,7 @@ module.exports = function (persistence, persistenceSettings) {
         var buf = 'abcdef'
         return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'single'], [C.idHeader, 'id10,id11,id12,id13']])
         .then(Fn.shouldHaveWritten(1))
-        // Check if only one was added after the previous lastID, then update the lastID
+        // Check that only one was added after the previous lastID, then update the lastID
         .then(() => Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'after_id ' + lastID]]))
         .then(Fn.shouldHaveRead([buf], '\n'))
         .then(result => lastID = result.res.headers[C.lastIdHeader])

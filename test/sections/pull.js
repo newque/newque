@@ -29,7 +29,7 @@ module.exports = function (persistence, persistenceSettings) {
       {name: 'Fixed-Length', headers: []},
       {name: 'Chunked', headers: [['Transfer-Encoding', 'chunked']]}
     ]
-    for (var i = 0; i < 2; i++) {
+    for (var i = 0; i < transports.length; i++) {
       describe('Transfer-Encoding: ' + transports[i].name, function () {
         var ii = i
         it('Without header, secondary channel', function () {

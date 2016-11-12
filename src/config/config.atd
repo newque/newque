@@ -3,6 +3,11 @@ type pair = {
   value: string;
 }
 
+type config_channel_format = [
+  | C_plaintext <json name="plaintext">
+  | C_json <json name="json">
+] <ocaml repr="classic">
+
 (* LOGGING *)
 type config_log_level = [
   | Debug <json name="debug">
@@ -69,11 +74,6 @@ type config_channel_write = {
   ~format <ocaml default="C_json">: config_channel_format;
   copy_to <json name="copyToChannels">: string list;
 } <ocaml field_prefix="c_">
-
-type config_channel_format = [
-  | C_plaintext <json name="plaintext">
-  | C_json <json name="json">
-] <ocaml repr="classic">
 
 type config_channel_read = {
   ~format <ocaml default="C_json">: config_channel_format;

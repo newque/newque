@@ -67,46 +67,13 @@ module M = struct
         handle_failure instance ex ~errstr:(Printf.sprintf "Failed to write to %s (%s) with error %s. Restarting." instance.file instance.chan_name (Exn.to_string ex))
     )
 
-  let pull_data instance ~search ~fetch_last =
+  let pull instance ~search ~fetch_last =
     Lwt_mutex.with_lock instance.mutex (fun () ->
       try%lwt
         Sqlite.pull instance.db ~search ~fetch_last
       with
       | ex ->
         handle_failure instance ex ~errstr:(Printf.sprintf "Failed to query from %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex))
-    )
-
-  let pull_slice instance ~search =
-    let%lwt (payloads, last_rowid, last_row_data) = pull_data instance ~search ~fetch_last:true in
-    let open Persistence in
-    match (last_rowid, last_row_data) with
-    | (None, _) | (_, None) ->
-      return { metadata = None; payloads }
-    | (Some _), (Some (last_id, last_timens)) ->
-      return { metadata = (Some { last_id; last_timens = (Int64.to_string last_timens); }); payloads }
-
-  let pull_stream instance ~search =
-    let open Persistence in
-    (* Ugly imperative code for performance here *)
-    let left = ref search.limit in
-    let next_search = ref {search with limit = Int64.min !left (Int.to_int64 read_batch_size)} in
-    wrap (fun () ->
-      Lwt_stream.from (fun () ->
-        if !next_search.limit <= Int64.zero then return_none else
-        let%lwt (payloads, last_rowid, _) = pull_data instance ~search:!next_search ~fetch_last:false in
-        match last_rowid with
-        | None -> return_none
-        | Some rowid ->
-          if Array.is_empty payloads then return_none else
-          let payloads_count = Int.to_int64 (Array.length payloads) in
-          left := Int64.(-) !left payloads_count;
-          next_search := {
-            !next_search with
-            limit = Int64.min !left (Int.to_int64 read_batch_size);
-            filters = Array.append [|`After_rowid rowid|] search.filters;
-          };
-          return_some payloads
-      )
     )
 
   let size instance =

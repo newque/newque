@@ -29,12 +29,18 @@ Proc.pathExists(Proc.newquePath)
 
   require('./sections/count')('disk', {})
   require('./sections/count')('memory', {})
+  require('./sections/count')('http json', httpJsonSettings)
+  require('./sections/count')('http plaintext', httpPlaintextSettings)
 
   require('./sections/push')('disk', {})
   require('./sections/push')('memory', {})
+  require('./sections/push')('http json', httpJsonSettings)
+  require('./sections/push')('http plaintext', httpPlaintextSettings)
 
   require('./sections/pull')('disk', {})
   require('./sections/pull')('memory', {})
+  require('./sections/pull')('http json', httpJsonSettings)
+  require('./sections/pull')('http plaintext', httpPlaintextSettings)
 
   require('./sections/ack')('disk', {})
   require('./sections/ack')('memory', {})

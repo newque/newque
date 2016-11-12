@@ -1,5 +1,6 @@
 open Core.Std
 open Lwt
+open Cohttp
 
 let split ~sep str =
   let delim = Str.regexp_string sep in
@@ -64,21 +65,18 @@ let stream_to_array ~mapper ~sep ?(init=(Some "")) stream =
   return (Queue.to_array queue)
 
 (* TODO: Decide what to do with these "impossible" synchronous exceptions *)
-let is_assoc sexp =
+let rec is_assoc sexp =
   match sexp with
-  | Sexp.List [Sexp.Atom _; _] -> true
+  | [] -> true
+  | (Sexp.Atom _)::_::tail -> is_assoc tail
   | _ -> false
 let has_dup_keys ll =
-  List.contains_dup (List.map ll ~f:(fun sexp ->
-      match sexp with
-      | Sexp.List [(Sexp.Atom key); _] -> key
-      | _ -> failwith "Unreachable"
-    ))
+  List.contains_dup (List.filteri ll ~f:(fun i sexp -> Int.(=) (i mod 2) 0))
 let rec json_of_sexp sexp =
   match sexp with
-  | Sexp.List ll when (List.for_all ll ~f:is_assoc) && not (has_dup_keys ll) ->
-    `Assoc (List.map ll ~f:(function
-        | Sexp.List [Sexp.Atom head; tail] -> (head, (json_of_sexp tail))
+  | Sexp.List ll when (is_assoc ll) && not (has_dup_keys ll) ->
+    `Assoc (List.map (List.groupi ll ~break:(fun i _ _ -> i mod 2 = 0)) ~f:(function
+        | [Sexp.Atom k; v] -> (k, (json_of_sexp v))
         | _ -> failwith "Unreachable"
       ))
   | Sexp.List ll -> `List (List.map ~f:json_of_sexp ll)
@@ -99,8 +97,8 @@ let string_of_sexp ?(pretty=true) sexp =
 let rec sexp_of_json_exn json =
   match json with
   | `Assoc ll ->
-    Sexp.List (List.map ll ~f:(fun (key, json) ->
-        Sexp.List [Sexp.Atom key; sexp_of_json_exn json]
+    Sexp.List (List.concat_map ll ~f:(fun (key, json) ->
+        [Sexp.Atom key; sexp_of_json_exn json]
       ))
   | `Bool b -> Sexp.Atom (Bool.to_string b)
   | `Float f -> Sexp.Atom (Float.to_string f)
@@ -137,3 +135,8 @@ let parse_json_lwt parser str =
   | Yojson.Json_error str ->
     let replaced = Str.global_replace json_error_regexp " " str in
     fail_with replaced
+
+let header_name_to_int64_opt headers name =
+  Option.bind
+    (Header.get headers name)
+    (fun x -> Option.try_with (fun () -> Int64.of_string x))

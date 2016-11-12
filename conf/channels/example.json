@@ -2,14 +2,18 @@
   "listeners": ["http8000"],
   "persistence": "http",
   "persistenceSettings": {
-    "baseUrls": [],
-    "baseHeaders": []
+    "baseUrls": ["http://127.0.0.1:8200/v1/"],
+    "baseHeaders": [],
+    "appendChannelName": true,
+    "remoteInputFormat": "plaintext",
+    "remoteOutputFormat": "plaintext"
   },
   "acknowledgement": "saved",
   "readSettings": {
     "onlyOnce": true
   },
   "writeSettings": {
-    "copyToChannels": []
+    "copyToChannels": [],
+    "format":"plaintext"
   }
 }

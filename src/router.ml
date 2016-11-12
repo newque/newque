@@ -121,14 +121,14 @@ let write router ~listen_name ~chan_name ~id_header ~mode stream =
         end
     end
 
-let read_slice router ~listen_name ~chan_name ~id_header ~mode =
+let read_slice router ~listen_name ~chan_name ~id_header ~mode ~limit =
   match find_chan router ~listen_name ~chan_name with
   | (Error _) as err -> return err
   | Ok chan ->
     begin match chan.Channel.read with
       | None -> return (Error [Printf.sprintf "Channel %s doesn't support Reading from it." chan_name])
       | Some read ->
-        let%lwt slice = Channel.pull_slice chan ~mode ~only_once:read.Read_settings.only_once in
+        let%lwt slice = Channel.pull_slice chan ~mode ~limit ~only_once:read.Read_settings.only_once in
         ignore_result (Logger.debug_lazy (lazy (
             Printf.sprintf "Read: %s (size: %d) from %s" chan_name (Array.length slice.Persistence.payloads) listen_name
           )));

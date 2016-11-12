@@ -131,6 +131,7 @@ var shouldHaveRead = exports.shouldHaveRead = function (values, separator) {
         assert(result.res.headers[C.lengthHeader] == null)
       } else {
         if (result.res.statusCode === 200) {
+          // Validate headers
           assert(parseInt(result.res.headers[C.lengthHeader], 10) === values.length)
           assert(parseInt(result.res.headers['content-length'], 10) === result.res.buffer.length)
           assert(result.res.headers[C.lastIdHeader].length > 0)

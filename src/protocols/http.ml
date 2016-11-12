@@ -37,6 +37,7 @@ type standard_routing = {
     chan_name:string ->
     id_header:string option ->
     mode:Mode.Read.t ->
+    limit:int64 ->
     (Persistence.slice * Channel.t, string list) Result.t Lwt.t);
   read_stream: (
     chan_name:string ->
@@ -98,7 +99,7 @@ let handle_errors code errors =
   Server.respond_string ~headers ~status ~body ()
 
 let handler http routing ((ch, _) as conn) req body =
-  (* async (fun () -> Logger.debug_lazy (lazy (Util.string_of_sexp (Request.sexp_of_t req)))); *)
+  async (fun () -> Logger.warning_lazy (lazy (Util.string_of_sexp (Request.sexp_of_t req))));
   let%lwt http = http in
   match%lwt default_filter conn req body with
   | Error (code, errors) -> handle_errors code errors
@@ -153,7 +154,9 @@ let handler http routing ((ch, _) as conn) req body =
                     return (response, body)
                 end
               | Transfer.Unknown | Transfer.Fixed _ ->
-                begin match%lwt routing.read_slice ~chan_name ~id_header ~mode with
+                let limit_opt = Util.header_name_to_int64_opt (Request.headers req) Header_names.limit in
+                let limit = Option.value ~default:Int64.max_value limit_opt in
+                begin match%lwt routing.read_slice ~chan_name ~id_header ~mode ~limit with
                   | Error errors -> handle_errors 400 errors
                   | Ok (slice, channel) ->
                     let open Persistence in
@@ -194,7 +197,7 @@ let handler http routing ((ch, _) as conn) req body =
           | `Count as mode ->
             let%lwt (code, errors, count) =
               begin match%lwt routing.count ~chan_name ~mode with
-                | Ok count -> return (200, [], Some (Int64.to_int_exn count))
+                | Ok count -> return (200, [], Some count)
                 | Error errors -> return (400, errors, None)
               end in
             let headers = json_response_header in

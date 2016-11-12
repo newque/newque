@@ -14,7 +14,7 @@ type read = {
 type count = {
   code: int;
   errors: string list;
-  count: int nullable;
+  count: int <ocaml repr="int64"> nullable;
 }
 
 type errors = {

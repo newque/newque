@@ -27,9 +27,7 @@ module M = struct
   let push instance ~msgs ~ids =
     return 1
 
-  let pull_slice instance ~search = fail_with "Unimplemented: Redis pull_slice"
-
-  let pull_stream instance ~search = fail_with "Unimplemented: Redis pull_stream"
+  let pull instance ~search ~fetch_last = fail_with "Unimplemented: Redis pull"
 
   let size instance =
     return (Int.to_int64 20)

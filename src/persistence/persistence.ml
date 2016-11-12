@@ -30,9 +30,10 @@ module type Template = sig
 
   val push : t -> msgs:string array -> ids:string array -> int Lwt.t
 
-  val pull_slice : t -> search:search -> slice Lwt.t
-
-  val pull_stream : t -> search:search -> string array Lwt_stream.t Lwt.t
+  val pull : t -> search:search -> fetch_last:bool ->
+    (* Returns the last rowid as first option *)
+    (* Returns the last id and timens as second option if fetch_last is true *)
+    (string array * int64 option * (string * int64) option) Lwt.t
 
   val size : t -> int64 Lwt.t
 end
@@ -72,26 +73,58 @@ module Make (Argument: Argument) : S = struct
   let pull_slice max_read ~mode ~only_once =
     let%lwt instance = instance in
     let search = create_search max_read ~mode ~only_once in
-    let%lwt slice = Argument.IO.pull_slice instance ~search in
+    let%lwt (raw_payloads, last_rowid, last_row_data) = Argument.IO.pull instance ~search ~fetch_last:true in
     wrap (fun () ->
-      {
-        slice with
-        payloads =
-          Array.concat_map slice.payloads ~f:(fun x ->
-            Message.contents (Message.parse_exn x)
-          )
-      }
+      let payloads = Array.concat_map raw_payloads ~f:(fun x ->
+          Message.contents (Message.parse_exn x)
+        )
+      in
+      match last_row_data with
+      | None ->
+        { metadata = None; payloads }
+      | Some (last_id, last_timens) ->
+        let meta = {
+          last_id;
+          last_timens = (Int64.to_string last_timens);
+        }
+        in
+        { metadata = (Some meta); payloads }
     )
 
   let pull_stream max_read ~mode ~only_once =
     let%lwt instance = instance in
-    let search = create_search max_read ~mode ~only_once in
-    let%lwt data = Argument.IO.pull_stream instance ~search in
-    let mapper = fun raw ->
-      Array.concat_map raw ~f:(fun x -> Message.contents (Message.parse_exn x))
-    in
-    let stream = Util.stream_map_array_s data ~batch_size:Argument.read_batch_size ~mapper in
-    return stream
+    wrap4 (fun instance max_read mode only_once ->
+      let search = create_search max_read ~mode ~only_once in
+      let mapper = fun raw ->
+        Array.concat_map raw ~f:(fun x -> Message.contents (Message.parse_exn x))
+      in
+      (* Ugly imperative code for performance here *)
+      let left = ref search.limit in
+      let next_search = ref {search with limit = Int64.min !left (Int.to_int64 Argument.read_batch_size)} in
+      let raw_stream = Lwt_stream.from (fun () ->
+          if !next_search.limit <= Int64.zero then return_none else
+          let%lwt (payloads, last_rowid, last_row_data) = Argument.IO.pull instance ~search:!next_search ~fetch_last:false in
+          let filter = match (last_rowid, last_row_data) with
+            | None, None -> None
+            | (Some rowid), _ -> Some [|`After_rowid rowid|]
+            | _, Some (last_id, _) -> Some [|`After_id last_id|]
+          in
+          match filter with
+          | None -> return_none
+          | Some filter ->
+            if Array.is_empty payloads then return_none else
+            let payloads_count = Int.to_int64 (Array.length payloads) in
+            left := Int64.(-) !left payloads_count;
+            next_search := {
+              !next_search with
+              limit = Int64.min !left (Int.to_int64 Argument.read_batch_size);
+              filters = Array.append filter search.filters;
+            };
+            return_some payloads
+        )
+      in
+      Util.stream_map_array_s raw_stream ~batch_size:Argument.read_batch_size ~mapper
+    ) instance max_read mode only_once
 
   let size () =
     let%lwt instance = instance in
