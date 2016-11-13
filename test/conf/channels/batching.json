@@ -1,0 +1,15 @@
+{
+  "listeners": ["http8000"],
+  "persistence": "disk",
+  "readSettings": {
+    "onlyOnce": false
+  },
+  "writeSettings": {
+    "acknowledgement": "saved",
+    "copyToChannels": [],
+    "batching": {
+      "maxTime": 1000,
+      "maxSize": 5
+    }
+  }
+}

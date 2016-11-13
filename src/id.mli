@@ -14,6 +14,4 @@ val array_of_string_opt :
 val to_string : t -> string
 val of_string : string -> t
 
-val time_ns : unit -> int64
-
 val uuid : unit -> string

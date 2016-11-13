@@ -250,7 +250,7 @@ let close db =
   aux 0
 
 let push db ~msgs ~ids =
-  let time = Id.time_ns () in
+  let time = Util.time_ns_int64 () in
   let make_stmt slice =
     let%lwt (st, _) as stmt = prepare db.db (insert_sql (Array.length slice)) in
     let args = Array.concat_mapi slice ~f:(fun i (raw, id) ->

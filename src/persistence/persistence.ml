@@ -41,7 +41,8 @@ end
 module type Argument = sig
   module IO : Template
   val create : unit -> IO.t Lwt.t
-  val read_batch_size: int
+  val batching : Write_settings.batching option
+  val read_batch_size : int
 end
 
 module type S = sig
@@ -64,11 +65,24 @@ module Make (Argument: Argument) : S = struct
 
   let instance = Argument.create ()
 
+  let queue = Option.map Argument.batching ~f:(fun b ->
+      let open Write_settings in
+      Double_queue.create ~max_time:b.max_time ~max_size:b.max_size ~handler:(fun msgs ids ->
+        let%lwt instance = instance in
+        Argument.IO.push instance ~msgs ~ids
+      )
+    )
+
   let push msgs ids =
-    let%lwt instance = instance in
-    let ids = Array.map ~f:Id.to_string ids in
     let msgs = Array.map ~f:Message.serialize msgs in
-    Argument.IO.push instance ~msgs ~ids
+    let ids = Array.map ~f:Id.to_string ids in
+    match queue with
+    | None ->
+      let%lwt instance = instance in
+      Argument.IO.push instance ~msgs ~ids
+    | Some queue ->
+      let%lwt () = Double_queue.submit queue msgs ids in
+      return (Array.length msgs)
 
   let pull_slice max_read ~mode ~only_once =
     let%lwt instance = instance in
@@ -83,11 +97,7 @@ module Make (Argument: Argument) : S = struct
       | None ->
         { metadata = None; payloads }
       | Some (last_id, last_timens) ->
-        let meta = {
-          last_id;
-          last_timens = (Int64.to_string last_timens);
-        }
-        in
+        let meta = { last_id; last_timens = (Int64.to_string last_timens); } in
         { metadata = (Some meta); payloads }
     )
 

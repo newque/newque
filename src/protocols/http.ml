@@ -99,7 +99,7 @@ let handle_errors code errors =
   Server.respond_string ~headers ~status ~body ()
 
 let handler http routing ((ch, _) as conn) req body =
-  async (fun () -> Logger.warning_lazy (lazy (Util.string_of_sexp (Request.sexp_of_t req))));
+  (* async (fun () -> Logger.warning_lazy (lazy (Util.string_of_sexp (Request.sexp_of_t req)))); *)
   let%lwt http = http in
   match%lwt default_filter conn req body with
   | Error (code, errors) -> handle_errors code errors

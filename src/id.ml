@@ -2,8 +2,6 @@ open Core.Std
 
 type t = string
 
-let time_ns () = Int63.to_int64 (Time_ns.to_int63_ns_since_epoch (Time_ns.now ()))
-
 let uuid () = Uuidm.to_string (Uuidm.v `V4)
 
 let default_separator = ","

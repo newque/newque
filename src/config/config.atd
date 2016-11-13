@@ -69,10 +69,16 @@ type config_channel_acknowledgement = [
   | C_saved <json name="saved">
 ] <ocaml repr="classic">
 
+type config_batching = {
+  max_time <json name="maxTime">: int <ocaml repr="float">;
+  max_size <json name="maxSize">: int;
+} <ocaml field_prefix="c_">
+
 type config_channel_write = {
   ~ack <json name="acknowledgement"><ocaml default="C_saved">: config_channel_acknowledgement;
   ~format <ocaml default="C_json">: config_channel_format;
   copy_to <json name="copyToChannels">: string list;
+  ?batching: config_batching nullable;
 } <ocaml field_prefix="c_">
 
 type config_channel_read = {

@@ -140,3 +140,12 @@ let header_name_to_int64_opt headers name =
   Option.bind
     (Header.get headers name)
     (fun x -> Option.try_with (fun () -> Int64.of_string x))
+
+let rec make_interval every callback =
+  let%lwt () = Lwt_unix.sleep every in
+  ignore_result (callback ());
+  make_interval every callback
+
+let time_ns_int64 () = Int63.to_int64 (Time_ns.to_int63_ns_since_epoch (Time_ns.now ()))
+let time_ns_int63 () = Time_ns.to_int63_ns_since_epoch (Time_ns.now ())
+let time_ms_float () = Time.to_float (Time.now ()) *. 1000.

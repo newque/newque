@@ -38,3 +38,9 @@ val parse_json : ('a -> 'b) -> 'a -> ('b, string) Result.t
 val parse_json_lwt : ('a -> 'b) -> 'a -> 'b Lwt.t
 
 val header_name_to_int64_opt : Header.t -> string -> int64 option
+
+val make_interval : float -> (unit -> 'a Lwt.t) -> 'b Lwt.t
+
+val time_ns_int64 : unit -> int64
+val time_ns_int63 : unit -> Int63.t
+val time_ms_float : unit -> float

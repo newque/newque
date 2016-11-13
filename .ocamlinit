@@ -48,6 +48,7 @@ open Cohttp_lwt_unix
 #mod_use "tmp/atomic.ml"
 #mod_use "tmp/message.ml"
 #mod_use "tmp/id.ml"
+#mod_use "tmp/double_queue.ml"
 #mod_use "tmp/persistence.ml"
 #mod_use "tmp/sqlite.ml"
 #mod_use "tmp/local.ml"

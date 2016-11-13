@@ -287,6 +287,49 @@ module.exports = function (persistence, persistenceSettings) {
 
     })
 
+    describe('Batching', function () {
+      it('Should buffer for +/- 1 seconds', function () {
+        this.timeout = 2500
+        var buf1 = Fn.makeJsonBuffer(['asd'], null, false)
+        var buf2 = Fn.makeJsonBuffer(['fgh'], null, false)
+        var t0 = Date.now()
+        var call1 = Fn.call('POST', 8000, '/v1/batching', buf1)
+        var call2 = Fn.call('POST', 8000, '/v1/batching', buf2)
+        return Fn.call('GET', 8000, '/v1/batching/count')
+        .then(Fn.shouldHaveCounted(0))
+        .then(() => call1)
+        .then(Fn.shouldHaveWritten(1))
+        .then(() => call2)
+        .then(Fn.shouldHaveWritten(1))
+        .then(function () {
+          var took = Date.now() - t0
+          Fn.assert(took < 2000)
+          Fn.assert(took > 100)
+        })
+      })
+
+      it('Should flush when full', function () {
+        this.timeout = 2500
+        var buf1 = Fn.makeJsonBuffer(['asd1', 'asd2', 'asd3', 'asd4', 'asd5'], null, false)
+        var buf2 = Fn.makeJsonBuffer(['fgh'], null, false)
+        var t0 = Date.now()
+        // This call should be instant, because it fills up the queue
+        return Fn.call('POST', 8000, '/v1/batching', buf1)
+        .then(Fn.shouldHaveWritten(5))
+        .then(function () {
+          var took = Date.now() - t0
+          Fn.assert(took < 100)
+          return Fn.call('POST', 8000, '/v1/batching', buf2)
+        })
+        .then(Fn.shouldHaveWritten(1))
+        .then(function () {
+          var took = Date.now() - t0
+          Fn.assert(took < 2000)
+          Fn.assert(took > 100)
+        })
+      })
+    })
+
     after(function () {
       return Proc.teardown(processes)
     })
