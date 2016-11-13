@@ -328,6 +328,30 @@ module.exports = function (persistence, persistenceSettings) {
           Fn.assert(took > 100)
         })
       })
+
+    it('Should work with atomics', function () {
+        this.timeout = 2500
+        var buf1 = Fn.makeJsonBuffer(['aaa', 'bbb'], null, false)
+        var buf2 = Fn.makeJsonBuffer(['ccc', 'ddd'], null, true)
+        var t0 = Date.now()
+        var call1 = Fn.call('POST', 8000, '/v1/batching', buf1)
+        var call2 = Fn.call('POST', 8000, '/v1/batching', buf2)
+
+        return Fn.call('GET', 8000, '/v1/batching/count')
+        .then(Fn.shouldHaveCounted(8))
+        .then(() => call1)
+        .then(Fn.shouldHaveWritten(2))
+        .then(() => call2)
+        .then(Fn.shouldHaveWritten(1))
+        .then(function () {
+          var took = Date.now() - t0
+          Fn.assert(took < 2000)
+          Fn.assert(took > 100)
+
+          return Fn.call('GET', 8000, '/v1/batching/count')
+          .then(Fn.shouldHaveCounted(11))
+        })
+      })
     })
 
     after(function () {

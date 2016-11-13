@@ -68,8 +68,8 @@ let check_max_size dq lefts =
 
 let submit dq lefts rights =
   let old_thread = dq.thread in
-  let%lwt () = check_max_size dq lefts rights in
+  let%lwt () = check_max_size dq lefts in
   Array.iter ~f:(Queue.enqueue dq.left) lefts;
-  Array.iter ~f:(Queue.enqueue dq.right);
+  Array.iter ~f:(Queue.enqueue dq.right) rights;
   let%lwt () = check_max_size dq lefts in
   old_thread
