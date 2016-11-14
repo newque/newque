@@ -127,6 +127,7 @@ exports.setupEnvironment = function (persistence, persistenceSettings) {
         }
         if (parsed.writeSettings) {
           parsed.writeSettings.format = remoteType
+          delete parsed.writeSettings.batching
         }
         return writeFile(remoteRunningDir + '/conf/channels/' + channel, JSON.stringify(parsed, null, 2))
       })

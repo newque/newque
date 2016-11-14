@@ -327,6 +327,8 @@ module.exports = function (persistence, persistenceSettings) {
           Fn.assert(took < 2000)
           Fn.assert(took > 100)
         })
+        .then(() => Fn.call('GET', 8000, '/v1/batching/count'))
+        .then(Fn.shouldHaveCounted(8))
       })
 
     it('Should work with atomics', function () {
