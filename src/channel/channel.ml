@@ -19,15 +19,20 @@ type t = {
 
 let create name conf_channel =
   let open Config_t in
+
+  let read = Option.map conf_channel.read_settings ~f:Read_settings.create in
+  let stream_slice_size = Option.value_map read ~default:Int64.max_value ~f:(fun r -> r.Read_settings.stream_slice_size) in
+
   let write = Option.map conf_channel.write_settings ~f:Write_settings.create in
   let batching = Option.bind write (fun w -> w.Write_settings.batching) in
+
   let module Persist = (val (match conf_channel.persistence_settings with
     | `Memory ->
       let module Arg = struct
         module IO = Local.M
         let create () = Local.create ~file:":memory:" ~chan_name:name ~avg_read:conf_channel.avg_read
         let batching = batching
-        let read_batch_size = Local.read_batch_size
+        let stream_slice_size = stream_slice_size
       end in
       (module Persistence.Make (Arg) : Persistence.S)
 
@@ -36,7 +41,7 @@ let create name conf_channel =
         module IO = Local.M
         let create () = Local.create ~file:(Printf.sprintf "%s%s.data" Fs.data_chan_dir name) ~chan_name:name ~avg_read:conf_channel.avg_read
         let batching = batching
-        let read_batch_size = Local.read_batch_size
+        let stream_slice_size = stream_slice_size
       end in
       (module Persistence.Make (Arg) : Persistence.S)
 
@@ -52,7 +57,7 @@ let create name conf_channel =
             ~output:remote.output_format
             ~chan_separator:conf_channel.separator
         let batching = batching
-        let read_batch_size = Remote.read_batch_size
+        let stream_slice_size = stream_slice_size
       end in
       (module Persistence.Make (Arg) : Persistence.S)
 
@@ -61,7 +66,7 @@ let create name conf_channel =
         module IO = Redis.M
         let create () = Redis.create redis.redis_host redis.redis_port redis.redis_auth
         let batching = batching
-        let read_batch_size = Redis.read_batch_size
+        let stream_slice_size = stream_slice_size
       end in
       (module Persistence.Make (Arg) : Persistence.S)
   ) : Persistence.S)

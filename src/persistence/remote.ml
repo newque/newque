@@ -24,12 +24,6 @@ let create base_urls base_headers ~input ~output ~chan_separator =
   let instance = { base_urls; base_headers; input_format; output_format; chan_separator; } in
   return instance
 
-    #ifdef DEBUG
-let read_batch_size = 2
-  #else
-let read_batch_size = 500
-  #endif
-
 let get_base instance =
   let arr = instance.base_urls in
   Array.get arr (Random.int (Array.length arr))

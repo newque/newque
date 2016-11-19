@@ -11,12 +11,6 @@ type local_t = {
   mutex: Lwt_mutex.t sexp_opaque;
 } [@@deriving sexp]
 
-#ifdef DEBUG
-let read_batch_size = 2
-  #else
-let read_batch_size = 500
-  #endif
-
 let create ~file ~chan_name ~avg_read =
   let mutex = Lwt_mutex.create () in
   let%lwt () = Logger.info (Printf.sprintf "Initializing %s (%s)" file chan_name) in

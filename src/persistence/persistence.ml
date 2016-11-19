@@ -42,7 +42,7 @@ module type Argument = sig
   module IO : Template
   val create : unit -> IO.t Lwt.t
   val batching : Write_settings.batching option
-  val read_batch_size : int
+  val stream_slice_size : int64
 end
 
 module type S = sig
@@ -110,7 +110,7 @@ module Make (Argument: Argument) : S = struct
       in
       (* Ugly imperative code for performance here *)
       let left = ref search.limit in
-      let next_search = ref {search with limit = Int64.min !left (Int.to_int64 Argument.read_batch_size)} in
+      let next_search = ref {search with limit = Int64.min !left Argument.stream_slice_size} in
       let raw_stream = Lwt_stream.from (fun () ->
           if !next_search.limit <= Int64.zero then return_none else
           let%lwt (payloads, last_rowid, last_row_data) = Argument.IO.pull instance ~search:!next_search ~fetch_last:false in
@@ -127,13 +127,14 @@ module Make (Argument: Argument) : S = struct
             left := Int64.(-) !left payloads_count;
             next_search := {
               !next_search with
-              limit = Int64.min !left (Int.to_int64 Argument.read_batch_size);
+              limit = Int64.min !left Argument.stream_slice_size;
               filters = Array.append filter search.filters;
             };
             return_some payloads
         )
       in
-      Util.stream_map_array_s raw_stream ~batch_size:Argument.read_batch_size ~mapper
+      let batch_size = Option.value (Int64.to_int Argument.stream_slice_size) ~default:Int.max_value in
+      Util.stream_map_array_s raw_stream ~batch_size ~mapper
     ) instance max_read mode only_once
 
   let size () =

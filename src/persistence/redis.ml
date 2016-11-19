@@ -8,12 +8,6 @@ type redis_t = {
   auth: string option;
 } [@@deriving sexp]
 
-#ifdef DEBUG
-let read_batch_size = 2
-  #else
-let read_batch_size = 500
-  #endif
-
 let create host port auth =
   let instance = {conn = (); host; port; auth;} in
   return instance
@@ -24,12 +18,10 @@ module M = struct
 
   let close instance = return_unit
 
-  let push instance ~msgs ~ids =
-    return 1
+  let push instance ~msgs ~ids = fail_with "Unimplemented: Redis push"
 
   let pull instance ~search ~fetch_last = fail_with "Unimplemented: Redis pull"
 
-  let size instance =
-    return (Int.to_int64 20)
+  let size instance = fail_with "Unimplemented: Redis size"
 
 end

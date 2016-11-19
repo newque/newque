@@ -83,6 +83,7 @@ type config_channel_write = {
 
 type config_channel_read = {
   ~format <ocaml default="C_json">: config_channel_format;
+  ~stream_slice_size <json name="streamSliceSize"> <ocaml default="500">: int;
   only_once <json name="onlyOnce">: bool;
 } <ocaml field_prefix="c_">
 

@@ -28,7 +28,8 @@ let zip_group ~size arr1 arr2 =
 
 (* An efficient lazy stream flattener *)
 let stream_map_array_s ~batch_size ~mapper arr_stream =
-  let queue = Queue.create ~capacity:batch_size () in
+  let capacity = Int.min batch_size 10000 in (* Sanity check... *)
+  let queue = Queue.create ~capacity () in
   Lwt_stream.from (fun () ->
     match Queue.dequeue queue with
     | (Some _) as x -> return x
