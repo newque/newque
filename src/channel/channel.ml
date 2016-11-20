@@ -6,10 +6,11 @@ let log_path name = Fs.conf_chan_dir ^ name
 type t = {
   name: string;
   endpoint_names: string list;
-  push: Message.t array -> Id.t array -> int Lwt.t sexp_opaque;
+  push: Message.t -> Id.t array -> int Lwt.t sexp_opaque;
   pull_slice: int64 -> mode:Mode.Read.t -> only_once:bool -> Persistence.slice Lwt.t sexp_opaque;
   pull_stream: int64 -> mode:Mode.Read.t -> only_once:bool -> string Lwt_stream.t Lwt.t sexp_opaque;
   size: unit -> int64 Lwt.t sexp_opaque;
+  raw: bool;
   read: Read_settings.t option;
   write: Write_settings.t option;
   separator: string;
@@ -31,8 +32,9 @@ let create name conf_channel =
       let module Arg = struct
         module IO = Local.M
         let create () = Local.create ~file:":memory:" ~chan_name:name ~avg_read:conf_channel.avg_read
-        let batching = batching
         let stream_slice_size = stream_slice_size
+        let raw = conf_channel.raw
+        let batching = batching
       end in
       (module Persistence.Make (Arg) : Persistence.S)
 
@@ -40,8 +42,9 @@ let create name conf_channel =
       let module Arg = struct
         module IO = Local.M
         let create () = Local.create ~file:(Printf.sprintf "%s%s.data" Fs.data_chan_dir name) ~chan_name:name ~avg_read:conf_channel.avg_read
-        let batching = batching
         let stream_slice_size = stream_slice_size
+        let raw = conf_channel.raw
+        let batching = batching
       end in
       (module Persistence.Make (Arg) : Persistence.S)
 
@@ -56,8 +59,9 @@ let create name conf_channel =
             ~input:remote.input_format
             ~output:remote.output_format
             ~chan_separator:conf_channel.separator
-        let batching = batching
         let stream_slice_size = stream_slice_size
+        let raw = conf_channel.raw
+        let batching = batching
       end in
       (module Persistence.Make (Arg) : Persistence.S)
 
@@ -65,8 +69,9 @@ let create name conf_channel =
       let module Arg = struct
         module IO = Redis.M
         let create () = Redis.create redis.redis_host redis.redis_port redis.redis_auth
-        let batching = batching
         let stream_slice_size = stream_slice_size
+        let raw = conf_channel.raw
+        let batching = batching
       end in
       (module Persistence.Make (Arg) : Persistence.S)
   ) : Persistence.S)
@@ -78,6 +83,7 @@ let create name conf_channel =
     pull_slice = Persist.pull_slice;
     pull_stream = Persist.pull_stream;
     size = Persist.size;
+    raw = conf_channel.raw;
     read = Option.map conf_channel.read_settings ~f:Read_settings.create;
     write;
     separator = conf_channel.separator;

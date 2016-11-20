@@ -1,8 +1,8 @@
-module.exports = function (persistence, persistenceSettings) {
-  describe('Push ' + persistence, function () {
+module.exports = function (persistence, persistenceSettings, raw) {
+  describe('Push ' + persistence + (!!raw ? ' raw' : ''), function () {
     var processes = []
     before(function () {
-      return Proc.setupEnvironment(persistence, persistenceSettings)
+      return Proc.setupEnvironment(persistence, persistenceSettings, raw)
       .then(function (procs) {
         procs.forEach((p) => processes.push(p))
         return Promise.delay(C.spawnDelay * processes.length)
@@ -73,25 +73,27 @@ module.exports = function (persistence, persistenceSettings) {
       })
     })
 
-    describe('Atomic', function () {
-      it('Without separator', function () {
-        var buf = 'abcdefghijkl'
-        return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'atomic']])
-        .then(Fn.shouldHaveWritten(1))
-      })
+    if (!raw) {
+      describe('Atomic', function () {
+        it('Without separator', function () {
+          var buf = 'abcdefghijkl'
+          return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'atomic']])
+          .then(Fn.shouldHaveWritten(1))
+        })
 
-      it('With separator', function () {
-        var buf = 'A abc\nA def\nA ghi\nA jkl'
-        return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'atomic']])
-        .then(Fn.shouldHaveWritten(1))
-      })
+        it('With separator', function () {
+          var buf = 'A abc\nA def\nA ghi\nA jkl'
+          return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'atomic']])
+          .then(Fn.shouldHaveWritten(1))
+        })
 
-      it('Empty messages', function () {
-        var buf = '\n\nz\n'
-        return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'atomic']])
-        .then(Fn.shouldHaveWritten(1))
+        it('Empty messages', function () {
+          var buf = '\n\nz\n'
+          return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'atomic']])
+          .then(Fn.shouldHaveWritten(1))
+        })
       })
-    })
+    }
 
     describe('Custom IDs', function () {
       // Set up an initial ID to track...
@@ -166,15 +168,17 @@ module.exports = function (persistence, persistenceSettings) {
         .then(Fn.shouldFail(400))
       })
 
-      it('With separator, atomic', function () {
-        var buf = 'H abc\nH def\nH ghi'
-        return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'atomic'], [C.idHeader, 'id60,id61,id62,']])
-        .then(Fn.shouldHaveWritten(1))
-        // Check that 3 were added after the previous lastID, then update the lastID
-        .then(() => Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'after_id ' + lastID]]))
-        .then(Fn.shouldHaveRead(buf.split('\n'), '\n'))
-        .then(result => lastID = result.res.headers[C.lastIdHeader])
-      })
+      if (!raw) {
+        it('With separator, atomic', function () {
+          var buf = 'H abc\nH def\nH ghi'
+          return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'atomic'], [C.idHeader, 'id60,id61,id62,']])
+          .then(Fn.shouldHaveWritten(1))
+          // Check that 3 were added after the previous lastID, then update the lastID
+          .then(() => Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'after_id ' + lastID]]))
+          .then(Fn.shouldHaveRead(buf.split('\n'), '\n'))
+          .then(result => lastID = result.res.headers[C.lastIdHeader])
+        })
+      }
 
       it('With separator, skip existing', function () {
         var buf = 'I abc\nI def\nI ghi'
@@ -253,11 +257,13 @@ module.exports = function (persistence, persistenceSettings) {
         .then(Fn.shouldHaveWritten(2))
       })
 
-      it('Should push atomic (ignores header)', function () {
-        var buf = Fn.makeJsonBuffer(['asd', 'fgh'], null, true)
-        return Fn.call('POST', 8000, '/v1/json', buf, [[C.modeHeader, 'single']])
-        .then(Fn.shouldHaveWritten(1))
-      })
+      if (!raw) {
+        it('Should push atomic (ignores header)', function () {
+          var buf = Fn.makeJsonBuffer(['asd', 'fgh'], null, true)
+          return Fn.call('POST', 8000, '/v1/json', buf, [[C.modeHeader, 'single']])
+          .then(Fn.shouldHaveWritten(1))
+        })
+      }
 
       it('Should push multiple (with IDs)', function () {
         var buf = Fn.makeJsonBuffer(['qwe', 'rty'], ['idA', 'idB'])
@@ -288,28 +294,25 @@ module.exports = function (persistence, persistenceSettings) {
     })
 
     describe('Batching', function () {
-      it('Should buffer for +/- 1 seconds', function () {
-        this.timeout = 2500
+      it('Should buffer for +/- 100 ms', function () {
         var buf1 = Fn.makeJsonBuffer(['asd'], null, false)
         var buf2 = Fn.makeJsonBuffer(['fgh'], null, false)
         var t0 = Date.now()
-        var call1 = Fn.call('POST', 8000, '/v1/batching', buf1)
-        var call2 = Fn.call('POST', 8000, '/v1/batching', buf2)
+
         return Fn.call('GET', 8000, '/v1/batching/count')
         .then(Fn.shouldHaveCounted(0))
-        .then(() => call1)
-        .then(Fn.shouldHaveWritten(1))
-        .then(() => call2)
-        .then(Fn.shouldHaveWritten(1))
         .then(function () {
-          var took = Date.now() - t0
-          Fn.assert(took < 2000)
-          Fn.assert(took > 100)
+          var call1 = Fn.call('POST', 8000, '/v1/batching', buf1)
+          var call2 = Fn.call('POST', 8000, '/v1/batching', buf2)
+
+          return call1
+          .then(Fn.shouldHaveWritten(1))
+          .then(() => call2)
+          .then(Fn.shouldHaveWritten(1))
         })
       })
 
       it('Should flush when full', function () {
-        this.timeout = 2500
         var buf1 = Fn.makeJsonBuffer(['asd1', 'asd2', 'asd3', 'asd4', 'asd5'], null, false)
         var buf2 = Fn.makeJsonBuffer(['fgh'], null, false)
         var t0 = Date.now()
@@ -322,38 +325,31 @@ module.exports = function (persistence, persistenceSettings) {
           return Fn.call('POST', 8000, '/v1/batching', buf2)
         })
         .then(Fn.shouldHaveWritten(1))
-        .then(function () {
-          var took = Date.now() - t0
-          Fn.assert(took < 2000)
-          Fn.assert(took > 100)
-        })
         .then(() => Fn.call('GET', 8000, '/v1/batching/count'))
         .then(Fn.shouldHaveCounted(8))
       })
 
-    it('Should work with atomics', function () {
-        this.timeout = 2500
-        var buf1 = Fn.makeJsonBuffer(['aaa', 'bbb'], null, false)
-        var buf2 = Fn.makeJsonBuffer(['ccc', 'ddd'], null, true)
-        var t0 = Date.now()
-        var call1 = Fn.call('POST', 8000, '/v1/batching', buf1)
-        var call2 = Fn.call('POST', 8000, '/v1/batching', buf2)
+      if (!raw) {
+        it('Should work with atomics', function () {
+            var buf1 = Fn.makeJsonBuffer(['aaa', 'bbb'], null, false)
+            var buf2 = Fn.makeJsonBuffer(['ccc', 'ddd'], null, true)
+            var t0 = Date.now()
 
-        return Fn.call('GET', 8000, '/v1/batching/count')
-        .then(Fn.shouldHaveCounted(8))
-        .then(() => call1)
-        .then(Fn.shouldHaveWritten(2))
-        .then(() => call2)
-        .then(Fn.shouldHaveWritten(1))
-        .then(function () {
-          var took = Date.now() - t0
-          Fn.assert(took < 2000)
-          Fn.assert(took > 100)
+            return Fn.call('GET', 8000, '/v1/batching/count')
+            .then(Fn.shouldHaveCounted(8))
+            .then(function () {
+              var call1 = Fn.call('POST', 8000, '/v1/batching', buf1)
+              var call2 = Fn.call('POST', 8000, '/v1/batching', buf2)
 
-          return Fn.call('GET', 8000, '/v1/batching/count')
-          .then(Fn.shouldHaveCounted(11))
-        })
-      })
+              return call1
+              .then(Fn.shouldHaveWritten(2))
+              .then(() => call2)
+              .then(Fn.shouldHaveWritten(1))
+              .then(() => Fn.call('GET', 8000, '/v1/batching/count'))
+              .then(Fn.shouldHaveCounted(11))
+            })
+          })
+        }
     })
 
     after(function () {

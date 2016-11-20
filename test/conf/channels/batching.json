@@ -8,7 +8,7 @@
     "acknowledgement": "saved",
     "copyToChannels": [],
     "batching": {
-      "maxTime": 1000,
+      "maxTime": 100,
       "maxSize": 5
     }
   }

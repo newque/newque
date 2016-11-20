@@ -6,13 +6,9 @@ let uuid () = Uuidm.to_string (Uuidm.v `V4)
 
 let default_separator = ","
 
-let array_of_string_opt ?(sep=default_separator) ~mode ~msgs opt =
+let array_of_string_opt ?(sep=default_separator) ~mode ~length_none opt =
   match opt with
-  | None ->
-    begin match mode with
-      | `Single | `Atomic -> Ok [| uuid () |]
-      | `Multiple -> Ok (Array.init (Array.length msgs) ~f:(fun _ -> uuid ()))
-    end
+  | None -> Ok (Array.init length_none ~f:(fun _ -> uuid ()))
   | Some header ->
     if String.is_empty header then
       Error "Message ID header exists, but is empty."

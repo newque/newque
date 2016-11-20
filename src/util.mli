@@ -18,11 +18,10 @@ val stream_to_string :
   string Lwt.t
 
 val stream_to_array :
-  mapper:(string -> 'a) ->
   sep:string ->
   ?init:string option ->
   string Lwt_stream.t ->
-  'a array Lwt.t
+  string array Lwt.t
 
 val zip_group : size:int -> 'a array -> 'b array -> ('a * 'b) array list Lwt.t
 

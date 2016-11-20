@@ -109,7 +109,7 @@ var getEnvironment = function () {
   })
 }
 
-exports.setupEnvironment = function (persistence, persistenceSettings) {
+exports.setupEnvironment = function (persistence, persistenceSettings, raw) {
   var type = persistence.split(' ')[0]
   var remoteType = persistence.split(' ')[1]
   return rm(remoteRunningDir)
@@ -143,6 +143,7 @@ exports.setupEnvironment = function (persistence, persistenceSettings) {
       .then(function (contents) {
         var parsed = JSON.parse(contents.toString('utf8'))
         parsed.persistence = type
+        parsed.raw = !!raw
         if (parsed.persistenceSettings == null) {
           parsed.persistenceSettings = persistenceSettings
         } else {

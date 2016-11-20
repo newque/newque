@@ -1,8 +1,8 @@
-module.exports = function (persistence, persistenceSettings) {
-  describe('Ack ' + persistence, function () {
+module.exports = function (persistence, persistenceSettings, raw) {
+  describe('Ack ' + persistence + (!!raw ? ' raw' : ''), function () {
     var processes = []
     before(function () {
-      return Proc.setupEnvironment(persistence, persistenceSettings)
+      return Proc.setupEnvironment(persistence, persistenceSettings, raw)
       .then(function (procs) {
         procs.forEach((p) => processes.push(p))
         return Promise.delay(C.spawnDelay * processes.length)

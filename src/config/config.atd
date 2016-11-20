@@ -91,6 +91,7 @@ type config_channel_read = {
 type config_channel = {
   endpoint_names <json name="listeners">: string list;
   persistence_settings <json name="persistenceSettings" tag_field="persistence">: config_persistence;
+  ~raw <ocaml default="false">: bool;
   read_settings <json name="readSettings">: config_channel_read nullable;
   write_settings <json name="writeSettings">: config_channel_write nullable;
   ~separator <ocaml default="\"\n\"">: string;

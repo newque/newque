@@ -51,18 +51,18 @@ let stream_to_string ~buffer_size ?(init=(Some "")) stream =
   in
   return (Bigbuffer.contents buffer)
 
-let stream_to_array ~mapper ~sep ?(init=(Some "")) stream =
+let stream_to_array ~sep ?(init=(Some "")) stream =
   let queue = Queue.create () in
   let split = split ~sep in
   let%lwt (msgs, last) = Lwt_stream.fold_s (fun read ((), leftover) ->
       let chunk = Option.value_map leftover ~default:read ~f:(fun a -> Printf.sprintf "%s%s" a read) in
       let lines = split chunk in
       let (fulls, partial) = List.split_n lines (List.length lines) in
-      List.iter fulls ~f:(fun raw -> Queue.enqueue queue (mapper raw));
+      List.iter fulls ~f:(fun raw -> Queue.enqueue queue raw);
       return ((), List.hd partial)
     ) stream ((), init)
   in
-  Option.iter last ~f:(fun raw -> Queue.enqueue queue (mapper raw));
+  Option.iter last ~f:(fun raw -> Queue.enqueue queue raw);
   return (Queue.to_array queue)
 
 (* TODO: Decide what to do with these "impossible" synchronous exceptions *)

@@ -73,24 +73,30 @@ let write router ~listen_name ~chan_name ~id_header ~mode stream =
             let%lwt str = Util.stream_to_string ~buffer_size:chan.buffer_size stream in
             let open Json_obj_j in
             begin match Util.parse_json message_of_string str with
-              | (Error _) as err -> return ([| |], err)
+              | (Error _) as err ->
+                let dummy = Message.of_string_array ~atomic:false [||] in
+                return (dummy, err)
               | Ok { atomic; messages; ids } ->
                 let msgs = Message.of_string_array ~atomic messages in
                 let mode = if Bool.(=) atomic true then `Atomic else `Multiple in
                 begin match ids with
                   | Some ids -> return (msgs, Ok (Array.map ~f:Id.of_string ids))
-                  | None -> return (msgs, (Id.array_of_string_opt ~mode ~msgs None))
+                  | None ->
+                    let length_none = Message.length ~raw:chan.raw msgs in
+                    return (msgs, (Id.array_of_string_opt ~mode ~length_none None))
                 end
             end
           | Io_format.Plaintext ->
             let%lwt msgs = Message.of_stream ~format:write.format ~mode ~sep:chan.separator ~buffer_size:chan.buffer_size stream in
-            let ids = Id.array_of_string_opt ~mode ~msgs id_header in
+            let length_none = Message.length ~raw:chan.raw msgs in
+            let ids = Id.array_of_string_opt ~mode ~length_none id_header in
             return (msgs, ids)
-        end in
+        end
+        in
         begin match parsed with
-          | (msgs, Error str) -> return (Error [str])
+          | (_, Error str) -> return (Error [str])
           | (msgs, Ok ids) ->
-            begin match ((Array.length msgs), (Array.length ids)) with
+            begin match ((Message.length ~raw:chan.raw msgs), (Array.length ids)) with
               | (msgs_l, ids_l) when Int.(<>) msgs_l ids_l -> return (Error [Printf.sprintf "Length mismatch between messages (%d) and IDs (%d)" msgs_l ids_l])
               | _ ->
                 (* Now write to the channel *)

@@ -41,14 +41,15 @@ end
 module type Argument = sig
   module IO : Template
   val create : unit -> IO.t Lwt.t
-  val batching : Write_settings.batching option
   val stream_slice_size : int64
+  val raw : bool
+  val batching : Write_settings.batching option
 end
 
 module type S = sig
   type t [@@deriving sexp]
 
-  val push : Message.t array -> Id.t array -> int Lwt.t
+  val push : Message.t -> Id.t array -> int Lwt.t
 
   val pull_slice : int64 -> mode:Mode.Read.t -> only_once:bool -> slice Lwt.t
 
@@ -65,34 +66,51 @@ module Make (Argument: Argument) : S = struct
 
   let instance = Argument.create ()
 
-  let batcher = Option.map Argument.batching ~f:(fun b ->
-      let open Write_settings in
-      Batcher.create ~max_time:b.max_time ~max_size:b.max_size ~handler:(fun msgs ids ->
+  (******************
+     PUSH
+   ********************)
+  let fast_serialize =
+    match Argument.raw with
+    | true -> Message.serialize_raw
+    | false -> Message.serialize_full
+
+  let fast_push =
+    let open Write_settings in
+    match Argument.batching with
+    | None ->
+      fun msgs ids ->
         let%lwt instance = instance in
         Argument.IO.push instance ~msgs ~ids
-      )
-    )
+    | Some { max_time; max_size; _ } ->
+      let batcher = Batcher.create ~max_time ~max_size ~handler:(fun msgs ids ->
+          let%lwt instance = instance in
+          Argument.IO.push instance ~msgs ~ids
+        )
+      in
+      fun msgs ids ->
+        let%lwt () = Batcher.submit batcher msgs ids in
+        return (Array.length msgs)
 
   let push msgs ids =
-    let msgs = Array.map ~f:Message.serialize msgs in
+    let msgs = fast_serialize msgs in
     let ids = Array.map ~f:Id.to_string ids in
-    match batcher with
-    | None ->
-      let%lwt instance = instance in
-      Argument.IO.push instance ~msgs ~ids
-    | Some batcher ->
-      let%lwt () = Batcher.submit batcher msgs ids in
-      return (Array.length msgs)
+    fast_push msgs ids
+
+  (******************
+     PULL
+   ********************)
+  let fast_parse_exn =
+    match Argument.raw with
+    | true -> Fn.id
+    | false ->
+      fun raw_payloads -> Array.concat_map raw_payloads ~f:Message.parse_full_exn
 
   let pull_slice max_read ~mode ~only_once =
     let%lwt instance = instance in
     let search = create_search max_read ~mode ~only_once in
     let%lwt (raw_payloads, last_rowid, last_row_data) = Argument.IO.pull instance ~search ~fetch_last:true in
     wrap (fun () ->
-      let payloads = Array.concat_map raw_payloads ~f:(fun x ->
-          Message.contents (Message.parse_exn x)
-        )
-      in
+      let payloads = fast_parse_exn raw_payloads in
       match last_row_data with
       | None ->
         { metadata = None; payloads }
@@ -105,9 +123,6 @@ module Make (Argument: Argument) : S = struct
     let%lwt instance = instance in
     wrap4 (fun instance max_read mode only_once ->
       let search = create_search max_read ~mode ~only_once in
-      let mapper = fun raw ->
-        Array.concat_map raw ~f:(fun x -> Message.contents (Message.parse_exn x))
-      in
       (* Ugly imperative code for performance here *)
       let left = ref search.limit in
       let next_search = ref {search with limit = Int64.min !left Argument.stream_slice_size} in
@@ -134,7 +149,7 @@ module Make (Argument: Argument) : S = struct
         )
       in
       let batch_size = Option.value (Int64.to_int Argument.stream_slice_size) ~default:Int.max_value in
-      Util.stream_map_array_s raw_stream ~batch_size ~mapper
+      Util.stream_map_array_s raw_stream ~batch_size ~mapper:fast_parse_exn
     ) instance max_read mode only_once
 
   let size () =
