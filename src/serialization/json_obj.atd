@@ -17,6 +17,11 @@ type count = {
   count: int <ocaml repr="int64"> nullable;
 }
 
+type health = {
+  code: int;
+  errors: string list;
+}
+
 type errors = {
   code: int;
   errors: string list;
@@ -27,4 +32,21 @@ type message = {
   ~atomic <ocaml default="false">: bool;
   messages: string list <ocaml repr="array">;
   ?ids: string list <ocaml repr="array"> option;
+}
+
+
+(* Elasticsearch *)
+type es_size = {
+  count: int <ocaml repr="int64">;
+} <ocaml field_prefix="es_">
+
+type bulk_item = {
+  status: int;
+}
+type bulk_item_index = {
+  index: bulk_item;
+}
+type bulk_response = {
+  errors: bool;
+  items: bulk_item_index list;
 }

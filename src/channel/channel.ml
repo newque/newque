@@ -1,8 +1,6 @@
 open Core.Std
 open Lwt
 
-let log_path name = Fs.conf_chan_dir ^ name
-
 type t = {
   name: string;
   endpoint_names: string list;
@@ -10,6 +8,7 @@ type t = {
   pull_slice: int64 -> mode:Mode.Read.t -> only_once:bool -> Persistence.slice Lwt.t sexp_opaque;
   pull_stream: int64 -> mode:Mode.Read.t -> only_once:bool -> string Lwt_stream.t Lwt.t sexp_opaque;
   size: unit -> int64 Lwt.t sexp_opaque;
+  health: unit -> string list Lwt.t sexp_opaque;
   raw: bool;
   read: Read_settings.t option;
   write: Write_settings.t option;
@@ -65,6 +64,17 @@ let create name conf_channel =
       end in
       (module Persistence.Make (Arg) : Persistence.S)
 
+    | `Elasticsearch es ->
+      if not conf_channel.raw then failwith (Printf.sprintf "Channel [%s] has persistence type 'elasticsearch' but 'raw' is not set to true" name) else
+      let module Arg = struct
+        module IO = Elasticsearch.M
+        let create () = Elasticsearch.create es.base_urls ~index:es.index ~typename:es.typename
+        let stream_slice_size = stream_slice_size
+        let raw = conf_channel.raw
+        let batching = batching
+      end in
+      (module Persistence.Make (Arg) : Persistence.S)
+
     | `Redis redis ->
       let module Arg = struct
         module IO = Redis.M
@@ -83,6 +93,7 @@ let create name conf_channel =
     pull_slice = Persist.pull_slice;
     pull_stream = Persist.pull_stream;
     size = Persist.size;
+    health = Persist.health;
     raw = conf_channel.raw;
     read = Option.map conf_channel.read_settings ~f:Read_settings.create;
     write;
@@ -98,3 +109,5 @@ let pull_slice chan ~mode ~limit = chan.pull_slice (Int64.min limit chan.max_rea
 let pull_stream chan ~mode = chan.pull_stream chan.max_read ~mode
 
 let size chan () = chan.size ()
+
+let health chan () = chan.health ()

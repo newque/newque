@@ -1,3 +1,5 @@
+open Core.Std
+
 type t [@@deriving sexp]
 
 val create : string -> avg_read:int -> t Lwt.t
@@ -14,3 +16,5 @@ val pull :
   (string array * int64 option * (string * int64) option) Lwt.t
 
 val size : t -> int64 Lwt.t
+
+val health : t -> string list Lwt.t

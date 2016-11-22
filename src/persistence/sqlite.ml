@@ -13,6 +13,7 @@ type statements = {
   begin_transaction: Sqlite3.stmt * string;
   commit_transaction: Sqlite3.stmt * string;
   rollback_transaction: Sqlite3.stmt * string;
+  quick_check: Sqlite3.stmt * string;
 }
 type t = {
   db: Sqlite3.db sexp_opaque;
@@ -79,6 +80,7 @@ let execute db ~destroy stmt =
 type _ repr =
   | FBlobRowid : string repr
   | FBlobInt64 : (string * int64) repr
+  | FText: string repr
   | FInt64 : int64 repr
   | Wrapped : Data.t array repr
 
@@ -106,6 +108,11 @@ let query : type a. t -> ?retry:int -> destroy:bool -> S3.stmt * string -> a rep
                 | Data.INT i -> Queue.enqueue queue i; last_rowid
                 | datatype -> failwith (Printf.sprintf "Querying failed, invalid datatype %s, expected INT" (Data.to_string_debug datatype))
               end
+            | FText ->
+              begin match S3.column stmt 0 with
+                | Data.TEXT str -> Queue.enqueue queue str; last_rowid
+                | datatype -> failwith (Printf.sprintf "Querying failed, invalid datatype %s, expected TEXT" (Data.to_string_debug datatype))
+              end
             | Wrapped -> Queue.enqueue queue (S3.row_data stmt); last_rowid
           end in
           run 1 last_rowid
@@ -122,7 +129,7 @@ let query : type a. t -> ?retry:int -> destroy:bool -> S3.stmt * string -> a rep
               failwith (Printf.sprintf "Querying failed after %d retries with code %s" retry (Rc.to_string code))
           end
         | code ->
-          failwith (Printf.sprintf "Querying failed with code %s" (Rc.to_string code))
+          failwith (Printf.sprintf "Querying failed with code %s: %s" (Rc.to_string code) (S3.errmsg db.db))
       in
       let last_rowid = run 1 None in
       ((Queue.to_array queue), last_rowid)
@@ -207,6 +214,7 @@ let count_sql = "SELECT COUNT(*) FROM MESSAGES;"
 let begin_sql = "BEGIN;"
 let commit_sql = "COMMIT;"
 let rollback_sql = "ROLLBACK;"
+let quick_check_sql = "PRAGMA quick_check;"
 let insert_sql count =
   let arr = Array.create ~len:count "(?,?,?)" in
   Printf.sprintf "INSERT OR IGNORE INTO MESSAGES (uuid,timens,raw) VALUES %s;" (String.concat_array ~sep:"," arr)
@@ -230,8 +238,9 @@ let create file ~avg_read =
   let%lwt begin_transaction = prepare db begin_sql in
   let%lwt commit_transaction = prepare db commit_sql in
   let%lwt rollback_transaction = prepare db rollback_sql in
+  let%lwt quick_check = prepare db quick_check_sql in
 
-  let stmts = {last_row; count; begin_transaction; commit_transaction; rollback_transaction} in
+  let stmts = {last_row; count; begin_transaction; commit_transaction; rollback_transaction; quick_check} in
   let instance = {db; file; avg_read; stmts} in
   return instance
 
@@ -346,4 +355,15 @@ let size db =
   let (_, sql) as stmt = db.stmts.count in
   match%lwt query db ~destroy:false stmt FInt64 with
   | [| x |], _ -> return x
-  | dataset, _ -> fail_with (Printf.sprintf "Count failed (dataset size: %d) for [%s]" (Array.length dataset) sql)
+  | dataset, _ -> fail_with (Printf.sprintf "Count failed (dataset size: %d)" (Array.length dataset))
+
+let health db =
+  let (_, sql) as stmt = db.stmts.quick_check in
+  match%lwt query db ~destroy:false stmt FText with
+  | [| "ok" |], _ -> return []
+  | [| str |], _ -> return [Printf.sprintf "Local Health failure: %s" str]
+  | dataset, _ -> fail_with (
+      Printf.sprintf
+        "Health failed (dataset size: %d) with %s"
+        (Array.length dataset) (String.concat_array ~sep:", " dataset)
+    )

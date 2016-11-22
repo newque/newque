@@ -19,12 +19,15 @@ let start_http watcher generic specific =
   (* Partially apply the routing function *)
   let open Config_t in
   let open Http in
-  Http.start generic specific (Standard {
+  let standard = Standard {
       push = Router.write watcher.router ~listen_name:generic.name;
       read_slice = Router.read_slice watcher.router ~listen_name:generic.name;
       read_stream = Router.read_stream watcher.router ~listen_name:generic.name;
       count = Router.count watcher.router ~listen_name:generic.name;
-    })
+      health = Router.health watcher.router ~listen_name:generic.name;
+    }
+  in
+  Http.start generic specific standard
 
 let rec monitor watcher listen =
   match listen.server with

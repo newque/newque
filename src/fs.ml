@@ -9,7 +9,7 @@ let conf_chan_dir = "./conf/channels/"
 let data_dir = "./data/"
 let data_chan_dir = "./data/channels/"
 
-(* | Unix.Unix_error (c, n, p) -> return (Error (Logger.format_unix_exn c n p)) *)
+(* | Unix.Unix_error (c, n, p) -> return (Error (Fs.format_unix_exn c n p)) *)
 let format_unix_exn code name param =
   Printf.sprintf "%s {call: %s(%s)}" (String.uppercase (Unix.error_message code)) name param
 

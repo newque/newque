@@ -127,7 +127,7 @@ let write router ~listen_name ~chan_name ~id_header ~mode stream =
         end
     end
 
-let read_slice router ~listen_name ~chan_name ~id_header ~mode ~limit =
+let read_slice router ~listen_name ~chan_name ~mode ~limit =
   match find_chan router ~listen_name ~chan_name with
   | (Error _) as err -> return err
   | Ok chan ->
@@ -141,7 +141,7 @@ let read_slice router ~listen_name ~chan_name ~id_header ~mode ~limit =
         return (Ok (slice, chan))
     end
 
-let read_stream router ~listen_name ~chan_name ~id_header ~mode =
+let read_stream router ~listen_name ~chan_name ~mode =
   match find_chan router ~listen_name ~chan_name with
   | (Error _) as err -> return err
   | Ok chan ->
@@ -155,7 +155,7 @@ let read_stream router ~listen_name ~chan_name ~id_header ~mode =
         return (Ok (stream, chan))
     end
 
-let count router ~listen_name ~chan_name ~(mode: Mode.Count.t) =
+let count router ~listen_name ~chan_name ~mode =
   match find_chan router ~listen_name ~chan_name with
   | (Error _) as err -> return err
   | Ok chan ->
@@ -167,4 +167,39 @@ let count router ~listen_name ~chan_name ~(mode: Mode.Count.t) =
             Printf.sprintf "Counted: %s (size: %Ld) from %s" chan_name count listen_name
           )));
         return (Ok count)
+    end
+
+let rec health router ~listen_name ~chan_name ~mode =
+  match chan_name with
+
+  (* Global health check *)
+  | None ->
+    let priv = Listener.(private_listener.id) in
+    begin match String.Table.find router.table priv with
+      | None -> fail_with "Cannot find internal private listener."
+      | Some channels_table ->
+        let channels = String.Table.data channels_table in
+        let%lwt error_lists = Lwt_list.map_p (fun chan ->
+            let chan_name = chan.Channel.name in
+            let%lwt err = health router ~listen_name:priv ~chan_name:(Some chan_name) ~mode in
+            return (List.map err ~f:(fun str -> Printf.sprintf "[%s] %s" chan_name str))
+          ) channels
+        in
+        return (List.concat error_lists)
+    end
+
+  (* Channel health check *)
+  | Some chan_name ->
+    begin match find_chan router ~listen_name ~chan_name with
+      | Error errors -> return errors
+      | Ok chan ->
+        let%lwt result = Channel.health chan () in
+        ignore_result (Logger.debug_lazy (lazy (
+            let str = match result with
+              | [] -> "OK"
+              | errors -> Printf.sprintf "Errors: %s" (String.concat ~sep:", " errors)
+            in
+            Printf.sprintf "Health: %s from %s. Status: %s" chan_name listen_name str
+          )));
+        return result
     end

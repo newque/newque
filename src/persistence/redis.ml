@@ -24,4 +24,6 @@ module M = struct
 
   let size instance = fail_with "Unimplemented: Redis size"
 
+  let health instance = fail_with "Unimplemented: Redis health"
+
 end

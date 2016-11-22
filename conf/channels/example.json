@@ -1,12 +1,10 @@
 {
   "listeners": ["http8000"],
-  "persistence": "http",
+  "persistence": "elasticsearch",
   "persistenceSettings": {
-    "baseUrls": ["http://127.0.0.1:8200/v1/"],
-    "baseHeaders": [],
-    "appendChannelName": true,
-    "remoteInputFormat": "plaintext",
-    "remoteOutputFormat": "plaintext"
+    "baseUrls": ["http://127.0.0.1:9200"],
+    "index": "abcdef",
+    "type": "zzz"
   },
   "acknowledgement": "saved",
   "readSettings": {
@@ -15,5 +13,7 @@
   "writeSettings": {
     "copyToChannels": [],
     "format":"plaintext"
-  }
+  },
+  "raw": true,
+  "separator":"-"
 }

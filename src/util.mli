@@ -43,3 +43,5 @@ val make_interval : float -> (unit -> 'a Lwt.t) -> 'b Lwt.t
 val time_ns_int64 : unit -> int64
 val time_ns_int63 : unit -> Int63.t
 val time_ms_float : unit -> float
+
+val append_to_path : Uri.t -> string -> Uri.t

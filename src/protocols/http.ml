@@ -26,6 +26,11 @@ let sexp_of_t http =
     ];
   ]
 
+type admin_routing = {
+  (* Channels (accessed by name) by listener.id *)
+  table: Channel.t String.Table.t String.Table.t;
+}
+
 type standard_routing = {
   push: (
     chan_name:string ->
@@ -35,33 +40,45 @@ type standard_routing = {
     (int option, string list) Result.t Lwt.t);
   read_slice: (
     chan_name:string ->
-    id_header:string option ->
     mode:Mode.Read.t ->
     limit:int64 ->
     (Persistence.slice * Channel.t, string list) Result.t Lwt.t);
   read_stream: (
     chan_name:string ->
-    id_header:string option ->
     mode:Mode.Read.t ->
     (string Lwt_stream.t * Channel.t, string list) Result.t Lwt.t);
   count: (
     chan_name:string ->
     mode:Mode.Count.t ->
     (int64, string list) Result.t Lwt.t);
+  health: (
+    chan_name:string option ->
+    mode:Mode.Health.t ->
+    string list Lwt.t);
 }
 
 type http_routing =
-  | Admin
+  | Admin of admin_routing
   | Standard of standard_routing
 
 let default_filter _ req _ =
-  let path = Request.uri req |> Uri.path in
-  let url_fragments = path |> String.split ~on:'/' in
+  let path = Uri.path (Request.uri req) in
+  let url_fragments = String.split ~on:'/' path in
   let result = match url_fragments with
+    | ""::"v1"::"health"::_ ->
+      begin match Request.meth req with
+        | `GET -> Ok (None, `Health)
+        | meth -> Error (405, [Printf.sprintf "Invalid HTTP method %s for health" (Code.string_of_method meth)])
+      end
+    | ""::"v1"::chan_name::"health"::_ ->
+      begin match Request.meth req with
+        | `GET -> Ok (Some chan_name, `Health)
+        | meth -> Error (405, [Printf.sprintf "Invalid HTTP method %s for health" (Code.string_of_method meth)])
+      end
     | ""::"v1"::chan_name::"count"::_ ->
       begin match Request.meth req with
-        | `GET -> Ok (chan_name, `Count)
-        | meth -> Error (405, [Printf.sprintf "Invalid HTTP method %s" (Code.string_of_method meth)])
+        | `GET -> Ok (Some chan_name, `Count)
+        | meth -> Error (405, [Printf.sprintf "Invalid HTTP method %s for count" (Code.string_of_method meth)])
       end
     | ""::"v1"::chan_name::_ ->
       let mode_value =
@@ -76,8 +93,8 @@ let default_filter _ req _ =
         | `GET, Ok (`One as m)
         | `GET, Ok ((`Many _) as m)
         | `GET, Ok ((`After_id _) as m)
-        | `GET, Ok ((`After_ts _) as m) -> Ok (chan_name, m)
-        | `POST, Error "<no header>" -> Ok (chan_name, `Single)
+        | `GET, Ok ((`After_ts _) as m) -> Ok (Some chan_name, Mode.wrap m)
+        | `POST, Error "<no header>" -> Ok (Some chan_name, Mode.wrap `Single)
         | (`POST as meth), Ok m
         | (`GET as meth), Ok m ->
           Error (400, [Printf.sprintf "Invalid {Method, Mode} pair: {%s, %s}" (Code.string_of_method meth) (Mode.to_string (m :> Mode.Any.t))])
@@ -86,7 +103,7 @@ let default_filter _ req _ =
         | meth, _ ->
           Error (405, [Printf.sprintf "Invalid HTTP method %s" (Code.string_of_method meth)])
       end
-    | _ -> Error (400, [Printf.sprintf "Invalid path %s" path])
+    | _ -> Error (400, [Printf.sprintf "Invalid path %s (should begin with /v1/)" path])
   in
   return result
 
@@ -101,112 +118,121 @@ let handle_errors code errors =
 let handler http routing ((ch, _) as conn) req body =
   (* async (fun () -> Logger.warning_lazy (lazy (Util.string_of_sexp (Request.sexp_of_t req)))); *)
   let%lwt http = http in
-  match%lwt default_filter conn req body with
-  | Error (code, errors) -> handle_errors code errors
-  | Ok (chan_name, mode) ->
-    begin try%lwt
-        begin match Mode.wrap mode with
+  try%lwt
+    begin match%lwt default_filter conn req body with
+      | Error (code, errors) -> handle_errors code errors
 
-          | `Write mode ->
-            let stream = Cohttp_lwt_body.to_stream body in
-            let id_header = Header.get (Request.headers req) Header_names.id in
-            let%lwt (code, errors, saved) =
-              begin match%lwt routing.push ~chan_name ~id_header ~mode stream with
-                | Ok ((Some _) as count) -> return (201, [], count)
-                | Ok None -> return (202, [], None)
-                | Error errors -> return (400, errors, (Some 0))
-              end in
-            let headers = json_response_header in
-            let status = Code.status_of_code code in
-            let body = Json_obj_j.(string_of_write { code; errors; saved; }) in
-            Server.respond_string ~headers ~status ~body ()
+      | Ok (Some chan_name, `Write mode) ->
+        let stream = Cohttp_lwt_body.to_stream body in
+        let id_header = Header.get (Request.headers req) Header_names.id in
+        let%lwt (code, errors, saved) =
+          begin match%lwt routing.push ~chan_name ~id_header ~mode stream with
+            | Ok ((Some _) as count) -> return (201, [], count)
+            | Ok None -> return (202, [], None)
+            | Error errors -> return (400, errors, (Some 0))
+          end in
+        let headers = json_response_header in
+        let status = Code.status_of_code code in
+        let body = Json_obj_j.(string_of_write { code; errors; saved; }) in
+        Server.respond_string ~headers ~status ~body ()
 
-          | `Read mode ->
-            let id_header = Header.get (Request.headers req) Header_names.id in
-            begin match Request.encoding req with
-              | Transfer.Chunked ->
-                begin match%lwt routing.read_stream ~chan_name ~id_header ~mode with
-                  | Error errors -> handle_errors 400 errors
-                  | Ok (stream, channel) ->
-                    let%lwt status, headers = match%lwt Lwt_stream.is_empty stream with
-                      | false -> return (
-                          (Code.status_of_code 200),
-                          (Header.add_list (Header.init ()) [("content-type", "application/octet-stream")])
-                        )
-                      | true -> return (
-                          (Code.status_of_code 204),
-                          (Header.add_list (Header.init ()) [
-                              ("content-type", "application/octet-stream");
-                              (Header_names.length, "0");
-                            ])
-                        )
-                    in
-                    let sep = channel.Channel.separator in
-                    let body_stream = Lwt_stream.map_list_s (fun raw ->
-                        begin match%lwt Lwt_stream.is_empty stream with
-                          | true -> return [raw]
-                          | false -> return [raw; sep]
-                        end
-                      ) stream in
-                    let encoding = Transfer.Chunked in
-                    let response = Response.make ~status ~flush:true ~encoding ~headers () in
-                    let body = Cohttp_lwt_body.of_stream body_stream in
-                    return (response, body)
-                end
-              | Transfer.Unknown | Transfer.Fixed _ ->
-                let limit_opt = Util.header_name_to_int64_opt (Request.headers req) Header_names.limit in
-                let limit = Option.value ~default:Int64.max_value limit_opt in
-                begin match%lwt routing.read_slice ~chan_name ~id_header ~mode ~limit with
-                  | Error errors -> handle_errors 400 errors
-                  | Ok (slice, channel) ->
-                    let open Persistence in
-                    let payloads = slice.payloads in
-                    let code = if Array.is_empty payloads then 204 else 200 in
-                    let status = Code.status_of_code code in
-                    let headers = match slice.metadata with
-                      | None ->
-                        Header.add_list (Header.init ()) [
+      | Ok (Some chan_name, `Read mode) ->
+        begin match Request.encoding req with
+          | Transfer.Chunked ->
+            begin match%lwt routing.read_stream ~chan_name ~mode with
+              | Error errors -> handle_errors 400 errors
+              | Ok (stream, channel) ->
+                let%lwt status, headers = match%lwt Lwt_stream.is_empty stream with
+                  | false -> return (
+                      (Code.status_of_code 200),
+                      (Header.add_list (Header.init ()) [("content-type", "application/octet-stream")])
+                    )
+                  | true -> return (
+                      (Code.status_of_code 204),
+                      (Header.add_list (Header.init ()) [
                           ("content-type", "application/octet-stream");
-                          (Header_names.length, Int.to_string (Array.length payloads));
-                        ]
-                      | Some metadata ->
-                        Header.add_list (Header.init ()) [
-                          ("content-type", "application/octet-stream");
-                          (Header_names.length, Int.to_string (Array.length payloads));
-                          (Header_names.last_id, metadata.last_id);
-                          (Header_names.last_ts, metadata.last_timens);
-                        ]
-                    in
-                    let open Read_settings in
-                    let body = match channel.Channel.read with
-                      | None ->
-                        let err = Printf.sprintf "Impossible case: Missing readSettings for channel %s" chan_name in
-                        async (fun () -> Logger.error err);
-                        Json_obj_j.(string_of_read { code = 500; errors = [err]; messages = [| |]; })
-                      | Some { format = Io_format.Plaintext } ->
-                        String.concat_array ~sep:channel.Channel.separator payloads
-                      | Some { format = Io_format.Json } ->
-                        Json_obj_j.(string_of_read { code; errors = []; messages = payloads; })
-                    in
-                    let encoding = Transfer.Fixed (Int.to_int64 (String.length body)) in
-                    let response = Response.make ~status ~flush:true ~encoding ~headers () in
-                    return (response, (Cohttp_lwt_body.of_string body))
-                end
+                          (Header_names.length, "0");
+                        ])
+                    )
+                in
+                let sep = channel.Channel.separator in
+                let body_stream = Lwt_stream.map_list_s (fun raw ->
+                    begin match%lwt Lwt_stream.is_empty stream with
+                      | true -> return [raw]
+                      | false -> return [raw; sep]
+                    end
+                  ) stream in
+                let encoding = Transfer.Chunked in
+                let response = Response.make ~status ~flush:true ~encoding ~headers () in
+                let body = Cohttp_lwt_body.of_stream body_stream in
+                return (response, body)
             end
-
-          | `Count as mode ->
-            let%lwt (code, errors, count) =
-              begin match%lwt routing.count ~chan_name ~mode with
-                | Ok count -> return (200, [], Some count)
-                | Error errors -> return (400, errors, None)
-              end in
-            let headers = json_response_header in
-            let status = Code.status_of_code code in
-            let body = Json_obj_j.(string_of_count { code; errors; count; }) in
-            Server.respond_string ~headers ~status ~body ()
+          | Transfer.Unknown | Transfer.Fixed _ ->
+            let limit_opt = Util.header_name_to_int64_opt (Request.headers req) Header_names.limit in
+            let limit = Option.value ~default:Int64.max_value limit_opt in
+            begin match%lwt routing.read_slice ~chan_name ~mode ~limit with
+              | Error errors -> handle_errors 400 errors
+              | Ok (slice, channel) ->
+                let open Persistence in
+                let payloads = slice.payloads in
+                let code = if Array.is_empty payloads then 204 else 200 in
+                let status = Code.status_of_code code in
+                let headers = match slice.metadata with
+                  | None ->
+                    Header.add_list (Header.init ()) [
+                      ("content-type", "application/octet-stream");
+                      (Header_names.length, Int.to_string (Array.length payloads));
+                    ]
+                  | Some metadata ->
+                    Header.add_list (Header.init ()) [
+                      ("content-type", "application/octet-stream");
+                      (Header_names.length, Int.to_string (Array.length payloads));
+                      (Header_names.last_id, metadata.last_id);
+                      (Header_names.last_ts, metadata.last_timens);
+                    ]
+                in
+                let open Read_settings in
+                let body = match channel.Channel.read with
+                  | None ->
+                    let err = Printf.sprintf "Impossible case: Missing readSettings for channel %s" chan_name in
+                    async (fun () -> Logger.error err);
+                    Json_obj_j.(string_of_read { code = 500; errors = [err]; messages = [| |]; })
+                  | Some { format = Io_format.Plaintext } ->
+                    String.concat_array ~sep:channel.Channel.separator payloads
+                  | Some { format = Io_format.Json } ->
+                    Json_obj_j.(string_of_read { code; errors = []; messages = payloads; })
+                in
+                let encoding = Transfer.Fixed (Int.to_int64 (String.length body)) in
+                let response = Response.make ~status ~flush:true ~encoding ~headers () in
+                return (response, (Cohttp_lwt_body.of_string body))
+            end
         end
-      with ex -> handle_errors 500 [Exn.to_string ex]
+
+      | Ok (Some chan_name, (`Count as mode)) ->
+        let%lwt (code, errors, count) =
+          begin match%lwt routing.count ~chan_name ~mode with
+            | Ok count -> return (200, [], Some count)
+            | Error errors -> return (400, errors, None)
+          end in
+        let headers = json_response_header in
+        let status = Code.status_of_code code in
+        let body = Json_obj_j.(string_of_count { code; errors; count; }) in
+        Server.respond_string ~headers ~status ~body ()
+
+      | Ok ((Some _) as chan_name, (`Health as mode))
+      | Ok (None as chan_name, (`Health as mode)) ->
+        let%lwt (code, errors) =
+          begin match%lwt routing.health ~chan_name ~mode with
+            | [] as ll -> return (200, ll)
+            | errors -> return (500, errors)
+          end in
+        let headers = json_response_header in
+        let status = Code.status_of_code code in
+        let body = Json_obj_j.(string_of_health { code; errors; }) in
+        Server.respond_string ~headers ~status ~body ()
+      | Ok (None, _) -> fail_with "Invalid routing"
     end
+  with ex -> handle_errors 500 [Exn.to_string ex]
 
 let open_sockets = Int.Table.create ~size:5 ()
 
@@ -251,7 +277,7 @@ let start generic specific http_routing_kind =
   let (instance_t, instance_w) = wait () in
   let conf = match http_routing_kind with
     | Standard routing -> Server.make ~callback:(handler instance_t routing) ()
-    | Admin -> Server.make ~callback:(Admin.handler) ()
+    | Admin {table} -> Server.make ~callback:(Admin.handler table) ()
   in
   let (stop, close) = wait () in
   let thread = Server.create ~stop ~ctx ~mode conf in

@@ -36,6 +36,8 @@ let do_flush batcher =
   with
   | err -> Logger.error (Exn.to_string err)
 
+let length batcher = Queue.length batcher.left
+
 let create ~max_time ~max_size ~handler =
   let (thread, wake) = wait () in
   let batcher = {
@@ -53,23 +55,22 @@ let create ~max_time ~max_size ~handler =
   async (fun () ->
     Util.make_interval (max_time /. 1000.) (fun () ->
       if Float.(>) (Util.time_ms_float ()) (batcher.last_flush +. batcher.max_time)
+      && Int.(>) (length batcher) 0
       then do_flush batcher
       else return_unit
     )
   );
   batcher
 
-let length batcher = Queue.length batcher.left
-
-let check_max_size batcher lefts =
-  if (((length batcher) + (Array.length lefts)) >= batcher.max_size) && length batcher > 0
+let check_max_size batcher add_n =
+  if (((length batcher) + add_n) >= batcher.max_size) && length batcher > 0
   then do_flush batcher
   else return_unit
 
 let submit batcher lefts rights =
   let old_thread = batcher.thread in
-  let%lwt () = check_max_size batcher lefts in
+  let%lwt () = check_max_size batcher (Array.length lefts) in
   Array.iter ~f:(Queue.enqueue batcher.left) lefts;
   Array.iter ~f:(Queue.enqueue batcher.right) rights;
-  let%lwt () = check_max_size batcher lefts in
+  let%lwt () = check_max_size batcher (Array.length lefts) in
   old_thread

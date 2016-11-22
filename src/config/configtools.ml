@@ -38,7 +38,6 @@ let parse_channels config path =
       else return_unit
     in
     let filepath = Printf.sprintf "%s%s" path filename in
-    (* TODO: make more efficient? *)
     let%lwt contents = Lwt_stream.to_string (Lwt_io.chars_of_file filepath) in
     let mapper = fun str ->
       let parsed = Config_j.config_channel_of_string str in
@@ -68,7 +67,12 @@ let create_admin_server watcher config =
     port = config.admin.a_port;
     listener_settings = Http_proto admin_spec_conf;
   } in
-  let%lwt admin_server = Http.start admin_conf admin_spec_conf Http.Admin in
+  let%lwt admin_server =
+    let open Http in
+    let table = (Watcher.router watcher).Router.table in
+    let admin = Admin { table } in
+    start admin_conf admin_spec_conf admin
+  in
   let (_, wakener) = wait () in
   let open Listener in
   async (fun () -> Watcher.monitor watcher {id = admin_conf.name; server = HTTP (admin_server, wakener);});

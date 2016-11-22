@@ -26,6 +26,11 @@ Proc.pathExists(Proc.newquePath)
     remoteInputFormat: 'plaintext',
     remoteOutputFormat: 'plaintext'
   }
+  var esSettings = {
+    baseUrls: ['http://127.0.0.1:9200'],
+    index: 'analytics-test',
+    type: 'mydata'
+  }
 
   require('./sections/count')('disk', {})
   require('./sections/count')('memory', {})
@@ -54,5 +59,11 @@ Proc.pathExists(Proc.newquePath)
   require('./sections/ack')('http json', httpJsonSettings)
   require('./sections/ack')('http plaintext', httpPlaintextSettings)
   require('./sections/ack')('disk', {}, true)
+
+  require('./sections/health')('disk', {})
+  require('./sections/health')('memory', {})
+  require('./sections/health')('http json', httpJsonSettings)
+  require('./sections/health')('http plaintext', httpPlaintextSettings)
+  require('./sections/health')('elasticsearch', esSettings, true)
   run()
 })

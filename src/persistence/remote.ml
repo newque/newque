@@ -114,17 +114,32 @@ module M = struct
   let size instance =
     let open Json_obj_j in
     let headers = instance.base_headers in
-    let base_uri = get_base instance in
-    let base_path = Uri.path base_uri in
-    let uri = if String.(=) (String.suffix base_path 1) "/"
-      then Uri.with_path base_uri (Printf.sprintf "%scount" base_path)
-      else Uri.with_path base_uri (Printf.sprintf "%s/count" base_path)
-    in
+    let uri = Util.append_to_path (get_base instance) "count" in
     let%lwt (response, body) = Client.call ~headers ~chunked:false `GET uri in
     let%lwt body_str = Cohttp_lwt_body.to_string body in
     let%lwt parsed = Util.parse_json_lwt count_of_string body_str in
     match parsed.errors with
     | [] -> return (Option.value ~default:Int64.zero parsed.count)
     | errors -> fail_with (String.concat ~sep:", " errors)
+
+  let health instance =
+    let open Json_obj_j in
+    let headers = instance.base_headers in
+    let uri = Util.append_to_path (get_base instance) "health" in
+    try%lwt
+      let%lwt (response, body) = Client.call ~headers ~chunked:false `GET uri in
+      let%lwt body_str = Cohttp_lwt_body.to_string body in
+      let%lwt parsed = Util.parse_json_lwt health_of_string body_str in
+      begin match parsed.errors with
+        | [] ->
+          begin match parsed.code, parsed.errors with
+            | (200, []) -> return []
+            | (_, errors) -> return errors
+          end
+        | errors -> return errors
+      end
+    with
+    | Unix.Unix_error (c, n, _) -> return [Fs.format_unix_exn c n (Uri.to_string uri)]
+    | err -> return [Exn.to_string err]
 
 end

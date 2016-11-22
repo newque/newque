@@ -162,6 +162,22 @@ var shouldFail = exports.shouldFail = function (code) {
   }
 }
 
+var shouldReturn = exports.shouldReturn = function (code, json) {
+  return function (result) {
+    return new Promise(function (resolve, reject) {
+      assert(result.res.statusCode === code)
+      assert(result.body.code === code)
+      assert(JSON.stringify(result.body) === JSON.stringify(json))
+      return resolve(result)
+    })
+    .catch(function (err) {
+      console.log(result.res.statusCode)
+      console.log(result.body)
+      throw err
+    })
+  }
+}
+
 var makeJsonBuffer = exports.makeJsonBuffer = function (arr, ids, atomic) {
   var payload = {
     messages: arr

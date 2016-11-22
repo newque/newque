@@ -79,4 +79,13 @@ module M = struct
         handle_failure instance ex ~errstr:(Printf.sprintf "Failed to count %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex))
     )
 
+  let health instance =
+    Lwt_mutex.with_lock instance.mutex (fun () ->
+      try%lwt
+        Sqlite.health instance.db
+      with
+      | ex ->
+        handle_failure instance ex ~errstr:(Printf.sprintf "Failed to check health %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex))
+    )
+
 end

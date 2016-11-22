@@ -23,7 +23,6 @@ val read_slice :
   t ->
   listen_name:string ->
   chan_name:string ->
-  id_header:string option ->
   mode:Mode.Read.t ->
   limit:int64 ->
   (Persistence.slice * Channel.t, string list) Result.t Lwt.t
@@ -32,7 +31,6 @@ val read_stream :
   t ->
   listen_name:string ->
   chan_name:string ->
-  id_header:string option ->
   mode:Mode.Read.t ->
   (string Lwt_stream.t * Channel.t, string list) Result.t Lwt.t
 
@@ -42,3 +40,10 @@ val count :
   chan_name:string ->
   mode:Mode.Count.t ->
   (int64, string list) Result.t Lwt.t
+
+val health :
+  t ->
+  listen_name:string ->
+  chan_name:(string option) ->
+  mode:Mode.Health.t ->
+  string list Lwt.t

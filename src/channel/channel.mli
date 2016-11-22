@@ -5,6 +5,7 @@ type t = {
   pull_slice : int64 -> mode:Mode.Read.t -> only_once:bool -> Persistence.slice Lwt.t;
   pull_stream : int64 -> mode:Mode.Read.t -> only_once:bool -> string Lwt_stream.t Lwt.t;
   size : unit -> int64 Lwt.t;
+  health: unit -> string list Lwt.t;
   raw: bool;
   read: Read_settings.t option;
   write : Write_settings.t option;
@@ -22,3 +23,5 @@ val pull_slice : t -> mode:Mode.Read.t -> limit:int64 -> only_once:bool -> Persi
 val pull_stream : t -> mode:Mode.Read.t -> only_once:bool -> string Lwt_stream.t Lwt.t
 
 val size : t -> unit -> int64 Lwt.t
+
+val health : t -> unit -> string list Lwt.t

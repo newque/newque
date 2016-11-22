@@ -11,7 +11,11 @@ type t = {
   thread : unit Lwt.t;
 } [@@deriving sexp_of]
 
-(* TODO: Clean this up.. *)
+type admin_routing = {
+  (* Channels (accessed by name) by listener.id *)
+  table: Channel.t String.Table.t String.Table.t;
+}
+
 type standard_routing = {
   push: (
     chan_name:string ->
@@ -22,23 +26,25 @@ type standard_routing = {
     (int option, string list) Result.t Lwt.t);
   read_slice: (
     chan_name:string ->
-    id_header:string option ->
     mode:Mode.Read.t ->
     limit:int64 ->
     (Persistence.slice * Channel.t, string list) Result.t Lwt.t);
   read_stream: (
     chan_name:string ->
-    id_header:string option ->
     mode:Mode.Read.t ->
     (string Lwt_stream.t * Channel.t, string list) Result.t Lwt.t);
   count: (
     chan_name:string ->
     mode:Mode.Count.t ->
     (int64, string list) Result.t Lwt.t);
+  health: (
+    chan_name:string option ->
+    mode:Mode.Health.t ->
+    string list Lwt.t);
 }
 
 type http_routing =
-  | Admin
+  | Admin of admin_routing
   | Standard of standard_routing
 
 val start :

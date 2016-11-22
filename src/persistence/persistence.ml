@@ -36,6 +36,8 @@ module type Template = sig
     (string array * int64 option * (string * int64) option) Lwt.t
 
   val size : t -> int64 Lwt.t
+
+  val health : t -> string list Lwt.t
 end
 
 module type Argument = sig
@@ -56,6 +58,8 @@ module type S = sig
   val pull_stream : int64 -> mode:Mode.Read.t -> only_once:bool -> string Lwt_stream.t Lwt.t
 
   val size : unit -> int64 Lwt.t
+
+  val health : unit -> string list Lwt.t
 end
 
 module Make (Argument: Argument) : S = struct
@@ -155,5 +159,9 @@ module Make (Argument: Argument) : S = struct
   let size () =
     let%lwt instance = instance in
     Argument.IO.size instance
+
+  let health () =
+    let%lwt instance = instance in
+    Argument.IO.health instance
 
 end
