@@ -37,6 +37,10 @@ type standard_routing = {
     chan_name:string ->
     mode:Mode.Count.t ->
     (int64, string list) Result.t Lwt.t);
+  delete: (
+    chan_name:string ->
+    mode:Mode.Delete.t ->
+    (unit, string list) Result.t Lwt.t);
   health: (
     chan_name:string option ->
     mode:Mode.Health.t ->

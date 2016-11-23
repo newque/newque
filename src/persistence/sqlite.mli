@@ -17,4 +17,6 @@ val pull :
 
 val size : t -> int64 Lwt.t
 
+val delete : t -> unit Lwt.t
+
 val health : t -> string list Lwt.t

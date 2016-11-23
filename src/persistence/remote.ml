@@ -122,6 +122,17 @@ module M = struct
     | [] -> return (Option.value ~default:Int64.zero parsed.count)
     | errors -> fail_with (String.concat ~sep:", " errors)
 
+  let delete instance =
+    let open Json_obj_j in
+    let headers = instance.base_headers in
+    let uri = Util.append_to_path (get_base instance) "delete" in
+    let%lwt (response, body) = Client.call ~headers ~chunked:false `DELETE uri in
+    let%lwt body_str = Cohttp_lwt_body.to_string body in
+    let%lwt parsed = Util.parse_json_lwt errors_of_string body_str in
+    match parsed.errors with
+    | [] -> return_unit
+    | errors -> fail_with (String.concat ~sep:", " errors)
+
   let health instance =
     let open Json_obj_j in
     let headers = instance.base_headers in

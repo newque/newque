@@ -24,6 +24,7 @@ let start_http watcher generic specific =
       read_slice = Router.read_slice watcher.router ~listen_name:generic.name;
       read_stream = Router.read_stream watcher.router ~listen_name:generic.name;
       count = Router.count watcher.router ~listen_name:generic.name;
+      delete = Router.delete watcher.router ~listen_name:generic.name;
       health = Router.health watcher.router ~listen_name:generic.name;
     }
   in

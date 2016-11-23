@@ -159,11 +159,25 @@ let count router ~listen_name ~chan_name ~mode =
   match find_chan router ~listen_name ~chan_name with
   | (Error _) as err -> return err
   | Ok chan ->
-    let%lwt count = Channel.size chan () in
+    let%lwt count = Channel.size chan in
     ignore_result (Logger.debug_lazy (lazy (
         Printf.sprintf "Counted: %s (size: %Ld) from %s" chan_name count listen_name
       )));
     return (Ok count)
+
+let delete router ~listen_name ~chan_name ~mode =
+  match find_chan router ~listen_name ~chan_name with
+  | (Error _) as err -> return err
+  | Ok chan ->
+    begin match chan.Channel.emptiable with
+      | false -> return (Error [Printf.sprintf "Channel %s doesn't support Deleting from it." chan_name])
+      | true ->
+        let%lwt () = Channel.delete chan in
+        ignore_result (Logger.debug_lazy (lazy (
+            Printf.sprintf "Deleted: %s from %s" chan_name listen_name
+          )));
+        return Result.ok_unit
+    end
 
 let rec health router ~listen_name ~chan_name ~mode =
   match chan_name with
@@ -189,7 +203,7 @@ let rec health router ~listen_name ~chan_name ~mode =
     begin match find_chan router ~listen_name ~chan_name with
       | Error errors -> return errors
       | Ok chan ->
-        let%lwt result = Channel.health chan () in
+        let%lwt result = Channel.health chan in
         ignore_result (Logger.debug_lazy (lazy (
             let str = match result with
               | [] -> "OK"

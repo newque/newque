@@ -51,6 +51,10 @@ type standard_routing = {
     chan_name:string ->
     mode:Mode.Count.t ->
     (int64, string list) Result.t Lwt.t);
+  delete: (
+    chan_name:string ->
+    mode:Mode.Delete.t ->
+    (unit, string list) Result.t Lwt.t);
   health: (
     chan_name:string option ->
     mode:Mode.Health.t ->
@@ -87,6 +91,7 @@ let default_filter _ req _ =
         |> (Fn.flip Result.bind) Mode.of_string
       in
       begin match ((Request.meth req), mode_value) with
+        | `DELETE, _ -> Ok (Some chan_name, `Delete)
         | `POST, Ok (`Single as m)
         | `POST, Ok (`Multiple as m)
         | `POST, Ok (`Atomic as m)
@@ -95,13 +100,10 @@ let default_filter _ req _ =
         | `GET, Ok ((`After_id _) as m)
         | `GET, Ok ((`After_ts _) as m) -> Ok (Some chan_name, Mode.wrap m)
         | `POST, Error "<no header>" -> Ok (Some chan_name, Mode.wrap `Single)
-        | (`POST as meth), Ok m
-        | (`GET as meth), Ok m ->
+        | meth, Ok m ->
           Error (400, [Printf.sprintf "Invalid {Method, Mode} pair: {%s, %s}" (Code.string_of_method meth) (Mode.to_string (m :> Mode.Any.t))])
-        | _, Error str ->
-          Error (400, [Printf.sprintf "Invalid %s header value: %s" Header_names.mode str])
-        | meth, _ ->
-          Error (405, [Printf.sprintf "Invalid HTTP method %s" (Code.string_of_method meth)])
+        | meth, Error str ->
+          Error (400, [Printf.sprintf "Invalid {Method, Mode} pair: {%s, %s}" (Code.string_of_method meth) str])
       end
     | _ -> Error (400, [Printf.sprintf "Invalid path %s (should begin with /v1/)" path])
   in
@@ -217,6 +219,17 @@ let handler http routing ((ch, _) as conn) req body =
         let headers = json_response_header in
         let status = Code.status_of_code code in
         let body = Json_obj_j.(string_of_count { code; errors; count; }) in
+        Server.respond_string ~headers ~status ~body ()
+
+      | Ok (Some chan_name, (`Delete as mode)) ->
+        let%lwt (code, errors) =
+          begin match%lwt routing.delete ~chan_name ~mode with
+            | Ok () -> return (200, [])
+            | Error errors -> return (400, errors)
+          end in
+        let headers = json_response_header in
+        let status = Code.status_of_code code in
+        let body = Json_obj_j.(string_of_errors { code; errors; }) in
         Server.respond_string ~headers ~status ~body ()
 
       | Ok ((Some _) as chan_name, (`Health as mode))

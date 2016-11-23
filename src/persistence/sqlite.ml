@@ -13,6 +13,7 @@ type statements = {
   begin_transaction: Sqlite3.stmt * string;
   commit_transaction: Sqlite3.stmt * string;
   rollback_transaction: Sqlite3.stmt * string;
+  truncate: Sqlite3.stmt * string;
   quick_check: Sqlite3.stmt * string;
 }
 type t = {
@@ -214,6 +215,7 @@ let count_sql = "SELECT COUNT(*) FROM MESSAGES;"
 let begin_sql = "BEGIN;"
 let commit_sql = "COMMIT;"
 let rollback_sql = "ROLLBACK;"
+let truncate_sql = "DELETE FROM MESSAGES;"
 let quick_check_sql = "PRAGMA quick_check;"
 let insert_sql count =
   let arr = Array.create ~len:count "(?,?,?)" in
@@ -238,9 +240,10 @@ let create file ~avg_read =
   let%lwt begin_transaction = prepare db begin_sql in
   let%lwt commit_transaction = prepare db commit_sql in
   let%lwt rollback_transaction = prepare db rollback_sql in
+  let%lwt truncate = prepare db truncate_sql in
   let%lwt quick_check = prepare db quick_check_sql in
 
-  let stmts = {last_row; count; begin_transaction; commit_transaction; rollback_transaction; quick_check} in
+  let stmts = {last_row; count; begin_transaction; commit_transaction; rollback_transaction; truncate; quick_check} in
   let instance = {db; file; avg_read; stmts} in
   return instance
 
@@ -356,6 +359,11 @@ let size db =
   match%lwt query db ~destroy:false stmt FInt64 with
   | [| x |], _ -> return x
   | dataset, _ -> fail_with (Printf.sprintf "Count failed (dataset size: %d)" (Array.length dataset))
+
+let delete db =
+  let (_, sql) as stmt = db.stmts.truncate in
+  let%lwt (_ : int) = execute db ~destroy:false stmt in
+  return_unit
 
 let health db =
   let (_, sql) as stmt = db.stmts.quick_check in

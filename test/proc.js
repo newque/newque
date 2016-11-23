@@ -155,6 +155,7 @@ exports.setupEnvironment = function (persistence, persistenceSettings, raw) {
         }
         if (type === 'elasticsearch') {
           parsed.readSettings = null
+          parsed.emptiable = false
           parsed.persistenceSettings.index = channelName
           var promise = new Promise(function (resolve, reject) {
             request.post(persistenceSettings.baseUrls[0] + '/' + channelName.toLowerCase())

@@ -1,5 +1,5 @@
 module.exports = function (persistence, persistenceSettings, raw) {
-  var delay = persistence === 'elasticsearch' ? 1000 : 0
+  var delay = persistence === 'elasticsearch' ? 1100 : 0
   describe('Push ' + persistence + (!!raw ? ' raw' : ''), function () {
     var processes = []
     before(function () {
@@ -246,7 +246,7 @@ module.exports = function (persistence, persistenceSettings, raw) {
       it('Invalid method', function () {
         var buf = ''
         return Fn.call('XYZ', 8000, '/v1/example', buf, [[C.modeHeader, 'single']])
-        .then(Fn.shouldFail(405))
+        .then(Fn.shouldFail(400))
       })
     })
 

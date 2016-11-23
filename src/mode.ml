@@ -32,6 +32,12 @@ module Count = struct
   ]
 end
 
+module Delete = struct
+  type t = [
+    | `Delete
+  ]
+end
+
 module Health = struct
   type t = [
     | `Health
@@ -43,6 +49,7 @@ module Any = struct
     | Write.t
     | Read.t
     | Count.t
+    | Delete.t
     | Health.t
   ]
 end
@@ -51,6 +58,7 @@ type t = [
   | `Write of Write.t
   | `Read of Read.t
   | Count.t
+  | Delete.t
   | Health.t
 ]
 
@@ -63,6 +71,7 @@ let wrap (tag : Any.t) : t = match tag with
   | (`After_id _) as x -> `Read x
   | (`After_ts _) as x-> `Read x
   | `Count -> `Count
+  | `Delete -> `Delete
   | `Health -> `Health
 
 (* Efficient, not pretty. *)
@@ -88,4 +97,5 @@ let to_string mode =
   | `Write m -> Write.to_string m
   | `Read m -> Read.to_string m
   | `Count -> "Count"
+  | `Delete -> "Delete"
   | `Health -> "Health"

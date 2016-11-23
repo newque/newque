@@ -41,6 +41,13 @@ val count :
   mode:Mode.Count.t ->
   (int64, string list) Result.t Lwt.t
 
+val delete :
+  t ->
+  listen_name:string ->
+  chan_name:string ->
+  mode:Mode.Delete.t ->
+  (unit, string list) Result.t Lwt.t
+
 val health :
   t ->
   listen_name:string ->

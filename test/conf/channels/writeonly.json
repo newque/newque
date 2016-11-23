@@ -6,5 +6,6 @@
     "acknowledgement": "saved",
     "format": "plaintext",
     "copyToChannels": []
-  }
+  },
+  "emptiable": true
 }

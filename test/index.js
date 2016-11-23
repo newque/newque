@@ -62,6 +62,12 @@ Proc.pathExists(Proc.newquePath)
   require('./sections/ack')('http plaintext', httpPlaintextSettings)
   require('./sections/ack')('disk', {}, true)
 
+  require('./sections/delete')('disk', {})
+  require('./sections/delete')('memory', {})
+  require('./sections/delete')('http json', httpJsonSettings)
+  require('./sections/delete')('http plaintext', httpPlaintextSettings)
+  require('./sections/delete')('disk', {}, true)
+
   require('./sections/health')('disk', {})
   require('./sections/health')('memory', {})
   require('./sections/health')('http json', httpJsonSettings)

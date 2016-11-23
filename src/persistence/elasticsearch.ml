@@ -95,6 +95,8 @@ module M = struct
         failwith (Printf.sprintf "Couldn't get count from ES (HTTP %s)" (Code.string_of_status (Response.status response)))
     end
 
+  let delete instance = fail_with "Unimplemented: ES delete"
+
   let health instance =
     let uri = Util.append_to_path (get_base instance) (Printf.sprintf "%s/_stats/docs" instance.index) in
     try%lwt

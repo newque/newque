@@ -1,6 +1,6 @@
 module.exports = function (persistence, persistenceSettings, raw) {
   var delay = persistence === 'elasticsearch' ? 1100 : 0
-  describe('Count ' + persistence + (!!raw ? ' raw' : ''), function () {
+  describe('Delete ' + persistence + (!!raw ? ' raw' : ''), function () {
     var processes = []
     before(function () {
       this.timeout(5000)
@@ -17,43 +17,28 @@ module.exports = function (persistence, persistenceSettings, raw) {
       })
     })
 
-    it('Valid', function () {
+    it('Deletes', function () {
       return Fn.call('GET', 8000, '/v1/example/count')
       .then(Fn.shouldHaveCounted(4))
-    })
-
-    it('Valid, empty', function () {
-      return Fn.call('GET', 8000, '/v1/empty/count')
+      .then(() => Fn.call('DELETE', 8000, '/v1/example'))
+      .then(Fn.shouldReturn(200, {code:200, errors:[]}))
+      .then(() => Fn.call('GET', 8000, '/v1/example/count'))
       .then(Fn.shouldHaveCounted(0))
     })
 
     it('Invalid path', function () {
-      return Fn.call('GET', 8000, '/v1//count')
-      .then(Fn.shouldFail(400))
-    })
-
-    it('Invalid path 2', function () {
-      return Fn.call('GET', 8000, '/v1/nothing/count')
+      return Fn.call('DELETE', 8000, '/v1/nothing/')
       .then(Fn.shouldFail(400))
     })
 
     it('Invalid method', function () {
-      return Fn.call('XYZ', 8000, '/v1/example/count')
-      .then(Fn.shouldFail(405))
+      return Fn.call('XYZ', 8000, '/v1/example/')
+      .then(Fn.shouldFail(400))
     })
 
-    describe('Read only', function () {
-      it('Should count', function () {
-        return Fn.call('GET', 8000, '/v1/readonly/count')
-        .then(Fn.shouldHaveCounted(0))
-      })
-    })
-
-    describe('Write only', function () {
-      it('Should count', function () {
-        return Fn.call('GET', 8000, '/v1/writeonly/count')
-        .then(Fn.shouldHaveCounted(0))
-      })
+    it('Not emptiable', function () {
+      return Fn.call('DELETE', 8000, '/v1/secondary')
+      .then(Fn.shouldFail(400))
     })
 
     after(function () {

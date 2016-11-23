@@ -35,6 +35,8 @@ module type Template = sig
     (* Returns the last id and timens as second option if fetch_last is true *)
     (string array * int64 option * (string * int64) option) Lwt.t
 
+  val delete : t -> unit Lwt.t
+
   val size : t -> int64 Lwt.t
 
   val health : t -> string list Lwt.t
@@ -58,6 +60,8 @@ module type S = sig
   val pull_stream : int64 -> mode:Mode.Read.t -> only_once:bool -> string Lwt_stream.t Lwt.t
 
   val size : unit -> int64 Lwt.t
+
+  val delete : unit -> unit Lwt.t
 
   val health : unit -> string list Lwt.t
 end
@@ -162,6 +166,13 @@ module Make (Argument: Argument) : S = struct
   let size () =
     let%lwt instance = instance in
     Argument.IO.size instance
+
+  (******************
+     DELETE
+   ********************)
+  let delete () =
+    let%lwt instance = instance in
+    Argument.IO.delete instance
 
   (******************
      HEALTH

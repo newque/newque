@@ -8,5 +8,6 @@
   "writeSettings": {
     "acknowledgement": "none",
     "copyToChannels": ["sink"]
-  }
+  },
+  "emptiable": true
 }

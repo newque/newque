@@ -1,5 +1,5 @@
 module.exports = function (persistence, persistenceSettings, raw) {
-  var delay = persistence === 'elasticsearch' ? 1000 : 0
+  var delay = persistence === 'elasticsearch' ? 1100 : 0
   describe('Health ' + persistence + (!!raw ? ' raw' : ''), function () {
     var processes = []
     before(function () {

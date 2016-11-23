@@ -11,5 +11,6 @@
       "maxTime": 100,
       "maxSize": 5
     }
-  }
+  },
+  "emptiable": true
 }

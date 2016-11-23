@@ -9,5 +9,6 @@
     "acknowledgement": "none",
     "format": "plaintext",
     "copyToChannels": ["sink1"]
-  }
+  },
+  "emptiable": true
 }

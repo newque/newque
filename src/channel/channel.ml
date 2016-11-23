@@ -8,7 +8,9 @@ type t = {
   pull_slice: int64 -> mode:Mode.Read.t -> only_once:bool -> Persistence.slice Lwt.t sexp_opaque;
   pull_stream: int64 -> mode:Mode.Read.t -> only_once:bool -> string Lwt_stream.t Lwt.t sexp_opaque;
   size: unit -> int64 Lwt.t sexp_opaque;
+  delete: unit -> unit Lwt.t sexp_opaque;
   health: unit -> string list Lwt.t sexp_opaque;
+  emptiable: bool;
   raw: bool;
   read: Read_settings.t option;
   write: Write_settings.t option;
@@ -67,6 +69,7 @@ let create name conf_channel =
     | `Elasticsearch es ->
       if not conf_channel.raw then failwith (Printf.sprintf "Channel [%s] has persistence type [elasticsearch] but 'raw' is not set to true" name) else
       if Option.is_some read then failwith (Printf.sprintf "Channel [%s] has persistence type [elasticsearch] but is not write-only" name) else
+      if conf_channel.emptiable then failwith (Printf.sprintf "Channel [%s] has persistence type [elasticsearch] but is emptiable" name) else
       let module Arg = struct
         module IO = Elasticsearch.M
         let create () = Elasticsearch.create es.base_urls ~index:es.index ~typename:es.typename
@@ -94,7 +97,9 @@ let create name conf_channel =
     pull_slice = Persist.pull_slice;
     pull_stream = Persist.pull_stream;
     size = Persist.size;
+    delete = Persist.delete;
     health = Persist.health;
+    emptiable = conf_channel.emptiable;
     raw = conf_channel.raw;
     read = Option.map conf_channel.read_settings ~f:Read_settings.create;
     write;
@@ -109,6 +114,8 @@ let pull_slice chan ~mode ~limit = chan.pull_slice (Int64.min limit chan.max_rea
 
 let pull_stream chan ~mode = chan.pull_stream chan.max_read ~mode
 
-let size chan () = chan.size ()
+let size chan = chan.size ()
 
-let health chan () = chan.health ()
+let delete chan = chan.delete ()
+
+let health chan = chan.health ()
