@@ -65,7 +65,8 @@ let create name conf_channel =
       (module Persistence.Make (Arg) : Persistence.S)
 
     | `Elasticsearch es ->
-      if not conf_channel.raw then failwith (Printf.sprintf "Channel [%s] has persistence type 'elasticsearch' but 'raw' is not set to true" name) else
+      if not conf_channel.raw then failwith (Printf.sprintf "Channel [%s] has persistence type [elasticsearch] but 'raw' is not set to true" name) else
+      if Option.is_some read then failwith (Printf.sprintf "Channel [%s] has persistence type [elasticsearch] but is not write-only" name) else
       let module Arg = struct
         module IO = Elasticsearch.M
         let create () = Elasticsearch.create es.base_urls ~index:es.index ~typename:es.typename

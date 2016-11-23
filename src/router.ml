@@ -159,15 +159,11 @@ let count router ~listen_name ~chan_name ~mode =
   match find_chan router ~listen_name ~chan_name with
   | (Error _) as err -> return err
   | Ok chan ->
-    begin match chan.Channel.read with
-      | None -> return (Error [Printf.sprintf "Channel %s doesn't support Reading from it." chan_name])
-      | Some read ->
-        let%lwt count = Channel.size chan () in
-        ignore_result (Logger.debug_lazy (lazy (
-            Printf.sprintf "Counted: %s (size: %Ld) from %s" chan_name count listen_name
-          )));
-        return (Ok count)
-    end
+    let%lwt count = Channel.size chan () in
+    ignore_result (Logger.debug_lazy (lazy (
+        Printf.sprintf "Counted: %s (size: %Ld) from %s" chan_name count listen_name
+      )));
+    return (Ok count)
 
 let rec health router ~listen_name ~chan_name ~mode =
   match chan_name with

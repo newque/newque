@@ -1,6 +1,7 @@
 var fs = require('fs')
 var spawn = require('child_process').spawn
 var exec = require('child_process').exec
+var request = require('superagent')
 
 var newquePath = exports.newquePath = __dirname + '/../newque.native'
 var confDir = __dirname + '/conf'
@@ -139,6 +140,7 @@ exports.setupEnvironment = function (persistence, persistenceSettings, raw) {
   .then(() => readDirectory(confDir + '/channels'))
   .then(function (channels) {
     return Promise.all(channels.map(function (channel) {
+      var channelName = channel.split('.json')[0]
       return readFile(confDir + '/channels/' + channel)
       .then(function (contents) {
         var parsed = JSON.parse(contents.toString('utf8'))
@@ -151,7 +153,26 @@ exports.setupEnvironment = function (persistence, persistenceSettings, raw) {
             parsed.persistenceSettings[key] = persistenceSettings[key]
           }
         }
-        return writeFile(runningDir + '/conf/channels/' + channel, JSON.stringify(parsed, null, 2))
+        if (type === 'elasticsearch') {
+          parsed.readSettings = null
+          parsed.persistenceSettings.index = channelName
+          var promise = new Promise(function (resolve, reject) {
+            request.post(persistenceSettings.baseUrls[0] + '/' + channelName.toLowerCase())
+            .end(function (err, result) {
+              if (err) {
+                console.log(result && result.res ? result.res.statusCode + ' ' + result.res.text : '')
+                reject(err)
+              }
+              resolve()
+            })
+          })
+        } else {
+          var promise = Promise.resolve()
+        }
+        var serialized = JSON.stringify(parsed, null, 2)
+
+        return promise
+        .then(() => writeFile(runningDir + '/conf/channels/' + channel, serialized))
       })
     }))
   })
@@ -190,6 +211,29 @@ var spawnExecutable = exports.spawnExecutable = function (execLocation, dirLocat
   return p
 }
 
-exports.teardown = function (processes) {
-  processes.forEach((p) => p.kill())
+exports.teardown = function (processes, persistence, persistenceSettings) {
+  // Reset all the indices
+  if (persistence === 'elasticsearch') {
+    var promise = readDirectory(confDir + '/channels')
+    .then(function (channels) {
+      var indexList = channels.map(c => c.toLowerCase().split('.json')[0]).join(',')
+      return new Promise(function (resolve, reject) {
+        request.delete(persistenceSettings.baseUrls[0] + '/' + indexList)
+        .end(function (err, result) {
+          if (err) {
+            console.log(result && result.res ? result.res.statusCode + ' ' + result.res.text : '')
+            reject (err)
+          }
+          resolve()
+        })
+      })
+    })
+  } else {
+    var promise = Promise.resolve()
+  }
+
+  return promise
+  .then(function () {
+    processes.forEach((p) => p.kill())
+  })
 }

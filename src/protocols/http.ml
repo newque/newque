@@ -232,7 +232,9 @@ let handler http routing ((ch, _) as conn) req body =
         Server.respond_string ~headers ~status ~body ()
       | Ok (None, _) -> fail_with "Invalid routing"
     end
-  with ex -> handle_errors 500 [Exn.to_string ex]
+  with
+  | Failure str -> handle_errors 500 [str]
+  | ex -> handle_errors 500 [Exn.to_string ex]
 
 let open_sockets = Int.Table.create ~size:5 ()
 

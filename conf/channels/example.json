@@ -7,9 +7,7 @@
     "type": "zzz"
   },
   "acknowledgement": "saved",
-  "readSettings": {
-    "onlyOnce": true
-  },
+  "readSettings": null,
   "writeSettings": {
     "copyToChannels": [],
     "format":"plaintext"

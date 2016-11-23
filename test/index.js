@@ -28,8 +28,8 @@ Proc.pathExists(Proc.newquePath)
   }
   var esSettings = {
     baseUrls: ['http://127.0.0.1:9200'],
-    index: 'analytics-test',
-    type: 'mydata'
+    // index is configured in the setup
+    type: 'test-type'
   }
 
   require('./sections/count')('disk', {})
@@ -37,6 +37,7 @@ Proc.pathExists(Proc.newquePath)
   require('./sections/count')('http json', httpJsonSettings)
   require('./sections/count')('http plaintext', httpPlaintextSettings)
   require('./sections/count')('disk', {}, true)
+  require('./sections/count')('elasticsearch', esSettings, true)
 
   require('./sections/push')('disk', {})
   require('./sections/push')('memory', {})
@@ -45,6 +46,7 @@ Proc.pathExists(Proc.newquePath)
   require('./sections/push')('http json', httpJsonSettings, true)
   require('./sections/push')('http plaintext', httpPlaintextSettings, true)
   require('./sections/push')('disk', {}, true)
+  require('./sections/push')('elasticsearch', esSettings, true)
 
   require('./sections/pull')('disk', {})
   require('./sections/pull')('memory', {})

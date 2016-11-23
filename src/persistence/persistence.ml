@@ -156,10 +156,16 @@ module Make (Argument: Argument) : S = struct
       Util.stream_map_array_s raw_stream ~batch_size ~mapper:fast_parse_exn
     ) instance max_read mode only_once
 
+  (******************
+     SIZE
+   ********************)
   let size () =
     let%lwt instance = instance in
     Argument.IO.size instance
 
+  (******************
+     HEALTH
+   ********************)
   let health () =
     let%lwt instance = instance in
     Argument.IO.health instance
