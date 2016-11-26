@@ -8,4 +8,4 @@ val parse_channels : Config_t.config_newque -> string -> Channel.t list Lwt.t
 
 val apply_channels : Watcher.t -> Channel.t list -> (unit, string list) Result.t
 
-val create_admin_server : Watcher.t -> Config_t.config_newque -> (Http.t * string) Lwt.t
+val create_admin_server : Watcher.t -> Config_t.config_newque -> (Http_prot.t * string) Lwt.t

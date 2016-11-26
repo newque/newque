@@ -115,6 +115,7 @@ exports.setupEnvironment = function (persistence, persistenceSettings, raw) {
   var remoteType = persistence.split(' ')[1]
   return rm(remoteRunningDir)
   .then(() => createDir(remoteRunningDir))
+  .then(() => copyDir(confDir + '/channels', remoteConfDir + '/channels'))
   .then(() => copyDir(remoteConfDir, remoteRunningDir + '/conf'))
   .then(() => readDirectory(confDir + '/channels'))
   .then(function (channels) {

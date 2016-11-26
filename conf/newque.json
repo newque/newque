@@ -1,5 +1,5 @@
 {
-  "logLevel": "debug", // debug, info, notice, warning, error, fatal
+  "logLevel": "debug",
   "admin": {
     "host": "0.0.0.0",
     "port": 8001
@@ -10,8 +10,15 @@
       "name": "http8000",
       "host": "0.0.0.0",
       "port": 8000,
+      "protocolSettings": {}
+    },
+    {
+      "protocol": "zmq",
+      "name": "zmq8005",
+      "host": "0.0.0.0",
+      "port": 8005,
       "protocolSettings": {
-        "backlog": 20 // Optional. Default 20. "backlog" for the listen(2) syscall
+        "concurrency": 20
       }
     }
   ]

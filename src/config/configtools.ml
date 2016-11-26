@@ -65,13 +65,13 @@ let create_admin_server watcher config =
     name = "newque_admin";
     host = config.admin.a_host;
     port = config.admin.a_port;
-    listener_settings = Http_proto admin_spec_conf;
+    protocol_settings = Config_http_prot admin_spec_conf;
   } in
   let%lwt admin_server =
-    let open Http in
+    let open Routing in
     let table = (Watcher.router watcher).Router.table in
     let admin = Admin { table } in
-    start admin_conf admin_spec_conf admin
+    Http_prot.start admin_conf admin_spec_conf admin
   in
   let (_, wakener) = wait () in
   let open Listener in

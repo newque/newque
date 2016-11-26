@@ -18,6 +18,7 @@ test/running
 test/newque
 test/logs
 test/remoteRunning
+test/remoteConf/channels
 
 conduit.0.12.0
 

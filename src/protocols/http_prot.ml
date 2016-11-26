@@ -9,7 +9,7 @@ type t = {
   generic: Config_t.config_listener;
   specific: Config_t.config_http_settings;
   sock: Lwt_unix.file_descr;
-  close: unit Lwt.u;
+  stop_w: unit Lwt.u;
   ctx: Cohttp_lwt_unix_net.ctx;
   thread: unit Lwt.t;
 }
@@ -25,45 +25,6 @@ let sexp_of_t http =
       Sexp.Atom (Int.to_string http.specific.backlog);
     ];
   ]
-
-type admin_routing = {
-  (* Channels (accessed by name) by listener.id *)
-  table: Channel.t String.Table.t String.Table.t;
-}
-
-type standard_routing = {
-  push: (
-    chan_name:string ->
-    id_header:string option ->
-    mode:Mode.Write.t ->
-    string Lwt_stream.t ->
-    (int option, string list) Result.t Lwt.t);
-  read_slice: (
-    chan_name:string ->
-    mode:Mode.Read.t ->
-    limit:int64 ->
-    (Persistence.slice * Channel.t, string list) Result.t Lwt.t);
-  read_stream: (
-    chan_name:string ->
-    mode:Mode.Read.t ->
-    (string Lwt_stream.t * Channel.t, string list) Result.t Lwt.t);
-  count: (
-    chan_name:string ->
-    mode:Mode.Count.t ->
-    (int64, string list) Result.t Lwt.t);
-  delete: (
-    chan_name:string ->
-    mode:Mode.Delete.t ->
-    (unit, string list) Result.t Lwt.t);
-  health: (
-    chan_name:string option ->
-    mode:Mode.Health.t ->
-    string list Lwt.t);
-}
-
-type http_routing =
-  | Admin of admin_routing
-  | Standard of standard_routing
 
 let default_filter _ req _ =
   let path = Uri.path (Request.uri req) in
@@ -118,6 +79,7 @@ let handle_errors code errors =
   Server.respond_string ~headers ~status ~body ()
 
 let handler http routing ((ch, _) as conn) req body =
+  let open Routing in
   (* async (fun () -> Logger.warning_lazy (lazy (Util.string_of_sexp (Request.sexp_of_t req)))); *)
   let%lwt http = http in
   try%lwt
@@ -275,8 +237,9 @@ let make_socket ~backlog host port =
   Lwt_unix.set_close_on_exec sock;
   return sock
 
-let start generic specific http_routing_kind =
+let start generic specific routing =
   let open Config_t in
+  let open Routing in
   let thunk () = make_socket ~backlog:specific.backlog generic.host generic.port in
   let%lwt sock = match Int.Table.find_and_remove open_sockets generic.port with
     | Some s ->
@@ -290,20 +253,20 @@ let start generic specific http_routing_kind =
   let ctx = Cohttp_lwt_unix_net.init ~ctx () in
   let mode = `TCP (`Socket sock) in
   let (instance_t, instance_w) = wait () in
-  let conf = match http_routing_kind with
+  let conf = match routing with
     | Standard routing -> Server.make ~callback:(handler instance_t routing) ()
     | Admin {table} -> Server.make ~callback:(Admin.handler table) ()
   in
-  let (stop, close) = wait () in
-  let thread = Server.create ~stop ~ctx ~mode conf in
-  let instance = {generic; specific; sock; close; ctx; thread;} in
+  let (stop_t, stop_w) = wait () in
+  let thread = Server.create ~stop:stop_t ~ctx ~mode conf in
+  let instance = {generic; specific; sock; stop_w; ctx; thread;} in
   wakeup instance_w instance;
   return instance
 
 let stop http =
   let open Config_t in
-  wakeup http.close ();
-  let%lwt () = waiter_of_wakener http.close in
+  wakeup http.stop_w ();
+  let%lwt () = waiter_of_wakener http.stop_w in
   Int.Table.add_exn open_sockets ~key:http.generic.port ~data:http.sock;
   return_unit
 

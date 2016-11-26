@@ -4,10 +4,16 @@
 
 open Core.Std
 open Lwt
-open Http
+open Http_prot
 
 let () = Lwt_engine.set ~transfer:true ~destroy:true (new Lwt_engine.libev)
-let () = Lwt.async_exception_hook := fun ex -> print_endline (Printf.sprintf "UNCAUGHT EXCEPTION: %s" (Exn.to_string ex))
+let () = Lwt.async_exception_hook := fun ex ->
+    let str = match ex with
+      | Failure str -> str
+      | ex -> Exn.to_string ex
+    in
+    print_endline (Printf.sprintf "UNCAUGHT EXCEPTION: %s" str
+    )
 let () = Lwt_preemptive.init 4 25 (fun str -> async (fun () -> Log.stdout Lwt_log.Info str))
 
 (* Only for startup, replaced by newque.json settings later *)
@@ -48,12 +54,24 @@ let start config_path =
   let result = Configtools.apply_channels watcher channels in
   let%lwt () = match result with
     | Ok () ->
-      Printf.sprintf "Current router state: %s"
-        (Watcher.router watcher |> Router.sexp_of_t |> Util.string_of_sexp)
-      |> Logger.debug
+      let%lwt () = Logger.info "Server started" in
+      let pairs = List.map (Int.Table.to_alist (Watcher.table watcher)) ~f:(fun (port, listener) ->
+          let name = listener.Listener.id in
+          let channels = match String.Table.find (Watcher.router watcher).Router.table name with
+            | None -> []
+            | Some chan_table -> String.Table.keys chan_table
+          in
+          name, `Assoc [
+            "protocol", `String (Listener.get_prot listener);
+            "port", `Int port;
+            "channels", `List (List.map channels ~f:(fun s -> `String s))
+          ]
+        )
+      in
+      print_endline (Yojson.Basic.pretty_to_string (`Assoc pairs));
+      return_unit
     | Error ll ->
-      String.concat ~sep:", " ll
-      |> Logger.error
+      Logger.error (String.concat ~sep:", " ll)
   in
 
   let%lwt () = admin_server.thread in

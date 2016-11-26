@@ -1,17 +1,13 @@
 {
-  "listeners": ["http8000"],
-  "persistence": "elasticsearch",
-  "persistenceSettings": {
-    "baseUrls": ["http://127.0.0.1:9200"],
-    "index": "abcdef",
-    "type": "zzz"
-  },
+  "listeners": ["http8000", "zmq8005"],
+  "persistence": "disk",
   "acknowledgement": "saved",
-  "readSettings": null,
+  "readSettings": {
+    "onlyOnce": true
+  },
   "writeSettings": {
-    "copyToChannels": [],
-    "format":"plaintext"
+    "copyToChannels": []
   },
   "raw": true,
-  "separator":"-"
+  "emptiable": false
 }

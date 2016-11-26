@@ -24,19 +24,19 @@ type config_http_settings = {
   ~backlog <ocaml default="20">: int;
 }
 type config_zmq_settings = {
-  something: string;
+  ~concurrency <ocaml default="20">: int;
 }
 
 type config_proto = [
-  | Http_proto <json name="http"> of config_http_settings
-  | Zmq_proto <json name="zmq"> of config_zmq_settings
+  | Config_http_prot <json name="http"> of config_http_settings
+  | Config_zmq_prot <json name="zmq"> of config_zmq_settings
 ] <ocaml repr="classic">
 
 type config_listener = {
   name: string;
   host: string;
   port: int;
-  listener_settings <json name="protocolSettings" tag_field="protocol">: config_proto;
+  protocol_settings <json name="protocolSettings" tag_field="protocol">: config_proto;
 }
 
 

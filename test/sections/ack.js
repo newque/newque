@@ -1,9 +1,9 @@
 module.exports = function (persistence, persistenceSettings, raw) {
-  var delay = persistence === 'elasticsearch' ? 1100 : 0
+  var delay = persistence === 'elasticsearch' ? C.esDelay : 0
   describe('Ack ' + persistence + (!!raw ? ' raw' : ''), function () {
     var processes = []
     before(function () {
-      this.timeout(5000)
+      this.timeout(C.setupTimeout)
       return Proc.setupEnvironment(persistence, persistenceSettings, raw)
       .then(function (procs) {
         procs.forEach((p) => processes.push(p))
