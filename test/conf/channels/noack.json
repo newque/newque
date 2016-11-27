@@ -1,13 +1,13 @@
 {
-  "listeners": ["http8000"],
+  "listeners": ["http8000","zmq8005"],
   "persistence": "disk",
   "readSettings": {
-    "format":"plaintext",
+    "httpFormat":"plaintext",
     "onlyOnce": false
   },
   "writeSettings": {
     "acknowledgement": "none",
-    "format": "plaintext",
+    "httpFormat": "plaintext",
     "copyToChannels": []
   },
   "emptiable": true

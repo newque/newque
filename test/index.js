@@ -74,5 +74,6 @@ Proc.pathExists(Proc.newquePath)
   require('./sections/health')('http json', httpJsonSettings)
   require('./sections/health')('http plaintext', httpPlaintextSettings)
   require('./sections/health')('elasticsearch', esSettings, true)
+
   run()
 })

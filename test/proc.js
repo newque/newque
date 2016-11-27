@@ -125,10 +125,10 @@ exports.setupEnvironment = function (persistence, persistenceSettings, raw) {
         var parsed = JSON.parse(contents.toString('utf8'))
         parsed.persistence = 'memory'
         if (parsed.readSettings) {
-          parsed.readSettings.format = remoteType
+          parsed.readSettings.httpFormat = remoteType
         }
         if (parsed.writeSettings) {
-          parsed.writeSettings.format = remoteType
+          parsed.writeSettings.httpFormat = remoteType
           delete parsed.writeSettings.batching
         }
         return writeFile(remoteRunningDir + '/conf/channels/' + channel, JSON.stringify(parsed, null, 2))
