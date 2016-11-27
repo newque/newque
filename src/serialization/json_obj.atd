@@ -28,7 +28,7 @@ type errors = {
 }
 
 (* Request objects *)
-type message = {
+type input = {
   ~atomic <ocaml default="false">: bool;
   messages: string list <ocaml repr="array">;
   ?ids: string list <ocaml repr="array"> option;

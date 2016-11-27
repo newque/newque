@@ -10,13 +10,31 @@ val register_listeners : t -> Listener.t list -> (unit, string list) Result.t
 
 val register_channels : t -> Channel.t list -> (unit, string list) Result.t
 
-val write :
+val write_shared :
+  t ->
+  listen_name:string ->
+  chan:Channel.t ->
+  write:Write_settings.t ->
+  msgs:Message.t ->
+  ids:Id.t array ->
+  (int option, string list) Result.t Lwt.t
+
+val write_http :
   t ->
   listen_name:string ->
   chan_name:string ->
   id_header:string option ->
   mode:Mode.Write.t ->
   string Lwt_stream.t ->
+  (int option, string list) Result.t Lwt.t
+
+val write_zmq :
+  t ->
+  listen_name:string ->
+  chan_name:string ->
+  ids:string array ->
+  msgs:string array ->
+  atomic:bool ->
   (int option, string list) Result.t Lwt.t
 
 val read_slice :

@@ -1,0 +1,19 @@
+message Write {
+  repeated bytes errors = 1;
+  optional int32 saved = 2 [(ocaml_type) = int_t];
+}
+
+message Input {
+
+  message Write_Action {
+    required bool atomic = 1;
+    repeated bytes ids = 2;
+  }
+
+  required bytes channel = 1;
+  oneof action {
+    Write_Action write = 11;
+    bytes count = 12;
+  }
+
+}

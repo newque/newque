@@ -101,7 +101,6 @@ module Make (Argument: Argument) : S = struct
 
   let push msgs ids =
     let msgs = fast_serialize msgs in
-    let ids = Array.map ~f:Id.to_string ids in
     fast_push msgs ids
 
   (******************

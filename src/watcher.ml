@@ -20,7 +20,8 @@ let make_standard_routing watcher listen_name =
   let open Routing in
   (* Partially apply the routing function *)
   Standard {
-    push = Router.write watcher.router ~listen_name;
+    write_http = Router.write_http watcher.router ~listen_name;
+    write_zmq = Router.write_zmq watcher.router ~listen_name;
     read_slice = Router.read_slice watcher.router ~listen_name;
     read_stream = Router.read_stream watcher.router ~listen_name;
     count = Router.count watcher.router ~listen_name;

@@ -25,6 +25,8 @@ type config_http_settings = {
 }
 type config_zmq_settings = {
   ~concurrency <ocaml default="20">: int;
+  ~receive_hwm <json name="receiveHighWaterMark"> <ocaml default="5000">: int;
+  ~send_hwm <json name="sendHighWaterMark"> <ocaml default="5000">: int;
 }
 
 type config_proto = [

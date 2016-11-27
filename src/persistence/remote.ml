@@ -41,7 +41,7 @@ module M = struct
       | Io_format.Plaintext ->
         String.concat_array ~sep:instance.chan_separator (Array.map ~f:B64.encode msgs)
       | Io_format.Json ->
-        string_of_message { atomic = false; messages = msgs; ids = Some ids; }
+        string_of_input { atomic = false; messages = msgs; ids = Some ids; }
     in
     let body = Cohttp_lwt_body.of_string payload in
 

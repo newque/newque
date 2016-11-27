@@ -21,7 +21,3 @@ let array_of_string_opt ?(sep=default_separator) ~mode ~length_none opt =
           | false -> Ok ids
         end
     end
-
-let to_string x = x
-
-let of_string x = x

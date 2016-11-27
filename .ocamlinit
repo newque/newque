@@ -31,6 +31,8 @@ open Cohttp_lwt_unix
 #require "uuidm"
 #require "sqlite3"
 
+#require "ocaml-protoc"
+
 #mod_use "tmp/util.ml"
 #mod_use "tmp/fs.ml"
 #mod_use "tmp/log.ml"
@@ -54,7 +56,10 @@ open Cohttp_lwt_unix
 #mod_use "tmp/elasticsearch.ml"
 #mod_use "tmp/channel.ml"
 #mod_use "tmp/admin.ml"
-#mod_use "tmp/http.ml"
+#mod_use "tmp/routing.ml"
+#mod_use "tmp/http_prot.ml"
+#mod_use "tmp/zmq_obj_pb.ml"
+#mod_use "tmp/zmq_prot.ml"
 #mod_use "tmp/listener.ml"
 #mod_use "tmp/router.ml"
 #mod_use "tmp/watcher.ml"

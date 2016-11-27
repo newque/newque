@@ -24,7 +24,7 @@ let of_string ~format ~mode ~sep str =
   match format with
   | Json ->
     let open Json_obj_j in
-    begin match Util.parse_json message_of_string str with
+    begin match Util.parse_json input_of_string str with
       | (Error _) as err -> err
       | Ok { atomic; messages } -> Ok (of_string_array ~atomic messages)
     end

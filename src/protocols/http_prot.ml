@@ -90,11 +90,12 @@ let handler http routing ((ch, _) as conn) req body =
         let stream = Cohttp_lwt_body.to_stream body in
         let id_header = Header.get (Request.headers req) Header_names.id in
         let%lwt (code, errors, saved) =
-          begin match%lwt routing.push ~chan_name ~id_header ~mode stream with
+          begin match%lwt routing.write_http ~chan_name ~id_header ~mode stream with
             | Ok ((Some _) as count) -> return (201, [], count)
             | Ok None -> return (202, [], None)
             | Error errors -> return (400, errors, (Some 0))
-          end in
+          end
+        in
         let headers = json_response_header in
         let status = Code.status_of_code code in
         let body = Json_obj_j.(string_of_write { code; errors; saved; }) in

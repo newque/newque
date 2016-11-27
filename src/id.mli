@@ -1,6 +1,8 @@
 open Core.Std
 
-type t
+type t = string
+
+val uuid : unit -> string
 
 val default_separator : string
 
@@ -11,7 +13,3 @@ val array_of_string_opt :
   string option ->
   (t array, string) Result.t
 
-val to_string : t -> string
-val of_string : string -> t
-
-val uuid : unit -> string

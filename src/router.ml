@@ -56,7 +56,47 @@ let find_chan router ~listen_name ~chan_name =
       | Some chan -> Ok chan
     end
 
-let write router ~listen_name ~chan_name ~id_header ~mode stream =
+(******************
+   WRITE
+ ******************)
+
+(* Actually write to the channel *)
+let write_shared router ~listen_name ~chan ~write ~msgs ~ids =
+  let open Channel in
+  let open Write_settings in
+  begin match ((Message.length ~raw:chan.raw msgs), (Array.length ids)) with
+    | (msgs_l, ids_l) when Int.(<>) msgs_l ids_l -> return (Error [Printf.sprintf "Length mismatch between messages (%d) and IDs (%d)" msgs_l ids_l])
+    | _ ->
+      let save_t =
+        let%lwt count = Channel.push chan msgs ids in
+        ignore_result (Logger.debug_lazy (lazy (
+            Printf.sprintf "Wrote: (length: %d) %s from %s" count chan.name listen_name
+          )));
+        (* Copy to other channels if needed. *)
+        let%lwt () = Lwt_list.iter_p (fun copy_chan_name ->
+            begin match find_chan router ~listen_name:Listener.(private_listener.id) ~chan_name:copy_chan_name with
+              | Error _ -> Logger.warning_lazy (lazy (Printf.sprintf "Cannot copy from %s to %s because %s doesn't exist." chan.name copy_chan_name copy_chan_name))
+              | Ok copy_chan ->
+                let%lwt copy_count = Channel.push copy_chan msgs ids in
+                if copy_count <> count then async (fun () ->
+                    Logger.warning_lazy (lazy (Printf.sprintf "Mismatch while copying from %s (wrote %d) to %s (wrote %d). Possible ID collision(s)." chan.name count copy_chan_name copy_count)
+                    ));
+                return_unit
+            end
+          ) write.copy_to in
+        return (Ok (Some count))
+      in
+      begin match write.ack with
+        | Saved -> save_t
+        | Instant -> return (Ok None)
+      end
+  end
+
+(*
+  The HTTP server doesn't know about the channel settings, so there's no point
+  parsing the entire body for nothing if the channel isn't writeable (for example).
+*)
+let write_http router ~listen_name ~chan_name ~id_header ~mode stream =
   match find_chan router ~listen_name ~chan_name with
   | (Error _) as err -> return err
   | Ok chan ->
@@ -72,7 +112,7 @@ let write router ~listen_name ~chan_name ~id_header ~mode stream =
           | Io_format.Json ->
             let%lwt str = Util.stream_to_string ~buffer_size:chan.buffer_size stream in
             let open Json_obj_j in
-            begin match Util.parse_json message_of_string str with
+            begin match Util.parse_json input_of_string str with
               | (Error _) as err ->
                 let dummy = Message.of_string_array ~atomic:false [||] in
                 return (dummy, err)
@@ -80,7 +120,7 @@ let write router ~listen_name ~chan_name ~id_header ~mode stream =
                 let msgs = Message.of_string_array ~atomic messages in
                 let mode = if Bool.(=) atomic true then `Atomic else `Multiple in
                 begin match ids with
-                  | Some ids -> return (msgs, Ok (Array.map ~f:Id.of_string ids))
+                  | Some ids -> return (msgs, Ok ids)
                   | None ->
                     let length_none = Message.length ~raw:chan.raw msgs in
                     return (msgs, (Id.array_of_string_opt ~mode ~length_none None))
@@ -95,37 +135,25 @@ let write router ~listen_name ~chan_name ~id_header ~mode stream =
         in
         begin match parsed with
           | (_, Error str) -> return (Error [str])
-          | (msgs, Ok ids) ->
-            begin match ((Message.length ~raw:chan.raw msgs), (Array.length ids)) with
-              | (msgs_l, ids_l) when Int.(<>) msgs_l ids_l -> return (Error [Printf.sprintf "Length mismatch between messages (%d) and IDs (%d)" msgs_l ids_l])
-              | _ ->
-                (* Now write to the channel *)
-                let save_t =
-                  let%lwt count = Channel.push chan msgs ids in
-                  ignore_result (Logger.debug_lazy (lazy (
-                      Printf.sprintf "Wrote: %s (length: %d) %s from %s" (Mode.Write.to_string mode) count chan_name listen_name
-                    )));
-                  (* Copy to other channels if needed. *)
-                  let%lwt () = Lwt_list.iter_p (fun copy_chan_name ->
-                      begin match find_chan router ~listen_name:Listener.(private_listener.id) ~chan_name:copy_chan_name with
-                        | Error _ -> Logger.warning_lazy (lazy (Printf.sprintf "Cannot copy from %s to %s because %s doesn't exist." chan_name copy_chan_name copy_chan_name))
-                        | Ok copy_chan ->
-                          let%lwt copy_count = Channel.push copy_chan msgs ids in
-                          if copy_count <> count then async (fun () ->
-                              Logger.warning_lazy (lazy (Printf.sprintf "Mismatch while copying from %s (wrote %d) to %s (wrote %d). Possible ID collision(s)." chan_name count copy_chan_name copy_count)
-                              ));
-                          return_unit
-                      end
-                    ) write.copy_to in
-                  return (Ok (Some count))
-                in
-                begin match write.ack with
-                  | Saved -> save_t
-                  | Instant -> return (Ok None)
-                end
-            end
+          | (msgs, Ok ids) -> write_shared router ~listen_name ~chan ~write ~msgs ~ids
         end
     end
+
+let write_zmq router ~listen_name ~chan_name ~ids ~msgs ~atomic =
+  match find_chan router ~listen_name ~chan_name with
+  | (Error _) as err -> return err
+  | Ok chan ->
+    let open Channel in
+    begin match chan.write with
+      | None -> return (Error [Printf.sprintf "Channel %s doesn't support Writing to it." chan_name])
+      | Some write ->
+        let msgs = Message.of_string_array ~atomic msgs in
+        write_shared router ~listen_name ~chan ~write ~msgs ~ids
+    end
+
+(******************
+   READ
+ ******************)
 
 let read_slice router ~listen_name ~chan_name ~mode ~limit =
   match find_chan router ~listen_name ~chan_name with
@@ -155,6 +183,10 @@ let read_stream router ~listen_name ~chan_name ~mode =
         return (Ok (stream, chan))
     end
 
+(******************
+   COUNT
+ ******************)
+
 let count router ~listen_name ~chan_name ~mode =
   match find_chan router ~listen_name ~chan_name with
   | (Error _) as err -> return err
@@ -164,6 +196,10 @@ let count router ~listen_name ~chan_name ~mode =
         Printf.sprintf "Counted: %s (size: %Ld) from %s" chan_name count listen_name
       )));
     return (Ok count)
+
+(******************
+   DELETE
+ ******************)
 
 let delete router ~listen_name ~chan_name ~mode =
   match find_chan router ~listen_name ~chan_name with
@@ -178,6 +214,10 @@ let delete router ~listen_name ~chan_name ~mode =
           )));
         return Result.ok_unit
     end
+
+(******************
+   HEALTH
+ ******************)
 
 let rec health router ~listen_name ~chan_name ~mode =
   match chan_name with
