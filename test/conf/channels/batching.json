@@ -1,6 +1,6 @@
 {
   "listeners": ["http8000","zmq8005"],
-  "persistence": "disk",
+  "backend": "disk",
   "readSettings": {
     "onlyOnce": false
   },

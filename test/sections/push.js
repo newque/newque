@@ -1,10 +1,10 @@
-module.exports = function (persistence, persistenceSettings, raw) {
-  var delay = persistence === 'elasticsearch' ? C.esDelay : 0
-  describe('Push ' + persistence + (!!raw ? ' raw' : ''), function () {
+module.exports = function (backend, backendSettings, raw) {
+  var delay = backend === 'elasticsearch' ? C.esDelay : 0
+  describe('Push ' + backend + (!!raw ? ' raw' : ''), function () {
     var processes = []
     before(function () {
       this.timeout(C.setupTimeout)
-      return Proc.setupEnvironment(persistence, persistenceSettings, raw)
+      return Proc.setupEnvironment(backend, backendSettings, raw)
       .then(function (procs) {
         procs.forEach((p) => processes.push(p))
         return Promise.delay(C.spawnDelay * processes.length)
@@ -12,7 +12,7 @@ module.exports = function (persistence, persistenceSettings, raw) {
     })
 
     describe('Single', function () {
-      if (persistence !== 'elasticsearch') {
+      if (backend !== 'elasticsearch') {
         it('No header', function () {
           var buf = 'abc\ndef'
           return Fn.call('POST', 8000, '/v1/example', buf)
@@ -64,7 +64,7 @@ module.exports = function (persistence, persistenceSettings, raw) {
         .then(Fn.shouldHaveWritten(4))
       })
 
-      if (persistence !== 'elasticsearch') {
+      if (backend !== 'elasticsearch') {
         it('No data', function () {
           var buf = ''
           return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'multiple']])
@@ -110,7 +110,7 @@ module.exports = function (persistence, persistenceSettings, raw) {
         .then(Fn.shouldHaveWritten(1))
       })
 
-      if (persistence !== 'elasticsearch') {
+      if (backend !== 'elasticsearch') {
         it('Without separator, single mode', function () {
           var buf = 'A abc\nA def\nA ghi\nA jkl'
           return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'single'], [C.idHeader, 'id1']])
@@ -176,7 +176,7 @@ module.exports = function (persistence, persistenceSettings, raw) {
         .then(Fn.shouldFail(400))
       })
 
-      if (!raw && persistence !== 'elasticsearch') {
+      if (!raw && backend !== 'elasticsearch') {
         it('With separator, atomic', function () {
           var buf = 'H abc\nH def\nH ghi'
           return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'atomic'], [C.idHeader, 'id60,id61,id62,']])
@@ -188,7 +188,7 @@ module.exports = function (persistence, persistenceSettings, raw) {
         })
       }
 
-      if (persistence !== 'elasticsearch') {
+      if (backend !== 'elasticsearch') {
         it('With separator, skip existing', function () {
           var buf = 'I abc\nI def\nI ghi'
           return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'multiple'], [C.idHeader, 'id70,id70,id1']])
@@ -370,7 +370,7 @@ module.exports = function (persistence, persistenceSettings, raw) {
     })
 
     after(function () {
-      return Proc.teardown(processes, persistence, persistenceSettings)
+      return Proc.teardown(processes, backend, backendSettings)
     })
   })
 }

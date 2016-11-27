@@ -84,8 +84,8 @@ type config_batching = {
 } <ocaml field_prefix="c_">
 
 type config_channel_write = {
-  ~ack <json name="acknowledgement"><ocaml default="C_saved">: config_channel_acknowledgement;
   ~http_format <json name="httpFormat"> <ocaml default="C_json">: config_channel_format;
+  ~ack <json name="acknowledgement"><ocaml default="C_saved">: config_channel_acknowledgement;
   copy_to <json name="copyToChannels">: string list;
   ?batching: config_batching nullable;
 } <ocaml field_prefix="c_">
@@ -99,7 +99,7 @@ type config_channel_read = {
 (* TODO: Validate that the separators are non-empty *)
 type config_channel = {
   endpoint_names <json name="listeners">: string list;
-  persistence_settings <json name="persistenceSettings" tag_field="persistence">: config_persistence;
+  persistence_settings <json name="backendSettings" tag_field="backend">: config_persistence;
   emptiable: bool;
   ~raw <ocaml default="false">: bool;
   read_settings <json name="readSettings">: config_channel_read nullable;

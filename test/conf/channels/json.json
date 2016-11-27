@@ -1,6 +1,6 @@
 {
   "listeners": ["http8000"],
-  "persistence": "disk",
+  "backend": "disk",
   "readSettings": {
     "httpFormat":"json",
     "onlyOnce": false

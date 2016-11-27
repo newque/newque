@@ -110,9 +110,9 @@ var getEnvironment = function () {
   })
 }
 
-exports.setupEnvironment = function (persistence, persistenceSettings, raw) {
-  var type = persistence.split(' ')[0]
-  var remoteType = persistence.split(' ')[1]
+exports.setupEnvironment = function (backend, backendSettings, raw) {
+  var type = backend.split(' ')[0]
+  var remoteType = backend.split(' ')[1]
   return rm(remoteRunningDir)
   .then(() => createDir(remoteRunningDir))
   .then(() => copyDir(confDir + '/channels', remoteConfDir + '/channels'))
@@ -123,7 +123,7 @@ exports.setupEnvironment = function (persistence, persistenceSettings, raw) {
       return readFile(confDir + '/channels/' + channel)
       .then(function (contents) {
         var parsed = JSON.parse(contents.toString('utf8'))
-        parsed.persistence = 'memory'
+        parsed.backend = 'memory'
         if (parsed.readSettings) {
           parsed.readSettings.httpFormat = remoteType
         }
@@ -145,21 +145,21 @@ exports.setupEnvironment = function (persistence, persistenceSettings, raw) {
       return readFile(confDir + '/channels/' + channel)
       .then(function (contents) {
         var parsed = JSON.parse(contents.toString('utf8'))
-        parsed.persistence = type
+        parsed.backend = type
         parsed.raw = !!raw
-        if (parsed.persistenceSettings == null) {
-          parsed.persistenceSettings = persistenceSettings
+        if (parsed.backendSettings == null) {
+          parsed.backendSettings = backendSettings
         } else {
-          for (var key in persistenceSettings) {
-            parsed.persistenceSettings[key] = persistenceSettings[key]
+          for (var key in backendSettings) {
+            parsed.backendSettings[key] = backendSettings[key]
           }
         }
         if (type === 'elasticsearch') {
           parsed.readSettings = null
           parsed.emptiable = false
-          parsed.persistenceSettings.index = channelName
+          parsed.backendSettings.index = channelName
           var promise = new Promise(function (resolve, reject) {
-            request.post(persistenceSettings.baseUrls[0] + '/' + channelName.toLowerCase())
+            request.post(backendSettings.baseUrls[0] + '/' + channelName.toLowerCase())
             .end(function (err, result) {
               if (err) {
                 console.log(result && result.res ? result.res.statusCode + ' ' + result.res.text : '')
@@ -213,12 +213,12 @@ var spawnExecutable = exports.spawnExecutable = function (execLocation, dirLocat
   return p
 }
 
-var clearEs = exports.clearEs = function (persistenceSettings) {
+var clearEs = exports.clearEs = function (backendSettings) {
   return readDirectory(confDir + '/channels')
   .then(function (channels) {
     var indexList = channels.map(c => c.toLowerCase().split('.json')[0]).join(',')
     return new Promise(function (resolve, reject) {
-      request.delete(persistenceSettings.baseUrls[0] + '/' + indexList)
+      request.delete(backendSettings.baseUrls[0] + '/' + indexList)
       .end(function (err, result) {
         resolve() // Always resolve
       })
@@ -226,10 +226,10 @@ var clearEs = exports.clearEs = function (persistenceSettings) {
   })
 }
 
-exports.teardown = function (processes, persistence, persistenceSettings) {
+exports.teardown = function (processes, backend, backendSettings) {
   // Reset all the indices
-  if (persistence === 'elasticsearch') {
-    var promise = clearEs(persistenceSettings)
+  if (backend === 'elasticsearch') {
+    var promise = clearEs(backendSettings)
   } else {
     var promise = Promise.resolve()
   }

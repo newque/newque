@@ -1,10 +1,10 @@
-module.exports = function (persistence, persistenceSettings, raw) {
-  var delay = persistence === 'elasticsearch' ? C.esDelay : 0
-  describe('Health ' + persistence + (!!raw ? ' raw' : ''), function () {
+module.exports = function (backend, backendSettings, raw) {
+  var delay = backend === 'elasticsearch' ? C.esDelay : 0
+  describe('Health ' + backend + (!!raw ? ' raw' : ''), function () {
     var processes = []
     before(function () {
       this.timeout(C.setupTimeout)
-      return Proc.setupEnvironment(persistence, persistenceSettings, raw)
+      return Proc.setupEnvironment(backend, backendSettings, raw)
       .then(function (procs) {
         procs.forEach((p) => processes.push(p))
         return Promise.delay(C.spawnDelay * processes.length)
@@ -31,7 +31,7 @@ module.exports = function (persistence, persistenceSettings, raw) {
     })
 
     after(function () {
-      return Proc.teardown(processes, persistence, persistenceSettings)
+      return Proc.teardown(processes, backend, backendSettings)
     })
   })
 }

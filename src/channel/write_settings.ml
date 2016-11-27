@@ -11,8 +11,8 @@ type batching = {
 } [@@deriving sexp]
 
 type t = {
-  ack: ack;
   http_format: Http_format.t;
+  ack: ack;
   copy_to: string list;
   batching: batching option;
 } [@@deriving sexp]
@@ -31,4 +31,4 @@ let create config_channel_write =
         max_size = conf_batching.c_max_size;
       }
     ) in
-  { ack; http_format; copy_to; batching; }
+  { http_format; ack; copy_to; batching; }
