@@ -10,7 +10,7 @@ type batching = {
 
 type t = {
   ack: ack;
-  format: Io_format.t;
+  http_format: Http_format.t;
   copy_to: string list;
   batching: batching option;
 } [@@deriving sexp]

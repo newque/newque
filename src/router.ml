@@ -109,8 +109,8 @@ let write_http router ~listen_name ~chan_name ~id_header ~mode stream =
 
         (* For JSON: Read the whole body, then generate IDs if needed *)
         (* For Plaintext: Use the stream parser *)
-        let%lwt parsed = begin match write.format with
-          | Io_format.Json ->
+        let%lwt parsed = begin match write.http_format with
+          | Http_format.Json ->
             let%lwt str = Util.stream_to_string ~buffer_size:chan.buffer_size stream in
             let open Json_obj_j in
             begin match Util.parse_sync input_of_string str with
@@ -127,8 +127,8 @@ let write_http router ~listen_name ~chan_name ~id_header ~mode stream =
                     return (msgs, (Id.array_of_string_opt ~mode ~length_none None))
                 end
             end
-          | Io_format.Plaintext ->
-            let%lwt msgs = Message.of_stream ~format:write.format ~mode ~sep:chan.separator ~buffer_size:chan.buffer_size stream in
+          | Http_format.Plaintext ->
+            let%lwt msgs = Message.of_stream ~format:write.http_format ~mode ~sep:chan.separator ~buffer_size:chan.buffer_size stream in
             let length_none = Message.length ~raw:chan.raw msgs in
             let ids = Id.array_of_string_opt ~mode ~length_none id_header in
             return (msgs, ids)

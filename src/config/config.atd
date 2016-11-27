@@ -85,13 +85,13 @@ type config_batching = {
 
 type config_channel_write = {
   ~ack <json name="acknowledgement"><ocaml default="C_saved">: config_channel_acknowledgement;
-  ~format <ocaml default="C_json">: config_channel_format;
+  ~http_format <json name="httpFormat"> <ocaml default="C_json">: config_channel_format;
   copy_to <json name="copyToChannels">: string list;
   ?batching: config_batching nullable;
 } <ocaml field_prefix="c_">
 
 type config_channel_read = {
-  ~format <ocaml default="C_json">: config_channel_format;
+  ~http_format <json name="httpFormat"> <ocaml default="C_json">: config_channel_format;
   ~stream_slice_size <json name="streamSliceSize"> <ocaml default="500">: int;
   only_once <json name="onlyOnce">: bool;
 } <ocaml field_prefix="c_">

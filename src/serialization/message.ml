@@ -20,7 +20,7 @@ let of_string_array ~atomic messages =
   end
 
 let of_string ~format ~mode ~sep str =
-  let open Io_format in
+  let open Http_format in
   match format with
   | Json ->
     let open Json_obj_j in
@@ -38,7 +38,7 @@ let of_string ~format ~mode ~sep str =
     Ok arr
 
 let of_stream ~format ~mode ~sep ~buffer_size stream =
-  let open Io_format in
+  let open Http_format in
   match format with
   | Json ->
     let%lwt str = Util.stream_to_string ~buffer_size stream in

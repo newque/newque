@@ -8,14 +8,14 @@ val of_string_array :
   t
 
 val of_string :
-  format:Io_format.t ->
+  format:Http_format.t ->
   mode:Mode.Write.t ->
   sep:string ->
   string ->
   (t, string) Result.t
 
 val of_stream :
-  format:Io_format.t ->
+  format:Http_format.t ->
   mode:Mode.Write.t ->
   sep:string ->
   buffer_size:int ->

@@ -164,9 +164,9 @@ let handler http routing ((ch, _) as conn) req body =
                     let err = Printf.sprintf "Impossible case: Missing readSettings for channel %s" chan_name in
                     async (fun () -> Logger.error err);
                     Json_obj_j.(string_of_read { code = 500; errors = [err]; messages = [| |]; })
-                  | Some { format = Io_format.Plaintext } ->
+                  | Some { http_format = Http_format.Plaintext } ->
                     String.concat_array ~sep:channel.Channel.separator payloads
-                  | Some { format = Io_format.Json } ->
+                  | Some { http_format = Http_format.Json } ->
                     Json_obj_j.(string_of_read { code; errors = []; messages = payloads; })
                 in
                 let encoding = Transfer.Fixed (Int.to_int64 (String.length body)) in
