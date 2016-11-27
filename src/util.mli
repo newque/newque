@@ -33,8 +33,8 @@ val sexp_of_json_str_exn : string -> Sexp.t
 
 val sexp_of_atdgen : string -> Sexp.t
 
-val parse_json : ('a -> 'b) -> 'a -> ('b, string) Result.t
-val parse_json_lwt : ('a -> 'b) -> 'a -> 'b Lwt.t
+val parse_sync : ('a -> 'b) -> 'a -> ('b, string) Result.t
+val parse_async : ('a -> 'b) -> 'a -> 'b Lwt.t
 
 val header_name_to_int64_opt : Header.t -> string -> int64 option
 

@@ -6,9 +6,11 @@ let uuid () = Uuidm.to_string (Uuidm.v `V4)
 
 let default_separator = ","
 
+let array_random length = Array.init length ~f:(fun _ -> uuid ())
+
 let array_of_string_opt ?(sep=default_separator) ~mode ~length_none opt =
   match opt with
-  | None -> Ok (Array.init length_none ~f:(fun _ -> uuid ()))
+  | None -> Ok (array_random length_none)
   | Some header ->
     if String.is_empty header then
       Error "Message ID header exists, but is empty."

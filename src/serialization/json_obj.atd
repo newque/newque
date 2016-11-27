@@ -1,4 +1,16 @@
-(* Response objects *)
+(* HTTP Request body JSON objects *)
+type input = {
+  ~atomic <ocaml default="false">: bool;
+  messages: string list <ocaml repr="array">;
+  ?ids: string list <ocaml repr="array"> option;
+}
+
+(* HTTP Response body JSON objects *)
+type errors = {
+  code: int;
+  errors: string list;
+}
+
 type write = {
   code: int;
   errors: string list;
@@ -20,18 +32,6 @@ type count = {
 type health = {
   code: int;
   errors: string list;
-}
-
-type errors = {
-  code: int;
-  errors: string list;
-}
-
-(* Request objects *)
-type input = {
-  ~atomic <ocaml default="false">: bool;
-  messages: string list <ocaml repr="array">;
-  ?ids: string list <ocaml repr="array"> option;
 }
 
 

@@ -5,6 +5,24 @@ global.Fn = require('./fn')
 global.C = require('./constants')
 global.Proc = require('./proc')
 
+var httpJsonSettings = {
+  baseUrls: ['http://127.0.0.1:' + C.remotePort + '/v1/'],
+  baseHeaders: [{key: 'secret-token', value: 'supersecret'}],
+  appendChannelName: true
+}
+var httpPlaintextSettings = {
+  baseUrls: ['http://127.0.0.1:' + C.remotePort + '/v1/'],
+  baseHeaders: [{key: 'secret-token', value: 'supersecret'}],
+  appendChannelName: true,
+  remoteInputFormat: 'plaintext',
+  remoteOutputFormat: 'plaintext'
+}
+var esSettings = {
+  baseUrls: ['http://127.0.0.1:9200'],
+  // index is configured in the setup
+  type: 'test-type'
+}
+
 Proc.pathExists(Proc.newquePath)
 .then(function (exists) {
   if (!exists) {
@@ -12,25 +30,8 @@ Proc.pathExists(Proc.newquePath)
   }
 })
 .then(Proc.cleanDirectories)
+.then(Proc.clearEs(esSettings))
 .then(function (server) {
-
-  var httpJsonSettings = {
-    baseUrls: ['http://127.0.0.1:' + C.remotePort + '/v1/'],
-    baseHeaders: [{key: 'secret-token', value: 'supersecret'}],
-    appendChannelName: true
-  }
-  var httpPlaintextSettings = {
-    baseUrls: ['http://127.0.0.1:' + C.remotePort + '/v1/'],
-    baseHeaders: [{key: 'secret-token', value: 'supersecret'}],
-    appendChannelName: true,
-    remoteInputFormat: 'plaintext',
-    remoteOutputFormat: 'plaintext'
-  }
-  var esSettings = {
-    baseUrls: ['http://127.0.0.1:9200'],
-    // index is configured in the setup
-    type: 'test-type'
-  }
 
   require('./sections/count')('disk', {})
   require('./sections/count')('memory', {})

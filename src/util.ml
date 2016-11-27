@@ -119,7 +119,7 @@ let sexp_of_atdgen str =
   | _ -> Sexp.Atom str
 
 let json_error_regexp = Str.regexp "[ \\\n]"
-let parse_json parser str =
+let parse_sync parser str =
   try
     Ok (parser str)
   with
@@ -128,7 +128,7 @@ let parse_json parser str =
     let replaced = Str.global_replace json_error_regexp " " str in
     Error replaced
 
-let parse_json_lwt parser str =
+let parse_async parser str =
   try
     return (parser str)
   with

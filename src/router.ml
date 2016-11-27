@@ -65,6 +65,7 @@ let write_shared router ~listen_name ~chan ~write ~msgs ~ids =
   let open Channel in
   let open Write_settings in
   begin match ((Message.length ~raw:chan.raw msgs), (Array.length ids)) with
+    | (0, _) -> return (Error [Printf.sprintf "Nothing to write."])
     | (msgs_l, ids_l) when Int.(<>) msgs_l ids_l -> return (Error [Printf.sprintf "Length mismatch between messages (%d) and IDs (%d)" msgs_l ids_l])
     | _ ->
       let save_t =
@@ -112,7 +113,7 @@ let write_http router ~listen_name ~chan_name ~id_header ~mode stream =
           | Io_format.Json ->
             let%lwt str = Util.stream_to_string ~buffer_size:chan.buffer_size stream in
             let open Json_obj_j in
-            begin match Util.parse_json input_of_string str with
+            begin match Util.parse_sync input_of_string str with
               | (Error _) as err ->
                 let dummy = Message.of_string_array ~atomic:false [||] in
                 return (dummy, err)
@@ -148,6 +149,7 @@ let write_zmq router ~listen_name ~chan_name ~ids ~msgs ~atomic =
       | None -> return (Error [Printf.sprintf "Channel %s doesn't support Writing to it." chan_name])
       | Some write ->
         let msgs = Message.of_string_array ~atomic msgs in
+        let ids = if Array.is_empty ids then Id.array_random (Message.length ~raw:chan.raw msgs) else ids in
         write_shared router ~listen_name ~chan ~write ~msgs ~ids
     end
 
@@ -162,6 +164,12 @@ let read_slice router ~listen_name ~chan_name ~mode ~limit =
     begin match chan.Channel.read with
       | None -> return (Error [Printf.sprintf "Channel %s doesn't support Reading from it." chan_name])
       | Some read ->
+        let limit = begin match limit with
+          | None -> Int64.max_value
+          | Some x when Int64.is_non_positive x -> Int64.max_value
+          | Some x -> x
+        end
+        in
         let%lwt slice = Channel.pull_slice chan ~mode ~limit ~only_once:read.Read_settings.only_once in
         ignore_result (Logger.debug_lazy (lazy (
             Printf.sprintf "Read: %s (size: %d) from %s" chan_name (Array.length slice.Persistence.payloads) listen_name
@@ -249,7 +257,8 @@ let rec health router ~listen_name ~chan_name ~mode =
               | [] -> "OK"
               | errors -> Printf.sprintf "Errors: %s" (String.concat ~sep:", " errors)
             in
-            Printf.sprintf "Health: %s from %s. Status: %s" chan_name listen_name str
+            let printable_listen_name = if String.is_empty listen_name then "<global>" else listen_name in
+            Printf.sprintf "Health: %s from %s. Status: %s" chan_name printable_listen_name str
           )));
         return result
     end

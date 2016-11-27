@@ -87,9 +87,9 @@ let of_string str : ([Write.t | Read.t], string) Result.t =
         begin match (name, (Util.parse_int64 v)) with
           | "many", Some n -> Ok (`Many n)
           | "after_ts", Some ts -> Ok (`After_ts ts)
-          | _ -> Error str
+          | _ -> Error (sprintf "Could not parse [%s] to a valid Mode" str)
         end
-      | _ -> Error str
+      | _ -> Error (sprintf "Could not parse [%s] to a valid Mode" str)
     end
 
 let to_string mode =

@@ -26,6 +26,8 @@ let sexp_of_t http =
     ];
   ]
 
+let missing_header = "<no header>"
+
 let default_filter _ req _ =
   let path = Uri.path (Request.uri req) in
   let url_fragments = String.split ~on:'/' path in
@@ -46,25 +48,26 @@ let default_filter _ req _ =
         | meth -> Error (405, [Printf.sprintf "Invalid HTTP method %s for count" (Code.string_of_method meth)])
       end
     | ""::"v1"::chan_name::_ ->
-      let mode_value =
-        Header.get (Request.headers req) Header_names.mode
-        |> Result.of_option ~error:"<no header>"
-        |> (Fn.flip Result.bind) Mode.of_string
-      in
+      let mode_opt = Header.get (Request.headers req) Header_names.mode in
+      let mode_string = Option.value ~default:missing_header mode_opt in
+      let mode_value = Result.bind (Result.of_option ~error:missing_header mode_opt) Mode.of_string in
       begin match ((Request.meth req), mode_value) with
-        | `DELETE, _ -> Ok (Some chan_name, `Delete)
+        | `DELETE, _ ->
+          Ok (Some chan_name, `Delete)
         | `POST, Ok (`Single as m)
         | `POST, Ok (`Multiple as m)
         | `POST, Ok (`Atomic as m)
         | `GET, Ok (`One as m)
         | `GET, Ok ((`Many _) as m)
         | `GET, Ok ((`After_id _) as m)
-        | `GET, Ok ((`After_ts _) as m) -> Ok (Some chan_name, Mode.wrap m)
-        | `POST, Error "<no header>" -> Ok (Some chan_name, Mode.wrap `Single)
+        | `GET, Ok ((`After_ts _) as m) ->
+          Ok (Some chan_name, Mode.wrap m)
+        | `POST, Error err when String.(=) err missing_header ->
+          Ok (Some chan_name, Mode.wrap `Single)
         | meth, Ok m ->
           Error (400, [Printf.sprintf "Invalid {Method, Mode} pair: {%s, %s}" (Code.string_of_method meth) (Mode.to_string (m :> Mode.Any.t))])
-        | meth, Error str ->
-          Error (400, [Printf.sprintf "Invalid {Method, Mode} pair: {%s, %s}" (Code.string_of_method meth) str])
+        | meth, Error _ ->
+          Error (400, [Printf.sprintf "Invalid {Method, Mode} pair: {%s, %s}" (Code.string_of_method meth) mode_string])
       end
     | _ -> Error (400, [Printf.sprintf "Invalid path %s (should begin with /v1/)" path])
   in
@@ -133,8 +136,7 @@ let handler http routing ((ch, _) as conn) req body =
                 return (response, body)
             end
           | Transfer.Unknown | Transfer.Fixed _ ->
-            let limit_opt = Util.header_name_to_int64_opt (Request.headers req) Header_names.limit in
-            let limit = Option.value ~default:Int64.max_value limit_opt in
+            let limit = Util.header_name_to_int64_opt (Request.headers req) Header_names.limit in
             begin match%lwt routing.read_slice ~chan_name ~mode ~limit with
               | Error errors -> handle_errors 400 errors
               | Ok (slice, channel) ->
@@ -178,7 +180,8 @@ let handler http routing ((ch, _) as conn) req body =
           begin match%lwt routing.count ~chan_name ~mode with
             | Ok count -> return (200, [], Some count)
             | Error errors -> return (400, errors, None)
-          end in
+          end
+        in
         let headers = json_response_header in
         let status = Code.status_of_code code in
         let body = Json_obj_j.(string_of_count { code; errors; count; }) in
@@ -189,7 +192,8 @@ let handler http routing ((ch, _) as conn) req body =
           begin match%lwt routing.delete ~chan_name ~mode with
             | Ok () -> return (200, [])
             | Error errors -> return (400, errors)
-          end in
+          end
+        in
         let headers = json_response_header in
         let status = Code.status_of_code code in
         let body = Json_obj_j.(string_of_errors { code; errors; }) in
@@ -201,7 +205,8 @@ let handler http routing ((ch, _) as conn) req body =
           begin match%lwt routing.health ~chan_name ~mode with
             | [] as ll -> return (200, ll)
             | errors -> return (500, errors)
-          end in
+          end
+        in
         let headers = json_response_header in
         let status = Code.status_of_code code in
         let body = Json_obj_j.(string_of_health { code; errors; }) in

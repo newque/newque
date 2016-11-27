@@ -50,7 +50,7 @@ module M = struct
     let json = Yojson.Basic.from_string body_str in
     match json |> member "errors" with
     | `Bool false ->
-      let%lwt parsed = Util.parse_json_lwt bulk_response_of_string body_str in
+      let%lwt parsed = Util.parse_async bulk_response_of_string body_str in
       let total = List.fold_left parsed.items ~init:0 ~f:(fun acc item ->
           if Int.(=) item.index.status 201 then (succ acc) else acc
         )
@@ -88,7 +88,7 @@ module M = struct
     let%lwt body_str = Cohttp_lwt_body.to_string body in
     begin match Code.code_of_status (Response.status response) with
       | 200 ->
-        let%lwt parsed = Util.parse_json_lwt es_size_of_string body_str in
+        let%lwt parsed = Util.parse_async es_size_of_string body_str in
         return parsed.es_count
       | code ->
         let%lwt () = Logger.error body_str in

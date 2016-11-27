@@ -42,7 +42,7 @@ val read_slice :
   listen_name:string ->
   chan_name:string ->
   mode:Mode.Read.t ->
-  limit:int64 ->
+  limit:int64 option ->
   (Persistence.slice * Channel.t, string list) Result.t Lwt.t
 
 val read_stream :

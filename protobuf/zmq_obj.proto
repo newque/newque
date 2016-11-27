@@ -1,19 +1,68 @@
-message Write {
-  repeated bytes errors = 1;
-  optional int32 saved = 2 [(ocaml_type) = int_t];
-}
-
+// REQUEST OBJECTS
 message Input {
 
-  message Write_Action {
+  message Write_Input {
     required bool atomic = 1;
     repeated bytes ids = 2;
   }
 
+  message Read_Input {
+    required bytes mode = 1;
+    optional int64 limit = 2;
+  }
+
+  message Count_Input { }
+
+  message Delete_Input { }
+
+  message Health_Input {
+    required bool global = 1;
+  }
+
   required bytes channel = 1;
   oneof action {
-    Write_Action write = 11;
-    bytes count = 12;
+    Write_Input write_input = 11;
+    Read_Input read_input = 12;
+    Count_Input count_input = 13;
+    Delete_Input delete_input = 14;
+    Health_Input health_input = 15;
+  }
+
+}
+
+// RESPONSE OBJECTS
+message Output {
+
+  message Error_Output { }
+
+  message Write_Output {
+    optional int32 saved = 1 [(ocaml_type) = int_t];
+  }
+
+  message Read_Output {
+    required int32 length = 1 [(ocaml_type) = int_t];
+    optional bytes last_id = 2;
+    optional bytes last_timens = 3;
+  }
+
+  message Count_Output {
+    optional int64 count = 1;
+  }
+
+  message Delete_Output { }
+
+  message Health_Output { }
+
+
+  repeated bytes errors = 1;
+
+  oneof action {
+    Error_Output error_output = 11;
+    Write_Output write_output = 12;
+    Read_Output read_output = 13;
+    Count_Output count_output = 14;
+    Delete_Output delete_output = 15;
+    Health_Output health_output = 16;
   }
 
 }

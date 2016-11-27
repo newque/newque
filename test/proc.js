@@ -213,23 +213,23 @@ var spawnExecutable = exports.spawnExecutable = function (execLocation, dirLocat
   return p
 }
 
+var clearEs = exports.clearEs = function (persistenceSettings) {
+  return readDirectory(confDir + '/channels')
+  .then(function (channels) {
+    var indexList = channels.map(c => c.toLowerCase().split('.json')[0]).join(',')
+    return new Promise(function (resolve, reject) {
+      request.delete(persistenceSettings.baseUrls[0] + '/' + indexList)
+      .end(function (err, result) {
+        resolve() // Always resolve
+      })
+    })
+  })
+}
+
 exports.teardown = function (processes, persistence, persistenceSettings) {
   // Reset all the indices
   if (persistence === 'elasticsearch') {
-    var promise = readDirectory(confDir + '/channels')
-    .then(function (channels) {
-      var indexList = channels.map(c => c.toLowerCase().split('.json')[0]).join(',')
-      return new Promise(function (resolve, reject) {
-        request.delete(persistenceSettings.baseUrls[0] + '/' + indexList)
-        .end(function (err, result) {
-          if (err) {
-            console.log(result && result.res ? result.res.statusCode + ' ' + result.res.text : '')
-            reject (err)
-          }
-          resolve()
-        })
-      })
-    })
+    var promise = clearEs(persistenceSettings)
   } else {
     var promise = Promise.resolve()
   }

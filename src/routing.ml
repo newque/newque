@@ -21,7 +21,7 @@ type standard_routing = {
   read_slice: (
     chan_name:string ->
     mode:Mode.Read.t ->
-    limit:int64 ->
+    limit:int64 option ->
     (Persistence.slice * Channel.t, string list) Result.t Lwt.t);
   read_stream: (
     chan_name:string ->
