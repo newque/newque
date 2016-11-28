@@ -1,6 +1,6 @@
 Name: newque
-Version: 0.0.1
-Synopsis: Fast declarative message broker.
+Version: 0.0.2
+Synopsis: Fast modular message broker.
 Authors: Simon Grondin <github@simongrondin.name>
 License: MPL
 

@@ -326,7 +326,6 @@ Body: N/A
 
 Status:
 - `200`: Messages have been retrieved successfully.
-- `204`: No messages were found.
 - `4xx`: Client error
 - `5xx`: Server error
 

@@ -159,8 +159,8 @@ module.exports = function (backend, backendSettings, raw) {
             Fn.call('GET', 8000, '/v1/onlyOnce', null, [[C.modeHeader, 'Many 5']])
           ],
           function (result) {
-            if (result.res.buffer.length > 0) {
-              var msgs = JSON.parse(result.res.buffer.toString('utf8')).messages
+            if (result.body.messages.length > 0) {
+              var msgs = result.body.messages
               if (JSON.stringify(msgs) === JSON.stringify(['ABC', 'DEF'])) {
                 return Fn.shouldHaveRead(['ABC', 'DEF'], null)(result)
                 .then(() => msgs)

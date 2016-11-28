@@ -110,18 +110,16 @@ let handler http routing ((ch, _) as conn) req body =
             begin match%lwt routing.read_stream ~chan_name ~mode with
               | Error errors -> handle_errors 400 errors
               | Ok (stream, channel) ->
-                let%lwt status, headers = match%lwt Lwt_stream.is_empty stream with
-                  | false -> return (
-                      (Code.status_of_code 200),
-                      (Header.add_list (Header.init ()) [("content-type", "application/octet-stream")])
-                    )
+                let status = Code.status_of_code 200 in
+                let%lwt headers = match%lwt Lwt_stream.is_empty stream with
+                  | false -> return (Header.add_list (Header.init ()) [
+                      ("content-type", "application/octet-stream")
+                    ])
                   | true -> return (
-                      (Code.status_of_code 204),
-                      (Header.add_list (Header.init ()) [
-                          ("content-type", "application/octet-stream");
-                          (Header_names.length, "0");
-                        ])
-                    )
+                      Header.add_list (Header.init ()) [
+                        ("content-type", "application/octet-stream");
+                        (Header_names.length, "0");
+                      ])
                 in
                 let sep = channel.Channel.separator in
                 let body_stream = Lwt_stream.map_list_s (fun raw ->
@@ -142,32 +140,36 @@ let handler http routing ((ch, _) as conn) req body =
               | Ok (slice, channel) ->
                 let open Persistence in
                 let payloads = slice.payloads in
-                let code = if Array.is_empty payloads then 204 else 200 in
+                let code = 200 in
                 let status = Code.status_of_code code in
                 let headers = match slice.metadata with
                   | None ->
                     Header.add_list (Header.init ()) [
-                      ("content-type", "application/octet-stream");
                       (Header_names.length, Int.to_string (Array.length payloads));
                     ]
                   | Some metadata ->
                     Header.add_list (Header.init ()) [
-                      ("content-type", "application/octet-stream");
                       (Header_names.length, Int.to_string (Array.length payloads));
                       (Header_names.last_id, metadata.last_id);
                       (Header_names.last_ts, metadata.last_timens);
                     ]
                 in
                 let open Read_settings in
-                let body = match channel.Channel.read with
+                let (body, headers) = match channel.Channel.read with
                   | None ->
                     let err = Printf.sprintf "Impossible case: Missing readSettings for channel %s" chan_name in
                     async (fun () -> Logger.error err);
-                    Json_obj_j.(string_of_read { code = 500; errors = [err]; messages = [| |]; })
+                    let headers = Header.add headers "content-type" "application/json" in
+                    let body = Json_obj_j.(string_of_read { code = 500; errors = [err]; messages = [| |]; }) in
+                    (body, headers)
                   | Some { http_format = Http_format.Plaintext } ->
-                    String.concat_array ~sep:channel.Channel.separator payloads
+                    let headers = Header.add headers "content-type" "application/octet-stream" in
+                    let body = String.concat_array ~sep:channel.Channel.separator payloads in
+                    (body, headers)
                   | Some { http_format = Http_format.Json } ->
-                    Json_obj_j.(string_of_read { code; errors = []; messages = payloads; })
+                    let headers = Header.add headers "content-type" "application/json" in
+                    let body = Json_obj_j.(string_of_read { code; errors = []; messages = payloads; }) in
+                    (body, headers)
                 in
                 let encoding = Transfer.Fixed (Int.to_int64 (String.length body)) in
                 let response = Response.make ~status ~flush:true ~encoding ~headers () in

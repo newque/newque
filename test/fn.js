@@ -15,23 +15,25 @@ var call = exports.call = function (method, port, path, buf, headers) {
       req.send(buf)
     }
     req.end(function (err, result) {
-      if (result.res.headers['content-type'] === 'application/octet-stream') {
+      if (result && result.res && result.res.statusCode > 0) {
+        if (result.res.headers['content-type'] === 'application/json') {
+          result.res.buffer = new Buffer(JSON.stringify(result.body), 'utf8')
+          return resolve(result)
+        }
         var arr = []
         result.res.on('data', data => arr.push(data))
         result.res.on('end', function () {
-          result.res.time = Date.now() - t0
-          if (result.res.time > 10) {
-            // console.log(result.res.time, method, port, path, headers)
-          }
           result.res.buffer = Buffer.concat(arr)
           return resolve(result)
         })
-      } else if (result && result.res && result.res.statusCode > 0) {
-        return resolve(result)
       } else {
         return reject(err)
       }
     })
+  })
+  .catch(function (err) {
+    console.log('Fn.call ERROR!!!')
+    console.log(err.stack)
   })
 }
 
@@ -90,55 +92,47 @@ var shouldHaveRead = exports.shouldHaveRead = function (values, separator) {
   return function (result) {
     // console.log(result.res.statusCode)
     // console.log(result.res.text)
+    // console.log(result.res.headers)
     return new Promise(function (resolve, reject) {
-      if (values.length === 0) {
-        assert(result.res.statusCode === 204)
-      } else {
-        assert(result.res.statusCode === 200)
+      assert(result.res.statusCode === 200)
 
-        if (separator !== null) {
-          // PLAINTEXT BODY
-          var sep = new Buffer(separator, 'utf8')
-          var arr = []
-          if (Buffer.isBuffer(values[0])) {
-            values.forEach(v => arr.push(v, sep))
-          } else {
-            values.forEach(v => arr.push(new Buffer(v, 'utf8'), sep))
-          }
-          assert(arr.length === values.length * 2)
-          arr.pop()
-          var buf = Buffer.concat(arr)
+      if (separator !== null) {
+        // PLAINTEXT BODY
+        var sep = new Buffer(separator, 'utf8')
+        var arr = []
+        if (Buffer.isBuffer(values[0])) {
+          values.forEach(v => arr.push(v, sep))
         } else {
-          // JSON BODY
-          var json = {
-            code: 200,
-            errors: [],
-            messages: values
-          }
-          var buf = new Buffer(JSON.stringify(json), 'utf8')
+          values.forEach(v => arr.push(new Buffer(v, 'utf8'), sep))
         }
+        assert(arr.length === values.length * 2)
+        arr.pop()
+        var buf = Buffer.concat(arr)
+      } else {
+        // JSON BODY
+        var json = {
+          code: 200,
+          errors: [],
+          messages: values
+        }
+        var buf = new Buffer(JSON.stringify(json), 'utf8')
+      }
 
-        if (Buffer.compare(buf, result.res.buffer) !== 0) {
-          console.log('Expecting', JSON.stringify(buf.toString('utf8')))
-          console.log('Got', JSON.stringify(result.res.buffer.toString('utf8')))
-          return reject('Invalid response buffer')
-        }
+      if (Buffer.compare(buf, result.res.buffer) !== 0) {
+        console.log('Expecting', JSON.stringify(buf.toString('utf8')))
+        console.log('Got', JSON.stringify(result.res.buffer.toString('utf8')))
+        return reject(new Error('Invalid response buffer'))
       }
 
       // Check HTTP headers
       if (result.res.headers['transfer-encoding'] === 'chunked') {
         assert(result.res.headers['content-length'] == null)
-        assert(result.res.headers[C.lengthHeader] == null)
       } else {
-        if (result.res.statusCode === 200) {
-          // Validate headers
-          assert(parseInt(result.res.headers[C.lengthHeader], 10) === values.length)
-          assert(parseInt(result.res.headers['content-length'], 10) === result.res.buffer.length)
+        assert(parseInt(result.res.headers[C.lengthHeader], 10) === values.length)
+        assert(parseInt(result.res.headers['content-length'], 10) === result.res.buffer.length)
+        if (parseInt(result.res.headers[C.lengthHeader], 10) > 0) {
           assert(result.res.headers[C.lastIdHeader].length > 0)
           assert(parseInt(result.res.headers[C.lastTsHeader], 10) > 0)
-        } else if (result.res.statusCode === 204) {
-          assert(result.res.headers['content-length'] == null)
-          assert(parseInt(result.res.headers[C.lengthHeader], 10) === 0)
         }
       }
       return resolve(result)
