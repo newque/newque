@@ -13,7 +13,7 @@ AlphaFeatures: ocamlbuild_more_args
 XOCamlbuildExtraArgs: '-no-hygiene'
 Plugins: META (0.4), DevFiles (0.4)
 
-PreBuildCommand: chmod +x .scripts/* && ./scripts/prebuild.sh
+PreBuildCommand: chmod +x ./scripts/* && ./scripts/prebuild.sh
 
 PreCleanCommand: ./scripts/preclean.sh
 
