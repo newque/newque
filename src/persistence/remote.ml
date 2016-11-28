@@ -140,7 +140,7 @@ module M = struct
     try%lwt
       let%lwt (response, body) = Client.call ~headers ~chunked:false `GET uri in
       let%lwt body_str = Cohttp_lwt_body.to_string body in
-      let%lwt parsed = Util.parse_async health_of_string body_str in
+      let%lwt parsed = Util.parse_async errors_of_string body_str in
       begin match parsed.errors with
         | [] ->
           begin match parsed.code, parsed.errors with

@@ -29,11 +29,6 @@ type count = {
   count: int <ocaml repr="int64"> nullable;
 }
 
-type health = {
-  code: int;
-  errors: string list;
-}
-
 
 (* Elasticsearch *)
 type es_size = {

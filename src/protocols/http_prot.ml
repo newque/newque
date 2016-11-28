@@ -209,7 +209,7 @@ let handler http routing ((ch, _) as conn) req body =
         in
         let headers = json_response_header in
         let status = Code.status_of_code code in
-        let body = Json_obj_j.(string_of_health { code; errors; }) in
+        let body = Json_obj_j.(string_of_errors { code; errors; }) in
         Server.respond_string ~headers ~status ~body ()
       | Ok (None, _) -> fail_with "Invalid routing"
     end

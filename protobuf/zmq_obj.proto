@@ -53,9 +53,7 @@ message Output {
 
   message Health_Output { }
 
-
   repeated bytes errors = 1;
-
   oneof action {
     Error_Output error_output = 11;
     Write_Output write_output = 12;
