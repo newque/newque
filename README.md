@@ -185,6 +185,12 @@ __`http` `backendSettings` Object__
 | `remoteInputFormat` | String | No | `json` | Format that the remote server accepts for writes. One of `plaintext` or `json`. |
 | `remoteOutputFormat` | String | No | `json` | Format that the remote server uses to send read results. One of `plaintext` or `json`. |
 
+Header object:
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `key` | String | Yes | | Header name |
+| `value` | String | Yes | | Header value |
+
 __`elasticsearch` `backendSettings` Object__
 
 | Property | Type | Required | Default | Description |
@@ -214,7 +220,7 @@ __Batching Object__
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
-| `maxTime` | Double | Yes | | How long can messages linger in the queue before they have to be written to the Backend. In seconds. |
+| `maxTime` | Double | Yes | | How long can messages linger in the queue before they have to be written to the Backend. In milliseconds. |
 | `maxSize` | Integer | Yes | | Maximum size the queue can reach before they have to be written to the Backend. |
 
 ## Concepts

@@ -53,21 +53,21 @@ let clean_sync ~destroy stmt =
     end
 
 let exec_sync db ?(retry=default_retries) ~destroy (stmt, sql) =
-  async (fun () -> Logger.debug_lazy (lazy (Printf.sprintf "Executing %s" sql)));
+  async (fun () -> Logger.debug_lazy (lazy (sprintf "Executing %s" sql)));
   let rec run count =
     match S3.step stmt with
     | Rc.DONE -> S3.changes db
     | (Rc.BUSY as code) | (Rc.LOCKED as code) ->
       begin match count <= retry with
         | true ->
-          async (fun () -> Logger.warning (Printf.sprintf "Retrying execution (%s)" (Rc.to_string code)));
+          async (fun () -> Logger.warning (sprintf "Retrying execution (%s)" (Rc.to_string code)));
           Thread.yield ();
           run (count + 1)
         | false ->
-          failwith (Printf.sprintf "Execution failed after %d retries with code %s" retry (Rc.to_string code))
+          failwith (sprintf "Execution failed after %d retries with code %s" retry (Rc.to_string code))
       end
     | code ->
-      failwith (Printf.sprintf "Execution failed with code %s" (Rc.to_string code))
+      failwith (sprintf "Execution failed with code %s" (Rc.to_string code))
   in
   let result = run 1 in
   clean_sync ~destroy stmt;
@@ -88,7 +88,7 @@ type _ repr =
 let query : type a. t -> ?retry:int -> destroy:bool -> S3.stmt * string -> a repr -> (a array * int64 option) Lwt.t =
   fun db ?(retry=default_retries) ~destroy (stmt, sql) repr ->
     Lwt_preemptive.detach (fun () ->
-      async (fun () -> Logger.debug_lazy (lazy (Printf.sprintf "Querying %s" sql)));
+      async (fun () -> Logger.debug_lazy (lazy (sprintf "Querying %s" sql)));
       let queue : a Queue.t = Queue.create ~capacity:db.avg_read () in
       let rec run count last_rowid =
         match S3.step stmt with
@@ -97,22 +97,22 @@ let query : type a. t -> ?retry:int -> destroy:bool -> S3.stmt * string -> a rep
             | FBlobRowid ->
               begin match ((S3.column stmt 0), (S3.column stmt 1)) with
                 | ((Data.BLOB blob), Data.INT rowid) -> Queue.enqueue queue blob; (Some rowid)
-                | (data1, data2) -> failwith (Printf.sprintf "Querying failed (FBlobRowid, invalid datatypes %s and %s, expected BLOB and INT" (Data.to_string_debug data1) (Data.to_string_debug data2))
+                | (data1, data2) -> failwith (sprintf "Querying failed (FBlobRowid, invalid datatypes %s and %s, expected BLOB and INT" (Data.to_string_debug data1) (Data.to_string_debug data2))
               end
             | FBlobInt64 ->
               begin match ((S3.column stmt 0), (S3.column stmt 1)) with
                 | ((Data.BLOB id), Data.INT timens) -> Queue.enqueue queue (id, timens); last_rowid
-                | (data1, data2) -> failwith (Printf.sprintf "Querying failed (FBlobInt64), invalid datatypes %s and %s, expected BLOB and INT" (Data.to_string_debug data1) (Data.to_string_debug data2))
+                | (data1, data2) -> failwith (sprintf "Querying failed (FBlobInt64), invalid datatypes %s and %s, expected BLOB and INT" (Data.to_string_debug data1) (Data.to_string_debug data2))
               end
             | FInt64 ->
               begin match S3.column stmt 0 with
                 | Data.INT i -> Queue.enqueue queue i; last_rowid
-                | datatype -> failwith (Printf.sprintf "Querying failed, invalid datatype %s, expected INT" (Data.to_string_debug datatype))
+                | datatype -> failwith (sprintf "Querying failed, invalid datatype %s, expected INT" (Data.to_string_debug datatype))
               end
             | FText ->
               begin match S3.column stmt 0 with
                 | Data.TEXT str -> Queue.enqueue queue str; last_rowid
-                | datatype -> failwith (Printf.sprintf "Querying failed, invalid datatype %s, expected TEXT" (Data.to_string_debug datatype))
+                | datatype -> failwith (sprintf "Querying failed, invalid datatype %s, expected TEXT" (Data.to_string_debug datatype))
               end
             | Wrapped -> Queue.enqueue queue (S3.row_data stmt); last_rowid
           end in
@@ -123,14 +123,14 @@ let query : type a. t -> ?retry:int -> destroy:bool -> S3.stmt * string -> a rep
         | (Rc.BUSY as code) | (Rc.LOCKED as code) ->
           begin match count <= retry with
             | true ->
-              async (fun () -> Logger.warning (Printf.sprintf "Retrying query (%s)" (Rc.to_string code)));
+              async (fun () -> Logger.warning (sprintf "Retrying query (%s)" (Rc.to_string code)));
               Thread.yield ();
               run (count + 1) last_rowid
             | false ->
-              failwith (Printf.sprintf "Querying failed after %d retries with code %s" retry (Rc.to_string code))
+              failwith (sprintf "Querying failed after %d retries with code %s" retry (Rc.to_string code))
           end
         | code ->
-          failwith (Printf.sprintf "Querying failed with code %s: %s" (Rc.to_string code) (S3.errmsg db.db))
+          failwith (sprintf "Querying failed with code %s: %s" (Rc.to_string code) (S3.errmsg db.db))
       in
       let last_rowid = run 1 None in
       ((Queue.to_array queue), last_rowid)
@@ -166,14 +166,14 @@ let bind ?(retry=default_retries) stmt args =
       | (Rc.BUSY as code) | (Rc.LOCKED as code) ->
         begin match count <= retry with
           | true ->
-            async (fun () -> Logger.warning (Printf.sprintf "Retrying bind (%s)" (Rc.to_string code)));
+            async (fun () -> Logger.warning (sprintf "Retrying bind (%s)" (Rc.to_string code)));
             Thread.yield ();
             run pos arg (count + 1)
           | false ->
-            failwith (Printf.sprintf "Bind failed after %d retries with code %s" retry (Rc.to_string code))
+            failwith (sprintf "Bind failed after %d retries with code %s" retry (Rc.to_string code))
         end
       | code ->
-        failwith (Printf.sprintf "Bind failed with code %s" (Rc.to_string code))
+        failwith (sprintf "Bind failed with code %s" (Rc.to_string code))
     in
     Array.iter ~f:(fun (i, arg) -> run i arg 1) args
   ) ()
@@ -198,14 +198,14 @@ let make_filters filters =
 let read_sql ~search =
   let open Persistence in
   match search.filters with
-  | [| |] -> Printf.sprintf "SELECT raw, ROWID FROM MESSAGES LIMIT %Ld;" search.limit
-  | _ -> Printf.sprintf "SELECT raw, ROWID FROM MESSAGES WHERE %s LIMIT %Ld;" (make_filters search.filters) search.limit
+  | [| |] -> sprintf "SELECT raw, ROWID FROM MESSAGES LIMIT %Ld;" search.limit
+  | _ -> sprintf "SELECT raw, ROWID FROM MESSAGES WHERE %s LIMIT %Ld;" (make_filters search.filters) search.limit
 
 let add_tag_sql ~search =
   let open Persistence in
   match search.filters with
-  | [| |] -> Printf.sprintf "UPDATE MESSAGES SET tag = ? LIMIT %Ld;" search.limit
-  | _ -> Printf.sprintf "UPDATE MESSAGES SET tag = ? WHERE %s LIMIT %Ld;" (make_filters search.filters) search.limit
+  | [| |] -> sprintf "UPDATE MESSAGES SET tag = ? LIMIT %Ld;" search.limit
+  | _ -> sprintf "UPDATE MESSAGES SET tag = ? WHERE %s LIMIT %Ld;" (make_filters search.filters) search.limit
 
 let read_tag_sql = "SELECT raw, ROWID FROM MESSAGES INDEXED BY MESSAGES_TAG_IDX WHERE (tag = ?);"
 let delete_tag_sql = "DELETE FROM MESSAGES INDEXED BY MESSAGES_TAG_IDX WHERE (tag = ?);"
@@ -219,7 +219,7 @@ let truncate_sql = "DELETE FROM MESSAGES;"
 let quick_check_sql = "PRAGMA quick_check;"
 let insert_sql count =
   let arr = Array.create ~len:count "(?,?,?)" in
-  Printf.sprintf "INSERT OR IGNORE INTO MESSAGES (uuid,timens,raw) VALUES %s;" (String.concat_array ~sep:"," arr)
+  sprintf "INSERT OR IGNORE INTO MESSAGES (uuid,timens,raw) VALUES %s;" (String.concat_array ~sep:"," arr)
 
 (*******************
    HIGH LEVEL FUNCTIONS
@@ -296,7 +296,7 @@ let fetch_last_row db ~rowid =
   let%lwt () = bind st args in
   match%lwt query db ~destroy:false stmt FBlobInt64 with
   | [| x |], _ -> return x
-  | dataset, _ -> fail_with (Printf.sprintf "Last_row failed (dataset size: %d) for [%s]" (Array.length dataset) sql)
+  | dataset, _ -> fail_with (sprintf "Last_row failed (dataset size: %d) for [%s]" (Array.length dataset) sql)
 
 let pull db ~search ~fetch_last =
   let open Persistence in
@@ -332,7 +332,7 @@ let pull db ~search ~fetch_last =
     let%lwt cnt3 = execute db ~destroy:false stmt in
 
     if cnt1 <> cnt2 || cnt2 <> cnt3 then
-      let err = (Printf.sprintf "Impossible state, returned counts differ: %d %d %d. This bug should be reported." cnt1 cnt2 cnt3) in
+      let err = (sprintf "Impossible state, returned counts differ: %d %d %d. This bug should be reported." cnt1 cnt2 cnt3) in
       let%lwt () = Logger.fatal err in
       fail_with err
     else
@@ -358,7 +358,7 @@ let size db =
   let (_, sql) as stmt = db.stmts.count in
   match%lwt query db ~destroy:false stmt FInt64 with
   | [| x |], _ -> return x
-  | dataset, _ -> fail_with (Printf.sprintf "Count failed (dataset size: %d)" (Array.length dataset))
+  | dataset, _ -> fail_with (sprintf "Count failed (dataset size: %d)" (Array.length dataset))
 
 let delete db =
   let (_, sql) as stmt = db.stmts.truncate in
@@ -369,9 +369,9 @@ let health db =
   let (_, sql) as stmt = db.stmts.quick_check in
   match%lwt query db ~destroy:false stmt FText with
   | [| "ok" |], _ -> return []
-  | [| str |], _ -> return [Printf.sprintf "Local Health failure: %s" str]
+  | [| str |], _ -> return [sprintf "Local Health failure: %s" str]
   | dataset, _ -> fail_with (
-      Printf.sprintf
+      sprintf
         "Health failed (dataset size: %d) with %s"
         (Array.length dataset) (String.concat_array ~sep:", " dataset)
     )

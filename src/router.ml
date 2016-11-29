@@ -20,7 +20,7 @@ let register_listeners router listeners =
     let entry = String.Table.create () in
     match String.Table.add router.table ~key:listen.id ~data:entry with
     | `Ok -> None
-    | `Duplicate -> Some (Printf.sprintf "Cannot register listener %s because it already exists" listen.id)
+    | `Duplicate -> Some (sprintf "Cannot register listener %s because it already exists" listen.id)
   )
   |> fun ll -> if List.length ll = 0 then Ok () else Error ll
 
@@ -36,12 +36,12 @@ let register_channels router channels =
         begin match String.Table.add chan_table ~key:chan.name ~data:chan with
           | `Ok -> None
           | `Duplicate -> Some (
-              Printf.sprintf
+              sprintf
                 "Registered channel %s with listener %s but another channel with the same name already existed"
                 chan.name listen_name
             )
         end
-      | None -> Some (Printf.sprintf "Cannot add channel %s to %s. Does that listener exist?" chan.name listen_name)
+      | None -> Some (sprintf "Cannot add channel %s to %s. Does that listener exist?" chan.name listen_name)
     ))
   |> function
   | [] -> Ok ()
@@ -49,10 +49,10 @@ let register_channels router channels =
 
 let find_chan router ~listen_name ~chan_name =
   match String.Table.find router.table listen_name with
-  | None -> Error [Printf.sprintf "Unknown listener \'%s\'" listen_name]
+  | None -> Error [sprintf "Unknown listener \'%s\'" listen_name]
   | Some chan_table ->
     begin match String.Table.find chan_table chan_name with
-      | None -> Error [Printf.sprintf "No channel \'%s\' associated with listener \'%s\'" chan_name listen_name]
+      | None -> Error [sprintf "No channel \'%s\' associated with listener \'%s\'" chan_name listen_name]
       | Some chan -> Ok chan
     end
 
@@ -65,22 +65,22 @@ let write_shared router ~listen_name ~chan ~write ~msgs ~ids =
   let open Channel in
   let open Write_settings in
   begin match ((Message.length ~raw:chan.raw msgs), (Array.length ids)) with
-    | (0, _) -> return (Error [Printf.sprintf "Nothing to write."])
-    | (msgs_l, ids_l) when Int.(<>) msgs_l ids_l -> return (Error [Printf.sprintf "Length mismatch between messages (%d) and IDs (%d)" msgs_l ids_l])
+    | (0, _) -> return (Error [sprintf "Nothing to write."])
+    | (msgs_l, ids_l) when Int.(<>) msgs_l ids_l -> return (Error [sprintf "Length mismatch between messages (%d) and IDs (%d)" msgs_l ids_l])
     | _ ->
       let save_t =
         let%lwt count = Channel.push chan msgs ids in
         ignore_result (Logger.debug_lazy (lazy (
-            Printf.sprintf "Wrote: (length: %d) %s from %s" count chan.name listen_name
+            sprintf "Wrote: (length: %d) %s from %s" count chan.name listen_name
           )));
         (* Copy to other channels if needed. *)
         let%lwt () = Lwt_list.iter_p (fun copy_chan_name ->
             begin match find_chan router ~listen_name:Listener.(private_listener.id) ~chan_name:copy_chan_name with
-              | Error _ -> Logger.warning_lazy (lazy (Printf.sprintf "Cannot copy from %s to %s because %s doesn't exist." chan.name copy_chan_name copy_chan_name))
+              | Error _ -> Logger.warning_lazy (lazy (sprintf "Cannot copy from %s to %s because %s doesn't exist." chan.name copy_chan_name copy_chan_name))
               | Ok copy_chan ->
                 let%lwt copy_count = Channel.push copy_chan msgs ids in
                 if copy_count <> count then async (fun () ->
-                    Logger.warning_lazy (lazy (Printf.sprintf "Mismatch while copying from %s (wrote %d) to %s (wrote %d). Possible ID collision(s)." chan.name count copy_chan_name copy_count)
+                    Logger.warning_lazy (lazy (sprintf "Mismatch while copying from %s (wrote %d) to %s (wrote %d). Possible ID collision(s)." chan.name count copy_chan_name copy_count)
                     ));
                 return_unit
             end
@@ -103,7 +103,7 @@ let write_http router ~listen_name ~chan_name ~id_header ~mode stream =
   | Ok chan ->
     let open Channel in
     begin match chan.write with
-      | None -> return (Error [Printf.sprintf "Channel %s doesn't support Writing to it." chan_name])
+      | None -> return (Error [sprintf "Channel %s doesn't support Writing to it." chan_name])
       | Some write ->
         let open Write_settings in
 
@@ -146,7 +146,7 @@ let write_zmq router ~listen_name ~chan_name ~ids ~msgs ~atomic =
   | Ok chan ->
     let open Channel in
     begin match chan.write with
-      | None -> return (Error [Printf.sprintf "Channel %s doesn't support Writing to it." chan_name])
+      | None -> return (Error [sprintf "Channel %s doesn't support Writing to it." chan_name])
       | Some write ->
         let msgs = Message.of_string_array ~atomic msgs in
         let ids = if Array.is_empty ids then Id.array_random (Message.length ~raw:chan.raw msgs) else ids in
@@ -162,7 +162,7 @@ let read_slice router ~listen_name ~chan_name ~mode ~limit =
   | (Error _) as err -> return err
   | Ok chan ->
     begin match chan.Channel.read with
-      | None -> return (Error [Printf.sprintf "Channel %s doesn't support Reading from it." chan_name])
+      | None -> return (Error [sprintf "Channel %s doesn't support Reading from it." chan_name])
       | Some read ->
         let limit = begin match limit with
           | None -> Int64.max_value
@@ -172,7 +172,7 @@ let read_slice router ~listen_name ~chan_name ~mode ~limit =
         in
         let%lwt slice = Channel.pull_slice chan ~mode ~limit ~only_once:read.Read_settings.only_once in
         ignore_result (Logger.debug_lazy (lazy (
-            Printf.sprintf "Read: %s (size: %d) from %s" chan_name (Array.length slice.Persistence.payloads) listen_name
+            sprintf "Read: %s (size: %d) from %s" chan_name (Array.length slice.Persistence.payloads) listen_name
           )));
         return (Ok (slice, chan))
     end
@@ -182,11 +182,11 @@ let read_stream router ~listen_name ~chan_name ~mode =
   | (Error _) as err -> return err
   | Ok chan ->
     begin match chan.Channel.read with
-      | None -> return (Error [Printf.sprintf "Channel %s doesn't support Reading from it." chan_name])
+      | None -> return (Error [sprintf "Channel %s doesn't support Reading from it." chan_name])
       | Some read ->
         let%lwt stream = Channel.pull_stream chan ~mode ~only_once:read.Read_settings.only_once in
         ignore_result (Logger.debug_lazy (lazy (
-            Printf.sprintf "Reading: %s (stream) from %s" chan_name listen_name
+            sprintf "Reading: %s (stream) from %s" chan_name listen_name
           )));
         return (Ok (stream, chan))
     end
@@ -201,7 +201,7 @@ let count router ~listen_name ~chan_name ~mode =
   | Ok chan ->
     let%lwt count = Channel.size chan in
     ignore_result (Logger.debug_lazy (lazy (
-        Printf.sprintf "Counted: %s (size: %Ld) from %s" chan_name count listen_name
+        sprintf "Counted: %s (size: %Ld) from %s" chan_name count listen_name
       )));
     return (Ok count)
 
@@ -214,11 +214,11 @@ let delete router ~listen_name ~chan_name ~mode =
   | (Error _) as err -> return err
   | Ok chan ->
     begin match chan.Channel.emptiable with
-      | false -> return (Error [Printf.sprintf "Channel %s doesn't support Deleting from it." chan_name])
+      | false -> return (Error [sprintf "Channel %s doesn't support Deleting from it." chan_name])
       | true ->
         let%lwt () = Channel.delete chan in
         ignore_result (Logger.debug_lazy (lazy (
-            Printf.sprintf "Deleted: %s from %s" chan_name listen_name
+            sprintf "Deleted: %s from %s" chan_name listen_name
           )));
         return Result.ok_unit
     end
@@ -240,7 +240,7 @@ let rec health router ~listen_name ~chan_name ~mode =
         let%lwt error_lists = Lwt_list.map_p (fun chan ->
             let chan_name = chan.Channel.name in
             let%lwt err = health router ~listen_name:priv ~chan_name:(Some chan_name) ~mode in
-            return (List.map err ~f:(fun str -> Printf.sprintf "[%s] %s" chan_name str))
+            return (List.map err ~f:(fun str -> sprintf "[%s] %s" chan_name str))
           ) channels
         in
         return (List.concat error_lists)
@@ -255,10 +255,10 @@ let rec health router ~listen_name ~chan_name ~mode =
         ignore_result (Logger.debug_lazy (lazy (
             let str = match result with
               | [] -> "OK"
-              | errors -> Printf.sprintf "Errors: %s" (String.concat ~sep:", " errors)
+              | errors -> sprintf "Errors: %s" (String.concat ~sep:", " errors)
             in
             let printable_listen_name = if String.is_empty listen_name then "<global>" else listen_name in
-            Printf.sprintf "Health: %s from %s. Status: %s" chan_name printable_listen_name str
+            sprintf "Health: %s from %s. Status: %s" chan_name printable_listen_name str
           )));
         return result
     end

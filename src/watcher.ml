@@ -60,7 +60,7 @@ let rec monitor watcher listen =
         (* Restart the server and monitor it recursively *)
         let g = http.generic in
         let open Config_t in
-        let%lwt () = Logger.notice (Printf.sprintf "Restarting HTTP listener %s on HTTP %s:%s" g.name g.host (Int.to_string g.port)) in
+        let%lwt () = Logger.notice (sprintf "Restarting HTTP listener %s on HTTP %s:%s" g.name g.host (Int.to_string g.port)) in
         let%lwt () = Http_prot.close http in
         let%lwt restarted = start_http watcher http.generic http.specific in
         let (_, new_wakener) = wait () in
@@ -82,12 +82,12 @@ let create_listeners watcher endpoints =
     (* Now start the new listeners *)
     let%lwt started = match generic.protocol_settings with
       | Config_http_prot specific ->
-        let%lwt () = Logger.notice (Printf.sprintf "Starting %s on HTTP %s:%s" generic.name generic.host (Int.to_string generic.port)) in
+        let%lwt () = Logger.notice (sprintf "Starting %s on HTTP %s:%s" generic.name generic.host (Int.to_string generic.port)) in
         let%lwt http = start_http watcher generic specific in
         let (_, wakener) = wait () in
         return {id=generic.name; server=(HTTP (http, wakener))}
       | Config_zmq_prot specific ->
-        let%lwt () = Logger.notice (Printf.sprintf "Starting %s on ZMQ %s:%s" generic.name generic.host (Int.to_string generic.port)) in
+        let%lwt () = Logger.notice (sprintf "Starting %s on ZMQ %s:%s" generic.name generic.host (Int.to_string generic.port)) in
         let%lwt zmq = start_zmq watcher generic specific in
         let (_, wakener) = wait () in
         return {id=generic.name; server=(ZMQ (zmq, wakener))}

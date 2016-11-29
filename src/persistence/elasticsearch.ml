@@ -32,7 +32,7 @@ module M = struct
 
   let push instance ~msgs ~ids =
     let open Json_obj_j in
-    let uri = Util.append_to_path (get_base instance) (Printf.sprintf "%s/_bulk" instance.index) in
+    let uri = Util.append_to_path (get_base instance) (sprintf "%s/_bulk" instance.index) in
     let bulk_format = Array.concat_mapi msgs ~f:(fun i msg ->
         let json = `Assoc [
             "index", `Assoc [
@@ -67,23 +67,23 @@ module M = struct
               let err_type = error_obj |> member "type" |> to_string_option |> Option.value ~default:"" in
               let err_reason = error_obj |> member "reason" |> to_string_option |> Option.value ~default:"" in
               begin match error_obj |> member "caused_by" with
-                | `Null -> Some (Printf.sprintf "%s %s" err_type err_reason)
+                | `Null -> Some (sprintf "%s %s" err_type err_reason)
                 | caused_by_obj ->
                   let caused_type = caused_by_obj |> member "type" |> to_string_option |> Option.value ~default:"" in
                   let caused_reason = caused_by_obj |> member "reason" |> to_string_option |> Option.value ~default:"" in
-                  Some (Printf.sprintf "%s %s %s %s" err_type err_reason caused_type caused_reason)
+                  Some (sprintf "%s %s %s %s" err_type err_reason caused_type caused_reason)
               end
           )
         in
-        failwith (Printf.sprintf "ES errors: [%s]" (String.concat ~sep:", " strings))
+        failwith (sprintf "ES errors: [%s]" (String.concat ~sep:", " strings))
       )
-    | err -> fail_with (Printf.sprintf "Incorrect ES bulk json: %s" body_str)
+    | err -> fail_with (sprintf "Incorrect ES bulk json: %s" body_str)
 
   let pull instance ~search ~fetch_last = fail_with "Unimplemented: ES pull"
 
   let size instance =
     let open Json_obj_j in
-    let uri = Util.append_to_path (get_base instance) (Printf.sprintf "%s/_count" instance.index) in
+    let uri = Util.append_to_path (get_base instance) (sprintf "%s/_count" instance.index) in
     let%lwt (response, body) = Client.call ~chunked:false `GET uri in
     let%lwt body_str = Cohttp_lwt_body.to_string body in
     begin match Code.code_of_status (Response.status response) with
@@ -92,13 +92,13 @@ module M = struct
         return parsed.es_count
       | code ->
         let%lwt () = Logger.error body_str in
-        failwith (Printf.sprintf "Couldn't get count from ES (HTTP %s)" (Code.string_of_status (Response.status response)))
+        failwith (sprintf "Couldn't get count from ES (HTTP %s)" (Code.string_of_status (Response.status response)))
     end
 
   let delete instance = fail_with "Unimplemented: ES delete"
 
   let health instance =
-    let uri = Util.append_to_path (get_base instance) (Printf.sprintf "%s/_stats/docs" instance.index) in
+    let uri = Util.append_to_path (get_base instance) (sprintf "%s/_stats/docs" instance.index) in
     try%lwt
       let%lwt (response, body) = Client.call ~chunked:false `GET uri in
       let%lwt body_str = Cohttp_lwt_body.to_string body in
@@ -107,7 +107,7 @@ module M = struct
         | code ->
           let%lwt () = Logger.error body_str in
           return [
-            Printf.sprintf
+            sprintf
               "Couldn't validate index [%s] at %s (HTTP %s)"
               instance.index (Uri.to_string uri) (Code.string_of_status (Response.status response))
           ]

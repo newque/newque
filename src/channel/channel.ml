@@ -42,7 +42,7 @@ let create name conf_channel =
     | `Disk ->
       let module Arg = struct
         module IO = Local.M
-        let create () = Local.create ~file:(Printf.sprintf "%s%s.data" Fs.data_chan_dir name) ~chan_name:name ~avg_read:conf_channel.avg_read
+        let create () = Local.create ~file:(sprintf "%s%s.data" Fs.data_chan_dir name) ~chan_name:name ~avg_read:conf_channel.avg_read
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
         let batching = batching
@@ -54,7 +54,7 @@ let create name conf_channel =
         module IO = Remote.M
         let create () = Remote.create
             (if remote.append_chan_name
-             then Array.map ~f:(fun b -> Printf.sprintf "%s%s" b name) remote.base_urls
+             then Array.map ~f:(fun b -> sprintf "%s%s" b name) remote.base_urls
              else remote.base_urls)
             remote.base_headers
             ~input:remote.input_format
@@ -67,9 +67,9 @@ let create name conf_channel =
       (module Persistence.Make (Arg) : Persistence.S)
 
     | `Elasticsearch es ->
-      if not conf_channel.raw then failwith (Printf.sprintf "Channel [%s] has persistence type [elasticsearch] but 'raw' is not set to true" name) else
-      if Option.is_some read then failwith (Printf.sprintf "Channel [%s] has persistence type [elasticsearch] but is not write-only" name) else
-      if conf_channel.emptiable then failwith (Printf.sprintf "Channel [%s] has persistence type [elasticsearch] but is emptiable" name) else
+      if not conf_channel.raw then failwith (sprintf "Channel [%s] has persistence type [elasticsearch], setting 'raw' must be set to true" name) else
+      if Option.is_some read then failwith (sprintf "Channel [%s] has persistence type [elasticsearch], reading must be disabled" name) else
+      if conf_channel.emptiable then failwith (sprintf "Channel [%s] has persistence type [elasticsearch], setting 'emptiable' must be set to false" name) else
       let module Arg = struct
         module IO = Elasticsearch.M
         let create () = Elasticsearch.create es.base_urls ~index:es.index ~typename:es.typename

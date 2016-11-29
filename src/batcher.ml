@@ -51,8 +51,7 @@ let create ~max_time ~max_size ~handler =
     last_flush = Util.time_ms_float ();
   }
   in
-  (* Background timer *)
-  async (fun () ->
+  async (
     Util.make_interval (max_time /. 1000.) (fun () ->
       if Float.(>) (Util.time_ms_float ()) (batcher.last_flush +. batcher.max_time)
       && Int.(>) (length batcher) 0

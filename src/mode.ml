@@ -21,9 +21,9 @@ module Read = struct
   ]
   let to_string (tag : t) = match tag with
     | `One -> "One"
-    | `Many x -> Printf.sprintf "Many %Ld" x
-    | `After_id s -> Printf.sprintf "After_id %s" s
-    | `After_ts ts -> Printf.sprintf "After_ts %Ld" ts
+    | `Many x -> sprintf "Many %Ld" x
+    | `After_id s -> sprintf "After_id %s" s
+    | `After_ts ts -> sprintf "After_ts %Ld" ts
 end
 
 module Count = struct

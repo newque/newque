@@ -138,7 +138,7 @@ let handler zmq routing socket frames =
 
   | strs ->
     let printable = Yojson.Basic.to_string (`List (List.map ~f:(fun s -> `String s) strs)) in
-    let%lwt () = Logger.warning (Printf.sprintf "Received invalid msg parts on %s: %s" zmq.inbound printable) in
+    let%lwt () = Logger.warning (sprintf "Received invalid msg parts on %s: %s" zmq.inbound printable) in
     let error = sprintf "Received invalid msg parts on %s. Expected [id], [meta], [msgs...]." zmq.inbound in
     Lwt_zmq.Socket.send_all socket (strs @ [error])
 
@@ -149,8 +149,8 @@ let set_hwm sock receive send =
 let start generic specific routing =
   let open Config_t in
   let open Routing in
-  let inproc = Printf.sprintf "inproc://%s" generic.name in
-  let inbound = Printf.sprintf "tcp://%s:%d" generic.host generic.port in
+  let inproc = sprintf "inproc://%s" generic.name in
+  let inbound = sprintf "tcp://%s:%d" generic.host generic.port in
   let (instance_t, instance_w) = wait () in
   let (stop_t, stop_w) = wait () in
 

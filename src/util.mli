@@ -31,14 +31,15 @@ val string_of_sexp : ?pretty:bool -> Sexp.t -> string
 val sexp_of_json_exn : Yojson.Basic.json -> Sexp.t
 val sexp_of_json_str_exn : string -> Sexp.t
 
-val sexp_of_atdgen : string -> Sexp.t
+val sexp_of_atdgen_exn : string -> Sexp.t
 
 val parse_sync : ('a -> 'b) -> 'a -> ('b, string) Result.t
 val parse_async : ('a -> 'b) -> 'a -> 'b Lwt.t
+val parse_async_bind : ('a -> 'b Lwt.t) -> 'a -> 'b Lwt.t
 
 val header_name_to_int64_opt : Header.t -> string -> int64 option
 
-val make_interval : float -> (unit -> 'a Lwt.t) -> 'b Lwt.t
+val make_interval : float -> (unit -> 'a Lwt.t) -> unit -> 'b Lwt.t
 
 val time_ns_int64 : unit -> int64
 val time_ns_int63 : unit -> Int63.t

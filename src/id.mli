@@ -14,4 +14,3 @@ val array_of_string_opt :
   length_none:int ->
   string option ->
   (t array, string) Result.t
-

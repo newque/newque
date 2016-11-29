@@ -35,17 +35,17 @@ let default_filter _ req _ =
     | ""::"v1"::"health"::_ ->
       begin match Request.meth req with
         | `GET -> Ok (None, `Health)
-        | meth -> Error (405, [Printf.sprintf "Invalid HTTP method %s for health" (Code.string_of_method meth)])
+        | meth -> Error (405, [sprintf "Invalid HTTP method %s for health" (Code.string_of_method meth)])
       end
     | ""::"v1"::chan_name::"health"::_ ->
       begin match Request.meth req with
         | `GET -> Ok (Some chan_name, `Health)
-        | meth -> Error (405, [Printf.sprintf "Invalid HTTP method %s for health" (Code.string_of_method meth)])
+        | meth -> Error (405, [sprintf "Invalid HTTP method %s for health" (Code.string_of_method meth)])
       end
     | ""::"v1"::chan_name::"count"::_ ->
       begin match Request.meth req with
         | `GET -> Ok (Some chan_name, `Count)
-        | meth -> Error (405, [Printf.sprintf "Invalid HTTP method %s for count" (Code.string_of_method meth)])
+        | meth -> Error (405, [sprintf "Invalid HTTP method %s for count" (Code.string_of_method meth)])
       end
     | ""::"v1"::chan_name::_ ->
       let mode_opt = Header.get (Request.headers req) Header_names.mode in
@@ -65,11 +65,11 @@ let default_filter _ req _ =
         | `POST, Error err when String.(=) err missing_header ->
           Ok (Some chan_name, Mode.wrap `Single)
         | meth, Ok m ->
-          Error (400, [Printf.sprintf "Invalid {Method, Mode} pair: {%s, %s}" (Code.string_of_method meth) (Mode.to_string (m :> Mode.Any.t))])
+          Error (400, [sprintf "Invalid {Method, Mode} pair: {%s, %s}" (Code.string_of_method meth) (Mode.to_string (m :> Mode.Any.t))])
         | meth, Error _ ->
-          Error (400, [Printf.sprintf "Invalid {Method, Mode} pair: {%s, %s}" (Code.string_of_method meth) mode_string])
+          Error (400, [sprintf "Invalid {Method, Mode} pair: {%s, %s}" (Code.string_of_method meth) mode_string])
       end
-    | _ -> Error (400, [Printf.sprintf "Invalid path %s (should begin with /v1/)" path])
+    | _ -> Error (400, [sprintf "Invalid path %s (should begin with /v1/)" path])
   in
   return result
 
@@ -157,7 +157,7 @@ let handler http routing ((ch, _) as conn) req body =
                 let open Read_settings in
                 let (body, headers) = match channel.Channel.read with
                   | None ->
-                    let err = Printf.sprintf "Impossible case: Missing readSettings for channel %s" chan_name in
+                    let err = sprintf "Impossible case: Missing readSettings for channel %s" chan_name in
                     async (fun () -> Logger.error err);
                     let headers = Header.add headers "content-type" "application/json" in
                     let body = Json_obj_j.(string_of_read { code = 500; errors = [err]; messages = [| |]; }) in
@@ -230,7 +230,7 @@ let healthy_socket sock =
 
 let make_socket ~backlog host port =
   let open Lwt_unix in
-  let%lwt () = Logger.notice (Printf.sprintf "Creating a new TCP socket on %s:%d" host port) in
+  let%lwt () = Logger.notice (sprintf "Creating a new TCP socket on %s:%d" host port) in
   let%lwt info = Lwt_unix.getaddrinfo host "0" [AI_PASSIVE; AI_SOCKTYPE SOCK_STREAM] in
   let%lwt (sockaddr, ip) = match List.hd info with
     | Some {ai_addr = (ADDR_UNIX _)} -> fail_with "Cant listen to TCP on a domain socket"

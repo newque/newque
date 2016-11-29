@@ -13,6 +13,16 @@
       "protocolSettings": {
         "backlog": 20
       }
+    },
+    {
+      "protocol": "zmq",
+      "name": "zmq8005",
+      "host": "0.0.0.0",
+      "port": 8105,
+      "protocolSettings": {
+        "concurrency": 20
+      }
     }
+
   ]
 }

@@ -12,7 +12,7 @@ let () = Lwt.async_exception_hook := fun ex ->
       | Failure str -> str
       | ex -> Exn.to_string ex
     in
-    print_endline (Printf.sprintf "UNCAUGHT EXCEPTION: %s" str
+    print_endline (sprintf "UNCAUGHT EXCEPTION: %s" str
     )
 let () = Lwt_preemptive.init 4 25 (fun str -> async (fun () -> Log.stdout Lwt_log.Info str))
 
@@ -25,7 +25,7 @@ let start config_path =
   let check_directory path =
     let dir = Fs.is_directory ~create:true path in
     if%lwt dir then return_unit else
-      Log.stderr Lwt_log.Error (Printf.sprintf "%s is not a directory or can't be created as one" path)
+      Log.stderr Lwt_log.Error (sprintf "%s is not a directory or can't be created as one" path)
   in
   let%lwt () = Lwt_list.iter_s check_directory [
       Fs.log_dir;
@@ -52,30 +52,27 @@ let start config_path =
   (* Load channel config files *)
   let%lwt channels = Configtools.parse_channels config Fs.conf_chan_dir in
   let result = Configtools.apply_channels watcher channels in
-  let%lwt () = match result with
-    | Ok () ->
-      let%lwt () = Logger.info "Server started" in
-      let pairs = List.map (Int.Table.to_alist (Watcher.table watcher)) ~f:(fun (port, listener) ->
-          let name = listener.Listener.id in
-          let channels = match String.Table.find (Watcher.router watcher).Router.table name with
-            | None -> []
-            | Some chan_table -> String.Table.keys chan_table
-          in
-          name, `Assoc [
-            "protocol", `String (Listener.get_prot listener);
-            "port", `Int port;
-            "channels", `List (List.map channels ~f:(fun s -> `String s))
-          ]
-        )
-      in
-      print_endline (Yojson.Basic.pretty_to_string (`Assoc pairs));
-      return_unit
-    | Error ll ->
-      Logger.error (String.concat ~sep:", " ll)
-  in
-
-  let%lwt () = admin_server.thread in
-  Logger.fatal "Admin server thread terminated."
+  match result with
+  | Error ll ->
+    Logger.error (String.concat ~sep:", " ll)
+  | Ok () ->
+    let%lwt () = Logger.info "Server started" in
+    let pairs = List.map (Int.Table.to_alist (Watcher.table watcher)) ~f:(fun (port, listener) ->
+        let name = listener.Listener.id in
+        let channels = match String.Table.find (Watcher.router watcher).Router.table name with
+          | None -> []
+          | Some chan_table -> String.Table.keys chan_table
+        in
+        name, `Assoc [
+          "protocol", `String (Listener.get_prot listener);
+          "port", `Int port;
+          "channels", `List (List.map channels ~f:(fun s -> `String s))
+        ]
+      )
+    in
+    print_endline (Yojson.Basic.pretty_to_string (`Assoc pairs));
+    (* Run forever *)
+    fst (wait ())
 
 let _ =
   Lwt_unix.run (start (Fs.conf_dir ^ "newque.json"))

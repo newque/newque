@@ -13,7 +13,7 @@ let parse_int64 str =
 (* This was rewritten in c/fortran style for efficiency *)
 let zip_group ~size arr1 arr2 =
   if Array.length arr1 <> Array.length arr2 then
-    fail_with (Printf.sprintf "Different array lengths: %d and %d" (Array.length arr1) (Array.length arr2))
+    fail_with (sprintf "Different array lengths: %d and %d" (Array.length arr1) (Array.length arr2))
   else
   let len = Array.length arr1 in
   let div = len / size in
@@ -55,7 +55,7 @@ let stream_to_array ~sep ?(init=(Some "")) stream =
   let queue = Queue.create () in
   let split = split ~sep in
   let%lwt (msgs, last) = Lwt_stream.fold_s (fun read ((), leftover) ->
-      let chunk = Option.value_map leftover ~default:read ~f:(fun a -> Printf.sprintf "%s%s" a read) in
+      let chunk = Option.value_map leftover ~default:read ~f:(fun a -> sprintf "%s%s" a read) in
       let lines = split chunk in
       let (fulls, partial) = List.split_n lines (List.length lines) in
       List.iter fulls ~f:(fun raw -> Queue.enqueue queue raw);
@@ -65,7 +65,6 @@ let stream_to_array ~sep ?(init=(Some "")) stream =
   Option.iter last ~f:(fun raw -> Queue.enqueue queue raw);
   return (Queue.to_array queue)
 
-(* TODO: Decide what to do with these "impossible" synchronous exceptions *)
 let rec is_assoc sexp =
   match sexp with
   | [] -> true
@@ -112,8 +111,7 @@ let sexp_of_json_str_exn str =
   let json = Yojson.Basic.from_string str in
   sexp_of_json_exn json
 
-(* TODO: Catch potential errors *)
-let sexp_of_atdgen str =
+let sexp_of_atdgen_exn str =
   match Yojson.Basic.from_string str with
   | `String s -> Sexp.Atom s
   | _ -> Sexp.Atom str
@@ -123,6 +121,7 @@ let parse_sync parser str =
   try
     Ok (parser str)
   with
+  | Unix.Unix_error (c, n, p) -> Error (Fs.format_unix_exn c n p)
   | Ag_oj_run.Error str
   | Yojson.Json_error str ->
     let replaced = Str.global_replace json_error_regexp " " str in
@@ -132,6 +131,17 @@ let parse_async parser str =
   try
     return (parser str)
   with
+  | Unix.Unix_error (c, n, p) -> fail_with (Fs.format_unix_exn c n p)
+  | Ag_oj_run.Error str
+  | Yojson.Json_error str ->
+    let replaced = Str.global_replace json_error_regexp " " str in
+    fail_with replaced
+
+let parse_async_bind parser str =
+  try
+    parser str
+  with
+  | Unix.Unix_error (c, n, p) -> fail_with (Fs.format_unix_exn c n p)
   | Ag_oj_run.Error str
   | Yojson.Json_error str ->
     let replaced = Str.global_replace json_error_regexp " " str in
@@ -142,10 +152,10 @@ let header_name_to_int64_opt headers name =
     (Header.get headers name)
     (fun x -> Option.try_with (fun () -> Int64.of_string x))
 
-let rec make_interval every callback =
+let rec make_interval every callback () =
   let%lwt () = Lwt_unix.sleep every in
   ignore_result (callback ());
-  make_interval every callback
+  make_interval every callback ()
 
 let time_ns_int64 () = Int63.to_int64 (Time_ns.to_int63_ns_since_epoch (Time_ns.now ()))
 let time_ns_int63 () = Time_ns.to_int63_ns_since_epoch (Time_ns.now ())
@@ -154,5 +164,5 @@ let time_ms_float () = Time.to_float (Time.now ()) *. 1000.
 let append_to_path uri append =
   let base_path = Uri.path uri in
   if String.(=) (String.suffix base_path 1) "/"
-  then Uri.with_path uri (Printf.sprintf "%s%s" base_path append)
-  else Uri.with_path uri (Printf.sprintf "%s/%s" base_path append)
+  then Uri.with_path uri (sprintf "%s%s" base_path append)
+  else Uri.with_path uri (sprintf "%s/%s" base_path append)

@@ -3,13 +3,17 @@ open Lwt
 open Config_t
 
 let parse_main path =
-  try%lwt
+  let parse path =
     let%lwt contents = Lwt_io.chars_of_file path |> Lwt_stream.to_string in
     return (Config_j.config_newque_of_string contents)
+  in
+  try%lwt
+    Util.parse_async_bind parse path
   with
-  | Ag_oj_run.Error str ->
-    let%lwt _ = Log.stdout Lwt_log.Fatal str in
-    fail_with (Printf.sprintf "Error while parsing %s" path)
+  | Failure err ->
+    let str = sprintf "Error while parsing %s: %s" path err in
+    let%lwt () = Log.stdout Lwt_log.Fatal str in
+    fail_with str
 
 let apply_main config watcher =
   (* Set global log level *)
@@ -24,20 +28,18 @@ let apply_main config watcher =
   in
   Lwt_log.add_rule "*" level;
   Log.lazy_level := (Log.int_of_level level);
-  (* TODO: dedup port and names *)
   Watcher.create_listeners watcher config.endpoints
 
-(* TODO: dedup endpoints *)
 let parse_channels config path =
   let open Channel in
   let%lwt files = Fs.list_files path in
   Lwt_list.map_p (fun filename ->
     let fragments = String.split ~on:'.' filename in
     let%lwt () = if (List.length fragments < 2) || (List.last_exn fragments <> "json")
-      then fail_with (Printf.sprintf "Channel file %s must end in .json" filename)
+      then fail_with (sprintf "Channel file %s must end in .json" filename)
       else return_unit
     in
-    let filepath = Printf.sprintf "%s%s" path filename in
+    let filepath = sprintf "%s%s" path filename in
     let%lwt contents = Lwt_stream.to_string (Lwt_io.chars_of_file filepath) in
     let mapper = fun str ->
       let parsed = Config_j.config_channel_of_string str in
@@ -47,8 +49,8 @@ let parse_channels config path =
     match Util.parse_sync mapper contents with
     | Ok chan -> return chan
     | Error err ->
-      let%lwt _ = Log.stdout Lwt_log.Fatal err in
-      fail_with (Printf.sprintf "Error while parsing %s: %s" filepath err)
+      let%lwt () = Log.stdout Lwt_log.Fatal err in
+      fail_with (sprintf "Error while parsing %s: %s" filepath err)
   ) files
 
 let apply_channels w channels =
@@ -77,5 +79,5 @@ let create_admin_server watcher config =
   let open Listener in
   async (fun () -> Watcher.monitor watcher {id = admin_conf.name; server = HTTP (admin_server, wakener);});
 
-  let success_str = Printf.sprintf "Started Admin server on HTTP %s:%d" admin_conf.host admin_conf.port in
+  let success_str = sprintf "Started Admin server on HTTP %s:%d" admin_conf.host admin_conf.port in
   return (admin_server, success_str)

@@ -14,7 +14,7 @@ type t = {
 let get_prot listener = match listener.server with
   | HTTP _ -> "HTTP"
   | ZMQ _ -> "ZMQ"
-  | Private -> "Internal"
+  | Private -> "<global>"
 
 let private_listener = {
   id = "";
