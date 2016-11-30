@@ -180,7 +180,7 @@ exports.setupEnvironment = function (backend, backendSettings, raw) {
   })
   .then(function () {
     var processes = [spawnExecutable(newquePath, runningDir)]
-    if (type === 'http') {
+    if (type === 'remotehttp') {
       processes.push(spawnExecutable(newquePath, remoteRunningDir))
     }
     return Promise.resolve(processes)

@@ -3,6 +3,11 @@ type pair = {
   value: string;
 }
 
+type cardinality = [
+  | C_one <json name="one">
+  | C_all <json name="all">
+] <ocaml repr="classic">
+
 type config_channel_format = [
   | C_plaintext <json name="plaintext">
   | C_json <json name="json">
@@ -66,7 +71,7 @@ type config_elasticsearch = {
 type config_persistence = [
   | Memory <json name="memory">
   | Disk <json name="disk">
-  | Remote_http <json name="http"> of config_remote_http
+  | Remote_http <json name="remotehttp"> of config_remote_http
   | Elasticsearch <json name="elasticsearch"> of config_elasticsearch
   | Redis <json name="redis"> of config_redis
 ]
