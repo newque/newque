@@ -163,7 +163,7 @@ __Example__
 | `readSettings` | Object or Null | Yes | | Settings related to Reading from this Channel, or `null` to disable all Reading. |
 | `writeSettings` | Object or Null | Yes | | Settings related to Writing to this Channel, or `null` to disable all Writing. |
 | `separator` | String | No | `\n` | String that acts as a separator between messages for `httpFormat`: `plaintext`. |
-| `averageSize` | Integer | No | `256` | Average size (in bytes) of HTTP bodies for `httpFormat`: `plaintext`. |
+| `averageSize` | Integer | No | `256` | Average size (in bytes) of incoming (Write) HTTP bodies when `httpFormat`: `plaintext`. |
 | `maxRead` | Integer | No | `1000` | How messages can be returned in a single Read operation. Includes Streaming.  |
 | `averageRead` | Integer | No | `32` | Average number of messages returned per Read operation. Includes Streaming. |
 
@@ -181,7 +181,7 @@ __`http` `backendSettings` Object__
 |----------|------|----------|---------|-------------|
 | `baseUrls` | Array of strings | Yes | | Base URLs to use for the remote HTTP server(s). |
 | `baseHeaders` | Array of Objects | Yes | | Headers to add to every request to the remote server. |
-| `appendChannelName` | Boolean | Yes | | Append the channel name to the URL path. |
+| `appendChannelName` | Boolean | No | `false` | Append the channel name to the URL path. |
 | `remoteInputFormat` | String | No | `json` | Format that the remote server accepts for writes. One of `plaintext` or `json`. |
 | `remoteOutputFormat` | String | No | `json` | Format that the remote server uses to send read results. One of `plaintext` or `json`. |
 
