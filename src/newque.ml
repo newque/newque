@@ -53,26 +53,36 @@ let start config_path =
   let%lwt channels = Configtools.parse_channels config Fs.conf_chan_dir in
   let result = Configtools.apply_channels watcher channels in
   match result with
-  | Error ll ->
-    Logger.error (String.concat ~sep:", " ll)
+  | Error errors ->
+    Logger.error (String.concat ~sep:", " errors)
   | Ok () ->
-    let%lwt () = Logger.info "Server started" in
-    let pairs = List.map (Int.Table.to_alist (Watcher.table watcher)) ~f:(fun (port, listener) ->
-        let name = listener.Listener.id in
-        let channels = match String.Table.find (Watcher.router watcher).Router.table name with
-          | None -> []
-          | Some chan_table -> String.Table.keys chan_table
-        in
-        name, `Assoc [
-          "protocol", `String (Listener.get_prot listener);
-          "port", `Int port;
-          "channels", `List (List.map channels ~f:(fun s -> `String s))
-        ]
-      )
-    in
-    print_endline (Yojson.Basic.pretty_to_string (`Assoc pairs));
-    (* Run forever *)
-    fst (wait ())
+    let open Router in
+    let router = Watcher.router watcher in
+    let priv = Listener.(private_listener.id) in
+    let%lwt () = Logger.info "Running global health check..." in
+    match%lwt Router.health router ~listen_name:priv ~chan_name:None ~mode:`Health with
+    | (_::_) as errors ->
+      Logger.error (String.concat ~sep:", " errors)
+    | [] ->
+      let%lwt () = Logger.info "Global health check succeeded" in
+      let%lwt () = Logger.info "Server started" in
+      let pairs = List.map (Int.Table.to_alist (Watcher.table watcher)) ~f:(fun (port, listener) ->
+          let name = listener.Listener.id in
+          let channels = match String.Table.find router.table name with
+            | None -> []
+            | Some chan_table -> String.Table.keys chan_table
+          in
+          name, `Assoc [
+            "protocol", `String (Listener.get_prot listener);
+            "port", `Int port;
+            "channels", `List (List.map channels ~f:(fun s -> `String s))
+          ]
+        )
+      in
+      print_endline (Yojson.Basic.pretty_to_string (`Assoc pairs));
+      (* Run forever *)
+      fst (wait ())
+
 
 let _ =
   Lwt_unix.run (start (Fs.conf_dir ^ "newque.json"))
