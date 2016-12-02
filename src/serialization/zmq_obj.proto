@@ -2,7 +2,7 @@
 message Input {
 
   message Write_Input {
-    required bool atomic = 1;
+    optional bool atomic = 1;
     repeated bytes ids = 2;
   }
 

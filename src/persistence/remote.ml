@@ -3,6 +3,8 @@ open Lwt
 open Cohttp
 open Cohttp_lwt_unix
 
+module Logger = Log.Make (struct let path = Log.outlog let section = "Remote" end)
+
 type remote_t = {
   base_urls: Uri.t array;
   base_headers: Header.t;

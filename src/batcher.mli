@@ -1,8 +1,8 @@
 open Core.Std
 
 type ('a, 'b) t = {
-  left: 'a Queue.t;
-  right: 'b Queue.t;
+  lefts: 'a Queue.t;
+  rights: 'b Queue.t;
   max_time: float; (* milliseconds *)
   max_size: int;
   handler: 'a array -> 'b array -> int Lwt.t;
@@ -19,4 +19,4 @@ val create :
 
 val length : ('a, 'b) t -> int
 
-val submit : ('a, 'b) t -> 'a array -> 'b array -> unit Lwt.t
+val submit : ('a, 'b) t -> 'a -> 'b -> unit Lwt.t

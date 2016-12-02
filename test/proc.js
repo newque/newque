@@ -88,12 +88,6 @@ var chmod = exports.chmod = function (path, mode) {
   })
 }
 
-exports.cleanDirectories = function (arr) {
-  return Promise.all([
-    rm(runningDir)
-  ])
-}
-
 var getEnvironment = function () {
   var path = runningDir + '/conf/'
   var env = {
@@ -114,6 +108,8 @@ exports.setupEnvironment = function (backend, backendSettings, raw) {
   var type = backend.split(' ')[0]
   var remoteType = backend.split(' ')[1]
   return rm(remoteRunningDir)
+  .then(() => rm(runningDir))
+  .then(() => rm(remoteConfDir + '/channels'))
   .then(() => createDir(remoteRunningDir))
   .then(() => copyDir(confDir + '/channels', remoteConfDir + '/channels'))
   .then(() => copyDir(remoteConfDir, remoteRunningDir + '/conf'))
@@ -179,10 +175,16 @@ exports.setupEnvironment = function (backend, backendSettings, raw) {
     }))
   })
   .then(function () {
-    var processes = [spawnExecutable(newquePath, runningDir)]
+    var processes = []
     if (type === 'remotehttp') {
       processes.push(spawnExecutable(newquePath, remoteRunningDir))
     }
+    var delay = processes.length > 0 ? C.spawnDelay : 0
+    return Promise.delay(delay)
+    .then(() => Promise.resolve(processes))
+  })
+  .then(function (processes) {
+    processes.push(spawnExecutable(newquePath, runningDir))
     return Promise.resolve(processes)
   })
 }

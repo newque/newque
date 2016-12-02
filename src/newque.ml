@@ -9,11 +9,11 @@ open Http_prot
 let () = Lwt_engine.set ~transfer:true ~destroy:true (new Lwt_engine.libev)
 let () = Lwt.async_exception_hook := fun ex ->
     let str = match ex with
+      | Unix.Unix_error (c, n, p) -> Fs.format_unix_exn c n p
       | Failure str -> str
       | ex -> Exn.to_string ex
     in
-    print_endline (sprintf "UNCAUGHT EXCEPTION: %s" str
-    )
+    print_endline (sprintf "UNCAUGHT EXCEPTION: %s" str)
 let () = Lwt_preemptive.init 4 25 (fun str -> async (fun () -> Log.stdout Lwt_log.Info str))
 
 (* Only for startup, replaced by newque.json settings later *)

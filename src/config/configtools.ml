@@ -46,9 +46,10 @@ let parse_channels config path =
       let name = List.slice fragments 0 (-1) |> String.concat ~sep:"." in
       Channel.create name parsed
     in
-    match Util.parse_sync mapper contents with
-    | Ok chan -> return chan
-    | Error err ->
+    try%lwt
+      Util.parse_async_bind mapper contents
+    with
+    | Failure err ->
       let%lwt () = Log.stdout Lwt_log.Fatal err in
       fail_with (sprintf "Error while parsing %s: %s" filepath err)
   ) files

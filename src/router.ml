@@ -49,10 +49,10 @@ let register_channels router channels =
 
 let find_chan router ~listen_name ~chan_name =
   match String.Table.find router.table listen_name with
-  | None -> Error [sprintf "Unknown listener \'%s\'" listen_name]
+  | None -> Error [sprintf "Unknown listener [%s]" listen_name]
   | Some chan_table ->
     begin match String.Table.find chan_table chan_name with
-      | None -> Error [sprintf "No channel \'%s\' associated with listener \'%s\'" chan_name listen_name]
+      | None -> Error [sprintf "No channel [%s] associated with listener [%s]" chan_name listen_name]
       | Some chan -> Ok chan
     end
 

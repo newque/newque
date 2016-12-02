@@ -25,6 +25,8 @@ val stream_to_array :
 
 val zip_group : size:int -> 'a array -> 'b array -> ('a * 'b) array list Lwt.t
 
+val array_to_list_rev_mapi : mapper:(int -> 'a -> 'b) -> 'a array -> 'b list
+
 val json_of_sexp : Sexp.t -> Yojson.Basic.json
 val string_of_sexp : ?pretty:bool -> Sexp.t -> string
 

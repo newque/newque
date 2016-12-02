@@ -53,6 +53,8 @@ end
 module type S = sig
   type t [@@deriving sexp]
 
+  val ready : unit -> unit Lwt.t
+
   val push : Message.t -> Id.t array -> int Lwt.t
 
   val pull_slice : int64 -> mode:Mode.Read.t -> only_once:bool -> slice Lwt.t
@@ -74,6 +76,10 @@ module Make (Argument: Argument) : S = struct
 
   let instance = Argument.create ()
 
+  let ready () =
+    let%lwt _ = instance in
+    return_unit
+
   (******************
      PUSH
    ********************)
@@ -89,6 +95,17 @@ module Make (Argument: Argument) : S = struct
       fun msgs ids ->
         let%lwt instance = instance in
         Argument.IO.push instance ~msgs ~ids
+    | Some { max_time; max_size = 1; _ } ->
+      (* Special case optimization *)
+      fun msgs ids ->
+        let%lwt instance = instance in
+        let threads = Util.array_to_list_rev_mapi msgs ~mapper:(fun i msg ->
+            let%lwt _ = Argument.IO.push instance ~msgs:[| msg |] ~ids:[| Array.get ids i |] in
+            return_unit
+          )
+        in
+        let%lwt () = join threads in
+        return (Array.length msgs)
     | Some { max_time; max_size; _ } ->
       let batcher = Batcher.create ~max_time ~max_size ~handler:(fun msgs ids ->
           let%lwt instance = instance in
@@ -96,7 +113,11 @@ module Make (Argument: Argument) : S = struct
         )
       in
       fun msgs ids ->
-        let%lwt () = Batcher.submit batcher msgs ids in
+        let threads = Util.array_to_list_rev_mapi msgs ~mapper:(fun i msg ->
+            Batcher.submit batcher msg (Array.get ids i)
+          )
+        in
+        let%lwt () = join threads in
         return (Array.length msgs)
 
   let push msgs ids =

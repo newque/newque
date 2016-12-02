@@ -26,6 +26,11 @@ let zip_group ~size arr1 arr2 =
     )
   )
 
+let array_to_list_rev_mapi ~mapper arr =
+  Array.foldi arr ~init:[] ~f:(fun i acc elt ->
+    (mapper i elt)::acc
+  )
+
 (* An efficient lazy stream flattener *)
 let stream_map_array_s ~batch_size ~mapper arr_stream =
   let capacity = Int.min batch_size 10000 in (* Sanity check... *)

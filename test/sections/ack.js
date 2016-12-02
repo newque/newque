@@ -7,7 +7,7 @@ module.exports = function (backend, backendSettings, raw) {
       return Proc.setupEnvironment(backend, backendSettings, raw)
       .then(function (procs) {
         procs.forEach((p) => processes.push(p))
-        return Promise.delay(C.spawnDelay * processes.length)
+        return Promise.delay(C.spawnDelay)
       })
     })
 

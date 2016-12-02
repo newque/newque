@@ -4,8 +4,8 @@ open Lwt
 module Logger = Log.Make (struct let path = Log.outlog let section = "Batcher" end)
 
 type ('a, 'b) t = {
-  left: 'a Queue.t;
-  right: 'b Queue.t;
+  lefts: 'a Queue.t;
+  rights: 'b Queue.t;
   max_time: float; (* milliseconds *)
   max_size: int;
   handler: 'a array -> 'b array -> int Lwt.t;
@@ -15,34 +15,34 @@ type ('a, 'b) t = {
 } [@@deriving sexp]
 
 let get_data batcher =
-  let lefts = Queue.to_array batcher.left in
-  let rights = Queue.to_array batcher.right in
-  Queue.clear batcher.left;
-  Queue.clear batcher.right;
-  let old_wake = batcher.wake in
-  let () =
-    let (thr, wake) = wait () in
-    batcher.thread <- thr;
-    batcher.wake <- wake
-  in
-  wakeup old_wake ();
+  let lefts = Queue.to_array batcher.lefts in
+  let rights = Queue.to_array batcher.rights in
+  Queue.clear batcher.lefts;
+  Queue.clear batcher.rights;
   (lefts, rights)
 
 let do_flush batcher =
+  let (lefts, rights) = get_data batcher in
   try%lwt
-    let (lefts, rights) = get_data batcher in
     let%lwt _ = batcher.handler lefts rights in
+    let old_wake = batcher.wake in
+    let () =
+      let (thr, wake) = wait () in
+      batcher.thread <- thr;
+      batcher.wake <- wake
+    in
+    wakeup old_wake ();
     return_unit
   with
   | err -> Logger.error (Exn.to_string err)
 
-let length batcher = Queue.length batcher.left
+let length batcher = Queue.length batcher.lefts
 
 let create ~max_time ~max_size ~handler =
   let (thread, wake) = wait () in
   let batcher = {
-    left = Queue.create ~capacity:max_size ();
-    right = Queue.create ~capacity:max_size ();
+    lefts = Queue.create ~capacity:max_size ();
+    rights = Queue.create ~capacity:max_size ();
     max_time;
     max_size;
     handler;
@@ -61,15 +61,12 @@ let create ~max_time ~max_size ~handler =
   );
   batcher
 
-let check_max_size batcher add_n =
-  if (((length batcher) + add_n) >= batcher.max_size) && length batcher > 0
+let check_max_size batcher =
+  if (Int.(=) (succ (length batcher)) batcher.max_size)
   then do_flush batcher
-  else return_unit
+  else batcher.thread
 
-let submit batcher lefts rights =
-  let old_thread = batcher.thread in
-  let%lwt () = check_max_size batcher (Array.length lefts) in
-  Array.iter ~f:(Queue.enqueue batcher.left) lefts;
-  Array.iter ~f:(Queue.enqueue batcher.right) rights;
-  let%lwt () = check_max_size batcher (Array.length lefts) in
-  old_thread
+let submit batcher left right =
+  Queue.enqueue batcher.lefts left;
+  Queue.enqueue batcher.rights right;
+  check_max_size batcher

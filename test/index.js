@@ -29,7 +29,6 @@ Proc.pathExists(Proc.newquePath)
     throw new Error('Newque executable not found at ' + Proc.newquePath)
   }
 })
-.then(Proc.cleanDirectories)
 .then(Proc.clearEs(esSettings))
 .then(function (server) {
 

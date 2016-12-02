@@ -66,6 +66,18 @@ let create name conf_channel =
       end in
       (module Persistence.Make (Arg) : Persistence.S)
 
+    | `Pubsub pubsub ->
+      if Option.is_some read then failwith (sprintf "Channel [%s] has persistence type [pubsub], reading must be disabled" name) else
+      if conf_channel.emptiable then failwith (sprintf "Channel [%s] has persistence type [pubsub], setting 'emptiable' must be set to false" name) else
+      let module Arg = struct
+        module IO = Pubsub.M
+        let create () = Pubsub.create ~chan_name:name pubsub.p_host pubsub.p_port
+        let stream_slice_size = stream_slice_size
+        let raw = conf_channel.raw
+        let batching = batching
+      end in
+      (module Persistence.Make (Arg) : Persistence.S)
+
     | `Elasticsearch es ->
       if not conf_channel.raw then failwith (sprintf "Channel [%s] has persistence type [elasticsearch], setting 'raw' must be set to true" name) else
       if Option.is_some read then failwith (sprintf "Channel [%s] has persistence type [elasticsearch], reading must be disabled" name) else
@@ -90,7 +102,7 @@ let create name conf_channel =
       (module Persistence.Make (Arg) : Persistence.S)
   ) : Persistence.S)
   in
-  {
+  let instance = {
     name;
     endpoint_names = conf_channel.endpoint_names;
     push = Persist.push;
@@ -107,6 +119,9 @@ let create name conf_channel =
     buffer_size = conf_channel.buffer_size;
     max_read = Int.to_int64 (conf_channel.max_read);
   }
+  in
+  let%lwt () = Persist.ready () in
+  return instance
 
 let push chan msgs ids = chan.push msgs ids
 

@@ -221,13 +221,6 @@ let handler http routing ((ch, _) as conn) req body =
 
 let open_sockets = Int.Table.create ~size:5 ()
 
-let healthy_socket sock =
-  try%lwt
-    Lwt_unix.check_descriptor sock;
-    return_true
-  with
-  | _ -> return_false
-
 let make_socket ~backlog host port =
   let open Lwt_unix in
   let%lwt () = Logger.notice (sprintf "Creating a new TCP socket on %s:%d" host port) in
@@ -251,7 +244,7 @@ let start generic specific routing =
   let thunk () = make_socket ~backlog:specific.backlog generic.host generic.port in
   let%lwt sock = match Int.Table.find_and_remove open_sockets generic.port with
     | Some s ->
-      begin match%lwt healthy_socket s with
+      begin match%lwt Fs.healthy_fd s with
         | true -> return s
         | false -> thunk ()
       end
