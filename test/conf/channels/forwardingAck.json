@@ -6,9 +6,9 @@
     "onlyOnce": false
   },
   "writeSettings": {
-    "acknowledgement": "none",
+    "acknowledgement": "saved",
     "httpFormat": "plaintext",
-    "copyToChannels": ["sink1"]
+    "forward": ["sink1", "sink2"]
   },
   "emptiable": true
 }

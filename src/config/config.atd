@@ -98,7 +98,7 @@ type config_batching = {
 type config_channel_write = {
   ~http_format <json name="httpFormat"> <ocaml default="C_json">: config_channel_format;
   ~ack <json name="acknowledgement"><ocaml default="C_saved">: config_channel_acknowledgement;
-  copy_to <json name="copyToChannels">: string list;
+  forward: string list;
   ?batching: config_batching nullable;
 } <ocaml field_prefix="c_">
 

@@ -5,7 +5,7 @@
   "writeSettings": {
     "acknowledgement": "saved",
     "httpFormat": "plaintext",
-    "copyToChannels": []
+    "forward": []
   },
   "emptiable": true
 }

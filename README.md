@@ -147,7 +147,7 @@ __Example__
     "onlyOnce": true
   },
   "writeSettings": {
-    "copyToChannels": ["sinkChannel"]
+    "forward": ["sinkChannel"]
   },
   "raw": true,
   "emptiable": true
@@ -226,7 +226,7 @@ __Write Settings Object__
 |----------|------|----------|---------|-------------|
 | `httpFormat` | String | No | `json` | Format that the Channel accepts for writes. One of `plaintext` or `json`. |
 | `acknowledgement` | String | No | `saved` | Whether to wait for the Write operation to be acknowledged before returning the results. One of `saved` or `instant`. |
-| `copyToChannels` | Array of strings | No | | List of Channel names where the messages must also be written after they've successfully been written to the Channel. |
+| `forward` | Array of strings | No | | List of Channel names where the messages must also be written after they've successfully been written to the Channel. |
 | `batching` | Object | No | | Settings related to batching writes. Generally results in large performance gains. |
 
 __Batching Object__

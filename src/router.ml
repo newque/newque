@@ -73,18 +73,18 @@ let write_shared router ~listen_name ~chan ~write ~msgs ~ids =
         ignore_result (Logger.debug_lazy (lazy (
             sprintf "Wrote: (length: %d) %s from %s" count chan.name listen_name
           )));
-        (* Copy to other channels if needed. *)
-        let%lwt () = Lwt_list.iter_p (fun copy_chan_name ->
-            begin match find_chan router ~listen_name:Listener.(private_listener.id) ~chan_name:copy_chan_name with
-              | Error _ -> Logger.warning_lazy (lazy (sprintf "Cannot copy from %s to %s because %s doesn't exist." chan.name copy_chan_name copy_chan_name))
-              | Ok copy_chan ->
-                let%lwt copy_count = Channel.push copy_chan msgs ids in
-                if copy_count <> count then async (fun () ->
-                    Logger.warning_lazy (lazy (sprintf "Mismatch while copying from %s (wrote %d) to %s (wrote %d). Possible ID collision(s)." chan.name count copy_chan_name copy_count)
+        (* Forward to other channels if needed. *)
+        let%lwt () = Lwt_list.iter_p (fun forward_chan_name ->
+            begin match find_chan router ~listen_name:Listener.(private_listener.id) ~chan_name:forward_chan_name with
+              | Error _ -> Logger.warning_lazy (lazy (sprintf "Cannot forward from %s to %s because %s doesn't exist." chan.name forward_chan_name forward_chan_name))
+              | Ok forward_chan ->
+                let%lwt forward_count = Channel.push forward_chan msgs ids in
+                if forward_count <> count then async (fun () ->
+                    Logger.warning_lazy (lazy (sprintf "Mismatch while forwarding from %s (wrote %d) to %s (wrote %d). Possible ID collision(s)." chan.name count forward_chan_name forward_count)
                     ));
                 return_unit
             end
-          ) write.copy_to in
+          ) write.forward in
         return (Ok (Some count))
       in
       begin match write.ack with

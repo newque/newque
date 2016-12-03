@@ -6,7 +6,7 @@
   },
   "writeSettings": {
     "acknowledgement": "saved",
-    "copyToChannels": [],
+    "forward": [],
     "batching": {
       "maxTime": 100,
       "maxSize": 5

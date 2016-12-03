@@ -8,7 +8,7 @@
   "acknowledgement": "saved",
   "readSettings": null,
   "writeSettings": {
-    "copyToChannels": []
+    "forward": []
   },
   "raw": true,
   "emptiable": false

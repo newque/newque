@@ -201,11 +201,11 @@ module.exports = function (backend, backendSettings, raw) {
       }
     })
 
-    describe('Copy to channels', function () {
+    describe('Forward to channels', function () {
       it ('Should also write to sinks (2 sinks, ack)', function () {
         this.timeout(3500)
-        var buf = '{"somefield":"Copying 1 abc"}\n{"somefield":"Copying 1 def"}\n{"somefield":"Copying 1 ghi"}\n{"somefield":"Copying 1 jkl"}'
-        return Fn.call('POST', 8000, '/v1/copyingAck', buf, [[C.modeHeader, 'multiple']])
+        var buf = '{"somefield":"Forwardinging 1 abc"}\n{"somefield":"Forwardinging 1 def"}\n{"somefield":"Forwardinging 1 ghi"}\n{"somefield":"Forwardinging 1 jkl"}'
+        return Fn.call('POST', 8000, '/v1/forwardingAck', buf, [[C.modeHeader, 'multiple']])
         .then(Fn.shouldHaveWritten(4))
         .delay(delay)
         .then(() => Fn.call('GET', 8000, '/v1/sink1/count'))
@@ -217,8 +217,8 @@ module.exports = function (backend, backendSettings, raw) {
 
       it ('Should also write to sinks (1 sink, no ack)', function () {
         this.timeout(3500)
-        var buf = '{"somefield":"Copying 2 abc"}\n{"somefield":"Copying 2 def"}\n{"somefield":"Copying 2 ghi"}\n{"somefield":"Copying 2 jkl"}'
-        return Fn.call('POST', 8000, '/v1/copyingNoAck', buf, [[C.modeHeader, 'multiple']])
+        var buf = '{"somefield":"Forwardinging 2 abc"}\n{"somefield":"Forwardinging 2 def"}\n{"somefield":"Forwardinging 2 ghi"}\n{"somefield":"Forwardinging 2 jkl"}'
+        return Fn.call('POST', 8000, '/v1/forwardingNoAck', buf, [[C.modeHeader, 'multiple']])
         .delay(25)
         .then(Fn.shouldHaveWrittenAsync())
         .delay(delay)
