@@ -29,6 +29,16 @@ let create name conf_channel =
   let batching = Option.bind write (fun w -> w.Write_settings.batching) in
 
   let module Persist = (val (match conf_channel.persistence_settings with
+    | `None ->
+      let module Arg = struct
+        module IO = None.M
+        let create () = None.create ()
+        let stream_slice_size = stream_slice_size
+        let raw = conf_channel.raw
+        let batching = batching
+      end in
+      (module Persistence.Make (Arg) : Persistence.S)
+
     | `Memory ->
       let module Arg = struct
         module IO = Local.M

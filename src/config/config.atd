@@ -74,6 +74,7 @@ type config_elasticsearch = {
 }
 
 type config_persistence = [
+  | None <json name="none">
   | Memory <json name="memory">
   | Disk <json name="disk">
   | Remote_http <json name="remotehttp"> of config_remote_http

@@ -14,11 +14,12 @@ Each message has a unique ID, Newque will generate IDs when they are not provide
 
 The current Backend options are:
 
+- None
 - Memory
 - Disk
 - Remote HTTP server
+- Publish to pubsub
 - ElasticSearch
-- Publish to pubsub (in development)
 - ...more coming soon (Redis)
 
 The main operations are:
@@ -157,7 +158,7 @@ __Example__
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `listeners` | Array of strings | Yes | | The name of all the Listeners this Channel will be available from. |
-| `backend` | String | Yes | | Which type of Backend. One of `memory`, `disk`, `remotehttp` or `elasticsearch`. |
+| `backend` | String | Yes | | Which type of Backend. One of `none`, `memory`, `disk`, `remotehttp`, `elasticsearch` or `pubsub`. |
 | `backendSettings` | Object | No | | The right Settings object for the `backend` value. |
 | `emtiable` | Boolean | Yes | | Whether the Delete operation can be used on this Channel. |
 | `raw` | Boolean | No | `false` | Whether the messages should be wrapped when writing to the Backend. |
@@ -167,6 +168,10 @@ __Example__
 | `averageSize` | Integer | No | `256` | Average size (in bytes) of incoming (Write) HTTP bodies when `httpFormat`: `plaintext`. |
 | `maxRead` | Integer | No | `1000` | How messages can be returned in a single Read operation. Includes Streaming.  |
 | `averageRead` | Integer | No | `32` | Average number of messages returned per Read operation. Includes Streaming. |
+
+__`none` `backendSettings` Object__
+
+The `none` Backend does not have a `backendSettings` object.
 
 __`memory` `backendSettings` Object__
 
@@ -199,6 +204,13 @@ __`elasticsearch` `backendSettings` Object__
 | `baseUrls` | Array of strings | Yes | | Base URLs to use for the ES server(s). |
 | `index` | String | Yes | | The ES index name to use as a Backend. |
 | `type` | String | Yes | | The ES type name to use as a Backend. |
+
+__`pubsub` `backendSettings` Object__
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `host` | String | Yes | | Address on which to messages will be broadcasted |
+| `port` | Integer | Yes | | Address on which to messages will be broadcasted |
 
 __Read Settings Object__
 

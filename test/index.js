@@ -68,11 +68,14 @@ Proc.pathExists(Proc.newquePath)
   require('./sections/delete')('remotehttp plaintext', httpPlaintextSettings)
   require('./sections/delete')('disk', {}, true)
 
+  require('./sections/health')('none', {})
   require('./sections/health')('disk', {})
   require('./sections/health')('memory', {})
   require('./sections/health')('remotehttp json', httpJsonSettings)
   require('./sections/health')('remotehttp plaintext', httpPlaintextSettings)
   require('./sections/health')('elasticsearch', esSettings, true)
+
+  require('./sections/none')('none', {})
 
   run()
 })
