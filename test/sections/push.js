@@ -332,25 +332,32 @@ module.exports = function (backend, backendSettings, raw) {
         var buf1 = Fn.makeJsonBuffer(['{"xyz":"asd1"}', '{"xyz":"asd2"}', '{"xyz":"asd3"}', '{"xyz":"asd4"}', '{"xyz":"asd5"}'], null, false)
         var buf2 = Fn.makeJsonBuffer(['{"xyz":"fgh"}'], null, false)
         var t0 = Date.now()
+        var t1
         // This call should be instant, because it fills up the queue
         return Fn.call('POST', 8000, '/v1/batching', buf1)
         .then(Fn.shouldHaveWritten(5))
         .then(function () {
           var took = Date.now() - t0
+          // console.log(took)
           Fn.assert(took < 100)
+
+          t1 = Date.now()
           return Fn.call('POST', 8000, '/v1/batching', buf2)
         })
         .then(Fn.shouldHaveWritten(1))
         .delay(delay)
         .then(() => Fn.call('GET', 8000, '/v1/batching/count'))
         .then(Fn.shouldHaveCounted(8))
+        .then(function () {
+          var took = Date.now() - t1
+          // console.log(took)
+        })
       })
 
       if (!raw) {
         it('Should work with atomics', function () {
             var buf1 = Fn.makeJsonBuffer(['aaa', 'bbb'], null, false)
             var buf2 = Fn.makeJsonBuffer(['ccc', 'ddd'], null, true)
-            var t0 = Date.now()
 
             return Fn.call('GET', 8000, '/v1/batching/count')
             .then(Fn.shouldHaveCounted(8))

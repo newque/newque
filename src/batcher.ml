@@ -24,6 +24,7 @@ let get_data batcher =
 let do_flush batcher =
   let (lefts, rights) = get_data batcher in
   try%lwt
+    batcher.last_flush <- Util.time_ms_float ();
     let%lwt _ = batcher.handler lefts rights in
     let old_wake = batcher.wake in
     let () =
@@ -54,7 +55,7 @@ let create ~max_time ~max_size ~handler =
   async (
     Util.make_interval (max_time /. 1000.) (fun () ->
       if Float.(>) (Util.time_ms_float ()) (batcher.last_flush +. batcher.max_time)
-      && Int.(>) (length batcher) 0
+      && Int.is_positive (length batcher)
       then do_flush batcher
       else return_unit
     )

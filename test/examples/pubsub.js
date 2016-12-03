@@ -43,6 +43,8 @@ sub.on('message', function(input, message1, message2) {
   console.log('Received IDs:', decoded.write_input.ids.map(str))
   console.log(str(message1))
   console.log(str(message2))
+
+  process.exit(0)
 })
 
 /****** Send it off! ******/

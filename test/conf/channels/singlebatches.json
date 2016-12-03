@@ -1,0 +1,17 @@
+{
+  "listeners": ["http8000","zmq8005"],
+  "backend": "pubsub",
+  "readSettings": {
+    "onlyOnce": false
+  },
+  "writeSettings": {
+    "acknowledgement": "saved",
+    "httpFormat": "plaintext",
+    "forward": [],
+    "batching": {
+      "maxTime": 100,
+      "maxSize": 1
+    }
+  },
+  "emptiable": true
+}

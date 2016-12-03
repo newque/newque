@@ -35,9 +35,8 @@ module.exports = function (backend, backendSettings, raw) {
       var originalIdsStr = originalIds.join(',')
       var buf = `{"a":"abc"}\n{"a":"def"}\n{"a":"ghi"}\n{"a":"jkl"}`
 
-      var receiveOnSocket = function (socket) {
+      var receiveOnSocket = function (socket, addr) {
         return new Promise(function (resolve, reject) {
-          var addr = 'tcp://127.0.0.1:' + pubsubPorts.example
           socket.connect(addr)
           socket.subscribe(new Buffer([]))
           socket.on('message', function (input, msg1, msg2, msg3, msg4) {
@@ -59,9 +58,49 @@ module.exports = function (backend, backendSettings, raw) {
           })
         })
       }
-      var receive1 = receiveOnSocket(socket1)
-      var receive2 = receiveOnSocket(socket2)
+      var addr = 'tcp://127.0.0.1:' + pubsubPorts.example
+      var receive1 = receiveOnSocket(socket1, addr)
+      var receive2 = receiveOnSocket(socket2, addr)
       return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'multiple'], [C.idHeader, originalIdsStr]])
+      .then(Fn.shouldHaveWritten(4))
+      .then(() => receive1)
+      .then(() => receive2)
+    })
+
+    it('Should split into single flushes', function () {
+      var originalIds = ['id1', 'id2', 'id4', 'id8']
+      var originalIdsStr = originalIds.join(',')
+      var buf = `1\n2\n4\n8`
+      var shouldTotal = 1 + 2 + 4 + 8
+
+      var receiveOnSocket = function (socket, addr) {
+        var total = 0
+        return new Promise(function (resolve, reject) {
+          socket.connect(addr)
+          socket.subscribe(new Buffer([]))
+          socket.on('message', function (input, msg) {
+            var decoded = specs.Input.decode(input)
+            Fn.assert(decoded.channel.toString('utf8') === 'singlebatches')
+            Fn.assert(decoded.write_input.atomic !== true)
+
+            var receivedIds = decoded.write_input.ids.map(x => x.toString('utf8'))
+            var receivedMsg = msg.toString('utf8')
+            Fn.assert(receivedIds[0] === 'id' + receivedMsg)
+            var splitBuf = buf.split('\n')
+
+            total += parseInt(receivedMsg, 10)
+            if (total === shouldTotal) {
+              socket.removeAllListeners('message')
+              socket.disconnect(addr)
+              resolve()
+            }
+          })
+        })
+      }
+      var addr = 'tcp://127.0.0.1:' + pubsubPorts.singlebatches
+      var receive1 = receiveOnSocket(socket1, addr)
+      var receive2 = receiveOnSocket(socket2, addr)
+      return Fn.call('POST', 8000, '/v1/singlebatches', buf, [[C.modeHeader, 'multiple'], [C.idHeader, originalIdsStr]])
       .then(Fn.shouldHaveWritten(4))
       .then(() => receive1)
       .then(() => receive2)
