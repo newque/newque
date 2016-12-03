@@ -5,8 +5,8 @@ module.exports = function (backend, backendSettings, raw) {
     before(function () {
       this.timeout(C.setupTimeout)
       return Proc.setupEnvironment(backend, backendSettings, raw)
-      .then(function (procs) {
-        procs.forEach((p) => processes.push(p))
+      .then(function (env) {
+        env.processes.forEach((p) => processes.push(p))
         return Promise.delay(C.spawnDelay)
       })
       .then(function () {

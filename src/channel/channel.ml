@@ -77,6 +77,7 @@ let create name conf_channel =
       (module Persistence.Make (Arg) : Persistence.S)
 
     | `Pubsub pubsub ->
+      if not conf_channel.raw then failwith (sprintf "Channel [%s] has persistence type [pubsub], setting 'raw' must be set to true" name) else
       if Option.is_some read then failwith (sprintf "Channel [%s] has persistence type [pubsub], reading must be disabled" name) else
       if conf_channel.emptiable then failwith (sprintf "Channel [%s] has persistence type [pubsub], setting 'emptiable' must be set to false" name) else
       let module Arg = struct

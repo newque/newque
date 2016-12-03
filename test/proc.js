@@ -107,6 +107,8 @@ var getEnvironment = function () {
 exports.setupEnvironment = function (backend, backendSettings, raw) {
   var type = backend.split(' ')[0]
   var remoteType = backend.split(' ')[1]
+  var pubsubPorts = {}
+  var remotePubsubPorts = {}
   return rm(remoteRunningDir)
   .then(() => rm(runningDir))
   .then(() => rm(remoteConfDir + '/channels'))
@@ -136,8 +138,9 @@ exports.setupEnvironment = function (backend, backendSettings, raw) {
   .then(() => copyDir(confDir, runningDir + '/conf'))
   .then(() => readDirectory(confDir + '/channels'))
   .then(function (channels) {
-    return Promise.all(channels.map(function (channel) {
+    return Promise.all(channels.map(function (channel, i) {
       var channelName = channel.split('.json')[0]
+      var portIncr = backendSettings.port + i
       return readFile(confDir + '/channels/' + channel)
       .then(function (contents) {
         var parsed = JSON.parse(contents.toString('utf8'))
@@ -164,6 +167,12 @@ exports.setupEnvironment = function (backend, backendSettings, raw) {
               resolve()
             })
           })
+        } else if (type === 'pubsub') {
+          parsed.readSettings = null
+          parsed.emptiable = false
+          pubsubPorts[channelName] = portIncr
+          parsed.backendSettings.port = portIncr
+          var promise = Promise.resolve()
         } else {
           var promise = Promise.resolve()
         }
@@ -185,7 +194,11 @@ exports.setupEnvironment = function (backend, backendSettings, raw) {
   })
   .then(function (processes) {
     processes.push(spawnExecutable(newquePath, runningDir))
-    return Promise.resolve(processes)
+    var ret = {
+      processes: processes,
+      pubsubPorts: pubsubPorts
+    }
+    return Promise.resolve(ret)
   })
 }
 

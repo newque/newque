@@ -22,6 +22,10 @@ var esSettings = {
   // index is configured in the setup
   type: 'test-type'
 }
+var pubsubSettings = {
+  host: '0.0.0.0',
+  port: 8500
+}
 
 Proc.pathExists(Proc.newquePath)
 .then(function (exists) {
@@ -74,8 +78,10 @@ Proc.pathExists(Proc.newquePath)
   require('./sections/health')('remotehttp json', httpJsonSettings)
   require('./sections/health')('remotehttp plaintext', httpPlaintextSettings)
   require('./sections/health')('elasticsearch', esSettings, true)
+  require('./sections/health')('pubsub', pubsubSettings, true)
 
   require('./sections/none')('none', {})
+  require('./sections/pubsub')('pubsub', pubsubSettings, true)
 
   run()
 })
