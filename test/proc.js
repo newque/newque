@@ -185,7 +185,7 @@ exports.setupEnvironment = function (backend, backendSettings, raw) {
   })
   .then(function () {
     var processes = []
-    if (type === 'remotehttp') {
+    if (type === 'httpproxy') {
       processes.push(spawnExecutable(newquePath, remoteRunningDir))
     }
     var delay = processes.length > 0 ? C.spawnDelay : 0

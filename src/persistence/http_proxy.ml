@@ -3,9 +3,9 @@ open Lwt
 open Cohttp
 open Cohttp_lwt_unix
 
-module Logger = Log.Make (struct let path = Log.outlog let section = "Remote" end)
+module Logger = Log.Make (struct let path = Log.outlog let section = "Httpproxy" end)
 
-type remote_t = {
+type httpproxy_t = {
   base_urls: Uri.t array;
   base_headers: Header.t;
   input_format: Http_format.t;
@@ -32,7 +32,7 @@ let get_base instance =
 
 module M = struct
 
-  type t = remote_t [@@deriving sexp]
+  type t = httpproxy_t [@@deriving sexp]
 
   let close instance = return_unit
 

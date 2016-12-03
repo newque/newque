@@ -59,16 +59,16 @@ let create name conf_channel =
       end in
       (module Persistence.Make (Arg) : Persistence.S)
 
-    | `Remote_http remote ->
+    | `Http_proxy httpproxy ->
       let module Arg = struct
-        module IO = Remote.M
-        let create () = Remote.create
-            (if remote.append_chan_name
-             then Array.map ~f:(fun b -> sprintf "%s%s" b name) remote.base_urls
-             else remote.base_urls)
-            remote.base_headers
-            ~input:remote.input_format
-            ~output:remote.output_format
+        module IO = Http_proxy.M
+        let create () = Http_proxy.create
+            (if httpproxy.append_chan_name
+             then Array.map ~f:(fun b -> sprintf "%s%s" b name) httpproxy.base_urls
+             else httpproxy.base_urls)
+            httpproxy.base_headers
+            ~input:httpproxy.input_format
+            ~output:httpproxy.output_format
             ~chan_separator:conf_channel.separator
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw

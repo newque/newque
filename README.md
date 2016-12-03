@@ -17,7 +17,7 @@ The current Backend options are:
 - None
 - Memory
 - Disk
-- Remote HTTP server
+- Proxy to a remote HTTP or Newque server
 - Publish to pubsub
 - ElasticSearch
 - ...more coming soon (Redis)
@@ -158,7 +158,7 @@ __Example__
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `listeners` | Array of strings | Yes | | The name of all the Listeners this Channel will be available from. |
-| `backend` | String | Yes | | Which type of Backend. One of `none`, `memory`, `disk`, `remotehttp`, `elasticsearch` or `pubsub`. |
+| `backend` | String | Yes | | Which type of Backend. One of `none`, `memory`, `disk`, `httpproxy`, `elasticsearch` or `pubsub`. |
 | `backendSettings` | Object | No | | The right Settings object for the `backend` value. |
 | `emtiable` | Boolean | Yes | | Whether the Delete operation can be used on this Channel. |
 | `raw` | Boolean | No | `false` | Whether the messages should be wrapped when writing to the Backend. |
@@ -181,7 +181,7 @@ __`disk` `backendSettings` Object__
 
 The `disk` Backend does not have a `backendSettings` object.
 
-__`remotehttp` `backendSettings` Object__
+__`httpproxy` `backendSettings` Object__
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
