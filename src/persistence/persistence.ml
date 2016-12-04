@@ -113,11 +113,7 @@ module Make (Argument: Argument) : S = struct
         )
       in
       fun msgs ids ->
-        let threads = Util.array_to_list_rev_mapi msgs ~mapper:(fun i msg ->
-            Batcher.submit batcher msg (Array.get ids i)
-          )
-        in
-        let%lwt () = join threads in
+        let%lwt () = Batcher.submit batcher msgs ids in
         return (Array.length msgs)
 
   let push msgs ids =

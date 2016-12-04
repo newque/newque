@@ -3,6 +3,8 @@ let ctx =
   ZMQ.Context.set_io_threads context 1;
   context
 
+let start_delay = 1.0
+
 let set_hwm sock receive send =
   ZMQ.Socket.set_receive_high_water_mark sock receive;
   ZMQ.Socket.set_send_high_water_mark sock send

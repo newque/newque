@@ -122,6 +122,7 @@ exports.setupEnvironment = function (backend, backendSettings, raw) {
       .then(function (contents) {
         var parsed = JSON.parse(contents.toString('utf8'))
         parsed.backend = 'memory'
+        parsed.raw = false
         if (parsed.readSettings) {
           parsed.readSettings.httpFormat = remoteType
         }

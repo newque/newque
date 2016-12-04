@@ -17,9 +17,9 @@ socket.connect('tcp://127.0.0.1:8005')
 var str = s => s ? s.toString('utf8') : s
 
 var UID = 'this is our random UID'
-var messages = ['THIS IS A MESSAGE!!!!', 'THIS IS ANOTHER MESSAGE']
+var messages = ['Something!!', 'Some other thing!!!']
 var request = specs.Input.encode({
-  channel: 'example_pubsub',
+  channel: 'example_fifo',
   write_input: {
     atomic: false,
     ids: [] // Optional
@@ -34,16 +34,23 @@ socket.on('message', function(uid, output) {
 
 
 
-/****** Pubsub ZMQ Socket for our channel ******/
-var sub = zmq.socket('sub')
-sub.connect('tcp://127.0.0.1:8006')
-sub.subscribe(new Buffer([]))
-sub.on('message', function(input, message1, message2) {
+/****** Fifo ZMQ Socket for our channel ******/
+var fifo = zmq.socket('dealer')
+fifo.connect('tcp://127.0.0.1:8007')
+fifo.on('message', function(uid, input, message1, message2) {
   var decoded = specs.Input.decode(input)
   console.log('Received Channel:', str(decoded.channel))
   console.log('Received IDs:', decoded.write_input.ids.map(str))
   console.log(str(message1))
   console.log(str(message2))
+
+  var encoded = specs.Output.encode({
+    errors: [],
+    write_output: {
+      saved: 2
+    }
+  })
+  fifo.send([uid, encoded])
 
   process.exit(0)
 })

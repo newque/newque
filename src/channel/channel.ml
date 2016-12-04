@@ -89,6 +89,16 @@ let create name conf_channel =
       end in
       (module Persistence.Make (Arg) : Persistence.S)
 
+    | `Fifo fifo ->
+      let module Arg = struct
+        module IO = Fifo.M
+        let create () = Fifo.create ~chan_name:name fifo.f_host fifo.f_port
+        let stream_slice_size = stream_slice_size
+        let raw = conf_channel.raw
+        let batching = batching
+      end in
+      (module Persistence.Make (Arg) : Persistence.S)
+
     | `Elasticsearch es ->
       if not conf_channel.raw then failwith (sprintf "Channel [%s] has persistence type [elasticsearch], setting 'raw' must be set to true" name) else
       if Option.is_some read then failwith (sprintf "Channel [%s] has persistence type [elasticsearch], reading must be disabled" name) else

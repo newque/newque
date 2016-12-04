@@ -216,6 +216,7 @@ let handler http routing ((ch, _) as conn) req body =
       | Ok (None, _) -> fail_with "Invalid routing"
     end
   with
+  | Exception.Multiple_exn errors -> handle_errors 500 errors
   | Failure str -> handle_errors 500 [str]
   | ex -> handle_errors 500 [Exn.to_string ex]
 

@@ -61,6 +61,17 @@ __Directories__
 - `logs/` is created when starting Newque and contains the output and error logs.
 - `lib/` contains the libraries needed to run Newque, it must be located in the same folder as the `newque` executable
 
+## Concepts
+
+__Atomics__
+
+When Writing a batch of messages, they can be flagged as `atomic`. They will be treated as one. They'll have a combined size of `1`, and all be written and/or read at once.
+
+__Raw__
+
+A Channel can enable the option `raw`. Atomics don't exist in this mode. Performance is marginally better for all non-atomic messages. The ElasticSearch backend requires this option to be enabled.
+
+
 ## Configuration files
 
 ### Main configuration file (`newque.json`)
@@ -161,7 +172,7 @@ __Example__
 | `backend` | String | Yes | | Which type of Backend. One of `none`, `memory`, `disk`, `httpproxy`, `elasticsearch` or `pubsub`. |
 | `backendSettings` | Object | No | | The right Settings object for the `backend` value. |
 | `emtiable` | Boolean | Yes | | Whether the Delete operation can be used on this Channel. |
-| `raw` | Boolean | No | `false` | Whether the messages should be wrapped when writing to the Backend. |
+| `raw` | Boolean | Yes | | Whether the messages should be wrapped when writing to the Backend. |
 | `readSettings` | Object or Null | Yes | | Settings related to Reading from this Channel, or `null` to disable all Reading. |
 | `writeSettings` | Object or Null | Yes | | Settings related to Writing to this Channel, or `null` to disable all Writing. |
 | `separator` | String | No | `\n` | String that acts as a separator between messages for `httpFormat`: `plaintext`. |
@@ -218,7 +229,7 @@ __Read Settings Object__
 |----------|------|----------|---------|-------------|
 | `httpFormat` | String | No | `json` | Format that the Channel uses to send back read results. One of `plaintext` or `json`. |
 | `streamSliceSize` | Integer | No | `500` | How many messages return per 'slice' when streaming. |
-| `onlyOnce` | Boolean | Yes | | Whether to automatically delete messages as soon as they've been read. |
+| `onlyOnce` | Boolean | Yes | | Whether to automatically delete messages while reading them. This only has an effect for the `memory` and `disk` backends, as they are the only backends where Newque manages storage itself. |
 
 __Write Settings Object__
 
@@ -235,17 +246,6 @@ __Batching Object__
 |----------|------|----------|---------|-------------|
 | `maxTime` | Double | Yes | | How long can messages linger in the queue before they have to be written to the Backend. In milliseconds. |
 | `maxSize` | Integer | Yes | | Maximum size the queue can reach before they have to be written to the Backend. |
-
-## Concepts
-
-__Atomics__
-
-When Writing a batch of messages, they can be flagged as `atomic`. They will be treated as one. They'll have a combined size of `1`, and all be written and/or read at once.
-
-__Raw__
-
-A Channel can enable the option `raw`. Atomics don't exist in this mode. Performance is marginally better for all non-atomic messages. The ElasticSearch backend requires this option to be enabled.
-
 
 ## HTTP
 

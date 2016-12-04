@@ -114,13 +114,14 @@ let handler zmq routing socket frames =
         end
       with
       | ex ->
-        let error = begin match ex with
-          | Protobuf.Decoder.Failure err -> sprintf "Protobuf Decoder Error: %s" (Protobuf.Decoder.error_to_string err)
-          | Failure str -> str
-          | ex -> Exn.to_string ex
+        let errors = begin match ex with
+          | Exception.Multiple_exn errors -> errors
+          | Protobuf.Decoder.Failure err -> [sprintf "Protobuf Decoder Error: %s" (Protobuf.Decoder.error_to_string err)]
+          | Failure str -> [str]
+          | ex -> [Exn.to_string ex]
         end
         in
-        return ({ errors = [error]; action = Error_output }, [||])
+        return ({ errors; action = Error_output }, [||])
     end
     in
     let encoder = Pbrt.Encoder.create () in
@@ -180,7 +181,10 @@ let start generic specific routing =
         in
         loop socket
       in
-      let accept = loop socket in
+      let accept =
+        let%lwt () = Lwt_unix.sleep Zmq_tools.start_delay in
+        loop socket
+      in
       async (fun () -> accept);
       { socket; accept; }
     )

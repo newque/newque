@@ -1,7 +1,7 @@
 open Core.Std
 open Lwt
 
-module Logger = Log.Make (struct let path = Log.outlog let section = "Remote" end)
+module Logger = Log.Make (struct let path = Log.outlog let section = "Pubsub" end)
 
 type pubsub_t = {
   chan_name: string;
@@ -14,6 +14,7 @@ type pubsub_t = {
 
 let create ~chan_name host port =
   let outbound = sprintf "tcp://%s:%d" host port in
+  let%lwt () = Logger.info (sprintf "Creating a new TCP socket on %s:%d" host port) in
   let pub = ZMQ.Socket.create Zmq_tools.ctx ZMQ.Socket.pub in
   (* TODO: ZMQ Options *)
   ZMQ.Socket.bind pub outbound;
@@ -45,8 +46,8 @@ module M = struct
     let input = { channel = instance.chan_name; action = Write_input { atomic = None; ids = (Array.to_list ids); } } in
     let encoder = Pbrt.Encoder.create () in
     encode_input input encoder;
-    let meta = Pbrt.Encoder.to_bytes encoder in
-    let%lwt () = Lwt_zmq.Socket.send_all instance.socket (meta::(Array.to_list msgs)) in
+    let input = Pbrt.Encoder.to_bytes encoder in
+    let%lwt () = Lwt_zmq.Socket.send_all instance.socket (input::(Array.to_list msgs)) in
     return (Array.length msgs)
 
   let pull instance ~search ~fetch_last = fail_with "Unimplemented: Pubsub delete"
