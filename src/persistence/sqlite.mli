@@ -11,7 +11,7 @@ val push : t -> msgs:string array -> ids:string array -> int Lwt.t
 (* See comments in Persistence *)
 val pull :
   t ->
-  search:Persistence.search ->
+  search:Search.t ->
   fetch_last:bool ->
   (string array * int64 option * (string * int64) option) Lwt.t
 

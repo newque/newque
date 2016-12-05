@@ -18,14 +18,7 @@ let parse_main path =
 let apply_main config watcher =
   (* Set global log level *)
   Lwt_log.reset_rules ();
-  let level = match config.log_level with
-    | Debug -> Lwt_log.Debug
-    | Info -> Lwt_log.Info
-    | Notice -> Lwt_log.Notice
-    | Warning -> Lwt_log.Warning
-    | Error -> Lwt_log.Error
-    | Fatal -> Lwt_log.Fatal
-  in
+  let level = Log.log_level_of_variant config.log_level in
   Lwt_log.add_rule "*" level;
   Log.lazy_level := (Log.int_of_level level);
   Watcher.create_listeners watcher config.endpoints

@@ -1,14 +1,17 @@
 module.exports = function (backend, backendSettings, raw) {
   var delay = backend === 'elasticsearch' ? C.esDelay : 0
   describe('None', function () {
-    var processes = []
+    var env
     before(function () {
       this.timeout(C.setupTimeout)
       return Proc.setupEnvironment(backend, backendSettings, raw)
-      .then(function (env) {
-        env.processes.forEach((p) => processes.push(p))
+      .then(function (pEnv) {
+        env = pEnv
         return Promise.delay(C.spawnDelay)
       })
+    })
+    beforeEach(function () {
+      Scenarios.clear()
     })
 
     it('Push', function () {
@@ -33,7 +36,7 @@ module.exports = function (backend, backendSettings, raw) {
     })
 
     after(function () {
-      return Proc.teardown(processes, backend, backendSettings)
+      return Proc.teardown(env, backend, backendSettings)
     })
   })
 }

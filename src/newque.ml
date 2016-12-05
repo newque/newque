@@ -40,8 +40,15 @@ let start config_path =
   let module Logger = Log.Make (struct let path = Log.outlog let section = "Main" end) in
 
   (* Load main config *)
-  let%lwt () = Logger.info ("Loading " ^ config_path) in
+  let%lwt () = Logger.info (sprintf "Loading %s" config_path) in
   let%lwt config = Configtools.parse_main config_path in
+  let log_level_str =
+    let open Config_t in
+    config.log_level
+    |> Log.log_level_of_variant
+    |> Lwt_log.string_of_level
+  in
+  let%lwt () = Logger.info (sprintf "Active Log Level: %s" log_level_str) in
   let watcher = Watcher.create () in
   let%lwt () = Configtools.apply_main config watcher in
 

@@ -72,9 +72,14 @@ let serialize_raw msg =
   | Atomic m -> m
 
 let parse_full_exn blob =
-  match Protobuf.Decoder.decode_exn flat_from_protobuf blob with
-  | F_single s -> [| s |]
-  | F_atomic m -> m
+  try
+    match Protobuf.Decoder.decode_exn flat_from_protobuf blob with
+    | F_single s -> [| s |]
+    | F_atomic m -> m
+  with
+  | Protobuf.Decoder.Failure err ->
+    let str = Protobuf.Decoder.error_to_string err in
+    failwith (sprintf "Unable to parse the wrapped messages. Reason: %s" str)
 
 let length ~raw msg =
   match msg with

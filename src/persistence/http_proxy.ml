@@ -70,12 +70,7 @@ module M = struct
 
   let pull instance ~search ~fetch_last =
     let open Json_obj_j in
-    let open Persistence in
-    let (mode, limit) = match search with
-      | { filters = [| ((`After_id _) as mode) |]; limit; _ }
-      | { filters = [| ((`After_ts _) as mode) |]; limit; _ } -> (mode, limit)
-      | { limit; _ } -> ((`Many limit), limit)
-    in
+    let (mode, limit) = Search.mode_and_limit search in
     let headers = Header.add_list instance.base_headers [
         Header_names.mode, (Mode.Read.to_string mode);
         Header_names.limit, (Int64.to_string limit);

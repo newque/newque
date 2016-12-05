@@ -1,3 +1,4 @@
+var util = require('util')
 var zmq = require('zmq')
 var fs = require('fs')
 var protobuf = require("protocol-buffers")
@@ -37,12 +38,12 @@ socket.on('message', function(uid, output) {
 /****** Fifo ZMQ Socket for our channel ******/
 var fifo = zmq.socket('dealer')
 fifo.connect('tcp://127.0.0.1:8007')
-fifo.on('message', function(uid, input, message1, message2) {
+fifo.on('message', function(uid, input) {
+  var messages = Array.prototype.slice.call(arguments, 2).map(str)
   var decoded = specs.Input.decode(input)
-  console.log('Received Channel:', str(decoded.channel))
-  console.log('Received IDs:', decoded.write_input.ids.map(str))
-  console.log(str(message1))
-  console.log(str(message2))
+  console.log('Received (' + str(decoded.channel) + '):', messages,
+    ', IDs:', JSON.stringify(decoded.write_input.ids.map(str)), '\n'
+  )
 
   var encoded = specs.Output.encode({
     errors: [],
@@ -54,6 +55,7 @@ fifo.on('message', function(uid, input, message1, message2) {
 
   process.exit(0)
 })
+
 
 /****** Send it off! ******/
 socket.send([UID, request].concat(messages))

@@ -1,22 +1,9 @@
 open Core.Std
 open Lwt
 
-type search = {
-  limit: int64;
-  filters: [ `After_id of string | `After_ts of int64 | `After_rowid of int64 | `Tag of string ] array;
-  only_once: bool;
-} [@@deriving sexp]
-
-let create_search max_read ~mode ~only_once =
-  match mode with
-  | `One -> { limit = Int64.one; filters = [| |]; only_once; }
-  | `Many x -> { limit = (Int64.min max_read x); filters = [| |]; only_once; }
-  | `After_id id -> { limit = max_read; filters = [|`After_id id|]; only_once; }
-  | `After_ts ts -> { limit = max_read; filters = [|`After_ts ts|]; only_once; }
-
 type slice_metadata = {
   last_id: string;
-  last_timens: string;
+  last_timens: int64;
 }
 type slice = {
   metadata: slice_metadata option;
@@ -30,7 +17,7 @@ module type Template = sig
 
   val push : t -> msgs:string array -> ids:string array -> int Lwt.t
 
-  val pull : t -> search:search -> fetch_last:bool ->
+  val pull : t -> search:Search.t -> fetch_last:bool ->
     (* Returns the last rowid as first option *)
     (* Returns the last id and timens as second option if fetch_last is true *)
     (string array * int64 option * (string * int64) option) Lwt.t
@@ -131,7 +118,7 @@ module Make (Argument: Argument) : S = struct
 
   let pull_slice max_read ~mode ~only_once =
     let%lwt instance = instance in
-    let search = create_search max_read ~mode ~only_once in
+    let search = Search.create max_read ~mode ~only_once in
     let%lwt (raw_payloads, last_rowid, last_row_data) = Argument.IO.pull instance ~search ~fetch_last:true in
     wrap (fun () ->
       let payloads = fast_parse_exn raw_payloads in
@@ -139,37 +126,46 @@ module Make (Argument: Argument) : S = struct
       | None ->
         { metadata = None; payloads }
       | Some (last_id, last_timens) ->
-        let meta = { last_id; last_timens = (Int64.to_string last_timens); } in
+        let meta = { last_id; last_timens; } in
         { metadata = (Some meta); payloads }
     )
 
   let pull_stream max_read ~mode ~only_once =
+    let open Search in
     let%lwt instance = instance in
     wrap4 (fun instance max_read mode only_once ->
-      let search = create_search max_read ~mode ~only_once in
+      let search = Search.create max_read ~mode ~only_once in
       (* Ugly imperative code for performance here *)
       let left = ref search.limit in
       let next_search = ref {search with limit = Int64.min !left Argument.stream_slice_size} in
       let raw_stream = Lwt_stream.from (fun () ->
-          if !next_search.limit <= Int64.zero then return_none else
+          if !next_search.limit <= Int64.zero
+          then return_none else
           let%lwt (payloads, last_rowid, last_row_data) = Argument.IO.pull instance ~search:!next_search ~fetch_last:false in
           let filter = match (last_rowid, last_row_data) with
             | None, None -> None
             | (Some rowid), _ -> Some [|`After_rowid rowid|]
             | _, Some (last_id, _) -> Some [|`After_id last_id|]
           in
-          match filter with
-          | None -> return_none
-          | Some filter ->
-            if Array.is_empty payloads then return_none else
-            let payloads_count = Int.to_int64 (Array.length payloads) in
-            left := Int64.(-) !left payloads_count;
-            next_search := {
-              !next_search with
-              limit = Int64.min !left Argument.stream_slice_size;
-              filters = Array.append filter search.filters;
-            };
-            return_some payloads
+          if Array.is_empty payloads
+          then return_none else
+          let payloads_count = Int.to_int64 (Array.length payloads) in
+          left := Int64.(-) !left payloads_count;
+          next_search := begin match filter with
+            | None ->
+              (* Without a filter we can't continue streaming *)
+              {
+                !next_search with
+                limit = Int64.zero;
+              }
+            | Some filter ->
+              {
+                !next_search with
+                limit = Int64.min !left Argument.stream_slice_size;
+                filters = Array.append filter search.filters;
+              }
+          end;
+          return_some payloads
         )
       in
       let batch_size = Option.value (Int64.to_int Argument.stream_slice_size) ~default:Int.max_value in

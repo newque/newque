@@ -1,17 +1,23 @@
 module.exports = function (backend, backendSettings, raw) {
   var delay = backend === 'elasticsearch' ? C.esDelay : 0
   describe('Ack ' + backend + (!!raw ? ' raw' : ''), function () {
-    var processes = []
+    var env
     before(function () {
       this.timeout(C.setupTimeout)
       return Proc.setupEnvironment(backend, backendSettings, raw)
-      .then(function (env) {
-        env.processes.forEach((p) => processes.push(p))
+      .then(function (pEnv) {
+        env = pEnv
         return Promise.delay(C.spawnDelay)
       })
     })
+    beforeEach(function () {
+      Scenarios.clear()
+    })
 
     it('Saved', function () {
+      Scenarios.push('example', [['AAA', 'BBB', 'CCC', 'DDD']])
+      Scenarios.set('example', 'last_id', 'something')
+      Scenarios.set('example', 'last_timens', 999)
       var buf = 'AAA\nBBB\nCCC\nDDD'
       return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'multiple']])
       .then(Fn.shouldHaveWritten(4))
@@ -20,6 +26,9 @@ module.exports = function (backend, backendSettings, raw) {
     })
 
     it('None', function () {
+      Scenarios.push('noack', [['eee', 'fff', 'ggg', 'hhh']])
+      Scenarios.set('noack', 'last_id', 'something')
+      Scenarios.set('noack', 'last_timens', 999)
       var buf = 'eee\nfff\nggg\nhhh'
       return Fn.call('POST', 8000, '/v1/noack', buf, [[C.modeHeader, 'multiple']])
       .then(Fn.shouldHaveWrittenAsync())
@@ -29,7 +38,7 @@ module.exports = function (backend, backendSettings, raw) {
     })
 
     after(function () {
-      return Proc.teardown(processes, backend, backendSettings)
+      return Proc.teardown(env, backend, backendSettings)
     })
   })
 }

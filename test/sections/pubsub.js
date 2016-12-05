@@ -8,16 +8,18 @@ var socket2 = zmq.socket('sub')
 module.exports = function (backend, backendSettings, raw) {
   var delay = backend === 'elasticsearch' ? C.esDelay : 0
   describe('Pubsub' + (!!raw ? ' raw' : ''), function () {
-    var processes = []
-    var pubsubPorts
+    var env
     before(function () {
       this.timeout(C.setupTimeout)
       return Proc.setupEnvironment(backend, backendSettings, raw)
-      .then(function (env) {
-        env.processes.forEach((p) => processes.push(p))
-        pubsubPorts = env.pubsubPorts
-        return Promise.delay(C.spawnDelay)
+      .then(function (pEnv) {
+        env = pEnv
+        return Promise.delay(1000)
+        // return Promise.delay(C.spawnDelay)
       })
+    })
+    beforeEach(function () {
+      Scenarios.clear()
     })
 
     it('Pull', function () {
@@ -58,7 +60,7 @@ module.exports = function (backend, backendSettings, raw) {
           })
         })
       }
-      var addr = 'tcp://127.0.0.1:' + pubsubPorts.example
+      var addr = 'tcp://127.0.0.1:' + env.pubsubPorts.example
       var receive1 = receiveOnSocket(socket1, addr)
       var receive2 = receiveOnSocket(socket2, addr)
       return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'multiple'], [C.idHeader, originalIdsStr]])
@@ -97,7 +99,7 @@ module.exports = function (backend, backendSettings, raw) {
           })
         })
       }
-      var addr = 'tcp://127.0.0.1:' + pubsubPorts.singlebatches
+      var addr = 'tcp://127.0.0.1:' + env.pubsubPorts.singlebatches
       var receive1 = receiveOnSocket(socket1, addr)
       var receive2 = receiveOnSocket(socket2, addr)
       return Fn.call('POST', 8000, '/v1/singlebatches', buf, [[C.modeHeader, 'multiple'], [C.idHeader, originalIdsStr]])
@@ -112,7 +114,7 @@ module.exports = function (backend, backendSettings, raw) {
     })
 
     after(function () {
-      return Proc.teardown(processes, backend, backendSettings)
+      return Proc.teardown(env, backend, backendSettings)
     })
   })
 }

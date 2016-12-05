@@ -3,6 +3,10 @@ var spawn = require('child_process').spawn
 var exec = require('child_process').exec
 var request = require('superagent')
 
+var zmq = require('zmq')
+var protobuf = require("protocol-buffers")
+var specs = protobuf(fs.readFileSync('../protobuf/zmq_obj.proto'))
+
 var newquePath = exports.newquePath = __dirname + '/../newque.native'
 var confDir = __dirname + '/conf'
 var runningDir = __dirname + '/running'
@@ -104,11 +108,130 @@ var getEnvironment = function () {
   })
 }
 
+var str = s => s ? s.toString('utf8') : s
+var setupFifoClient = function (backendSettings, fifoPorts) {
+  var sockets = {}
+  var handler = function (name) {
+    return function (uid, input) {
+      try {
+        var sendMsgs = []
+        var decoded = specs.Input.decode(input)
+
+        if (decoded.write_input) {
+
+          var ids = decoded.write_input.ids
+          if (Scenarios.peek(name, 'encounteredIds') == null) {
+            Scenarios.set(name, 'encounteredIds', {})
+          }
+          var encounteredIds = Scenarios.peek(name, 'encounteredIds')
+          var recvMsgs = Array.prototype.slice.call(arguments, 2).filter(function (elt, i) {
+            if (encounteredIds[ids[i]]) {
+              return false
+            } else {
+              encounteredIds[ids[i]] = true
+              return true
+            }
+          })
+          var obj = {
+            errors: [],
+            write_output: {
+              saved: recvMsgs.length
+            }
+          }
+          var saved = Scenarios.get(name, 'saved')
+          if (saved != null) {
+            obj.write_output.saved = saved
+          }
+          var output = specs.Output.encode(obj)
+          Scenarios.push(name, [recvMsgs])
+
+        } else if (decoded.read_input) {
+
+          var mode = str(decoded.read_input.mode)
+          Fn.assert(mode.length > 0)
+          var msgs = Scenarios.take(name)
+          msgs.forEach(m => sendMsgs.push(m))
+
+          var obj = {
+            errors: [],
+            read_output: {
+              length: sendMsgs.length
+            }
+          }
+          var last_id = Scenarios.get(name, 'last_id')
+          if (last_id != null) {
+            obj.read_output.last_id = last_id
+          }
+          var last_timens = Scenarios.get(name, 'last_timens')
+          if (last_timens != null) {
+            obj.read_output.last_timens = last_timens
+          }
+
+          var output = specs.Output.encode(obj)
+
+        } else if (decoded.count_input) {
+
+          var obj = {
+            errors: [],
+            count_output: {
+              count: Scenarios.count(name)
+            }
+          }
+          var count = Scenarios.get(name, 'count')
+          if (count != null) {
+            obj.count_output.count = count
+          }
+          var output = specs.Output.encode(obj)
+
+        } else if (decoded.delete_input) {
+
+          var obj = {
+            errors: [],
+            delete_output: {}
+          }
+          var output = specs.Output.encode(obj)
+
+        } else if (decoded.health_input) {
+
+          var obj = {
+            errors: [],
+            health_output: {}
+          }
+          var output = specs.Output.encode(obj)
+
+        } else {
+          console.log(decoded)
+        }
+        sockets[name].socket.send([uid, output].concat(sendMsgs))
+      } catch (err) {
+        console.log('ZMQ tests handler error')
+        console.log(err.message)
+        console.log(err.stack)
+        throw err
+      }
+    }
+  }
+
+  for (var name in fifoPorts) {
+    var sock = zmq.socket('dealer')
+    var addr = 'tcp://' + backendSettings.host + ':' + fifoPorts[name]
+    sock.on('message', handler(name))
+    sock.connect(addr)
+    sockets[name] = {
+      socket: sock,
+      addr: addr
+    }
+  }
+
+  return Promise.resolve(sockets)
+}
+
 exports.setupEnvironment = function (backend, backendSettings, raw) {
   var type = backend.split(' ')[0]
   var remoteType = backend.split(' ')[1]
   var pubsubPorts = {}
-  var remotePubsubPorts = {}
+  var fifoPorts = {}
+  var sockets = {}
   return rm(remoteRunningDir)
   .then(() => rm(runningDir))
   .then(() => rm(remoteConfDir + '/channels'))
@@ -174,6 +297,10 @@ exports.setupEnvironment = function (backend, backendSettings, raw) {
           pubsubPorts[channelName] = portIncr
           parsed.backendSettings.port = portIncr
           var promise = Promise.resolve()
+        } else if (type === 'fifo') {
+          fifoPorts[channelName] = portIncr
+          parsed.backendSettings.port = portIncr
+          var promise = Promise.resolve()
         } else {
           var promise = Promise.resolve()
         }
@@ -184,7 +311,9 @@ exports.setupEnvironment = function (backend, backendSettings, raw) {
       })
     }))
   })
-  .then(function () {
+  .then(() => setupFifoClient(backendSettings, fifoPorts))
+  .then(function (pSockets) {
+    sockets = pSockets
     var processes = []
     if (type === 'httpproxy') {
       processes.push(spawnExecutable(newquePath, remoteRunningDir))
@@ -197,7 +326,9 @@ exports.setupEnvironment = function (backend, backendSettings, raw) {
     processes.push(spawnExecutable(newquePath, runningDir))
     var ret = {
       processes: processes,
-      pubsubPorts: pubsubPorts
+      pubsubPorts: pubsubPorts,
+      fifoPorts: fifoPorts,
+      sockets: sockets
     }
     return Promise.resolve(ret)
   })
@@ -242,7 +373,7 @@ var clearEs = exports.clearEs = function (backendSettings) {
   })
 }
 
-exports.teardown = function (processes, backend, backendSettings) {
+exports.teardown = function (env, backend, backendSettings) {
   // Reset all the indices
   if (backend === 'elasticsearch') {
     var promise = clearEs(backendSettings)
@@ -252,6 +383,13 @@ exports.teardown = function (processes, backend, backendSettings) {
 
   return promise
   .then(function () {
-    processes.forEach((p) => p.kill())
+    if (env.sockets) {
+      for (var name in env.sockets) {
+        env.sockets[name].socket.disconnect(env.sockets[name].addr)
+      }
+    }
+  })
+  .then(function () {
+    env.processes.forEach((p) => p.kill())
   })
 }

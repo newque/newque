@@ -196,13 +196,13 @@ let make_filters filters =
   String.concat_array ~sep:" AND " strings
 
 let read_sql ~search =
-  let open Persistence in
+  let open Search in
   match search.filters with
   | [| |] -> sprintf "SELECT raw, ROWID FROM MESSAGES LIMIT %Ld;" search.limit
   | _ -> sprintf "SELECT raw, ROWID FROM MESSAGES WHERE %s LIMIT %Ld;" (make_filters search.filters) search.limit
 
 let add_tag_sql ~search =
-  let open Persistence in
+  let open Search in
   match search.filters with
   | [| |] -> sprintf "UPDATE MESSAGES SET tag = ? LIMIT %Ld;" search.limit
   | _ -> sprintf "UPDATE MESSAGES SET tag = ? WHERE %s LIMIT %Ld;" (make_filters search.filters) search.limit
@@ -299,7 +299,7 @@ let fetch_last_row db ~rowid =
   | dataset, _ -> fail_with (sprintf "Last_row failed (dataset size: %d) for [%s]" (Array.length dataset) sql)
 
 let pull db ~search ~fetch_last =
-  let open Persistence in
+  let open Search in
   match search.only_once with
   | true ->
     let tag = Id.uuid () in

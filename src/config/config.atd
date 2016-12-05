@@ -21,7 +21,7 @@ type config_log_level = [
   | Warning <json name="warning">
   | Error <json name="error">
   | Fatal <json name="fatal">
-] <ocaml repr="classic">
+]
 
 
 (* NETWORK *)

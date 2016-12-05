@@ -155,7 +155,7 @@ let parse_async_bind parser str =
 let header_name_to_int64_opt headers name =
   Option.bind
     (Header.get headers name)
-    (fun x -> Option.try_with (fun () -> Int64.of_string x))
+    parse_int64
 
 let rec make_interval every callback () =
   let%lwt () = Lwt_unix.sleep every in

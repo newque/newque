@@ -4,6 +4,15 @@ open Lwt
 let outlog = Fs.log_dir ^ "out.log"
 let errlog = Fs.log_dir ^ "err.log"
 
+let log_level_of_variant variant =
+  match variant with
+  | `Debug -> Lwt_log.Debug
+  | `Info -> Lwt_log.Info
+  | `Notice -> Lwt_log.Notice
+  | `Warning -> Lwt_log.Warning
+  | `Error -> Lwt_log.Error
+  | `Fatal -> Lwt_log.Fatal
+
 let int_of_level level =
   match level with
   | Lwt_log.Debug -> 1

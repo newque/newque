@@ -14,6 +14,31 @@ type fifo_t = {
   workers: unit Lwt.t array sexp_opaque;
 } [@@deriving sexp]
 
+let handler instance input messages =
+  let open Zmq_obj_pb in
+  let encoder = Pbrt.Encoder.create () in
+  encode_input input encoder;
+  let input = Pbrt.Encoder.to_bytes encoder in
+
+  (* Register and send request *)
+  let uid = Id.uuid_bytes () in
+  let thread = Connector.submit instance.connector uid in
+  let%lwt () = Lwt_zmq.Socket.send_all instance.socket (uid::input::messages) in
+
+  (* Wait for response *)
+  let%lwt frames = thread in
+
+  (* Process response *)
+  let%lwt (output, msgs_recv) as pair = match frames with
+    | [] -> fail_with "No frames received"
+    | head::msgs_recv ->
+      let output = decode_output (Pbrt.Decoder.of_bytes head) in
+      return (output, msgs_recv)
+  in
+  match output.errors with
+  | [] -> return pair
+  | errors -> fail (Exception.Multiple_exn errors)
+
 let create ~chan_name host port =
   let outbound = sprintf "tcp://%s:%d" host port in
   let%lwt () = Logger.info (sprintf "Creating a new TCP socket on %s:%d" host port) in
@@ -21,7 +46,7 @@ let create ~chan_name host port =
   (* TODO: ZMQ Options *)
   ZMQ.Socket.bind router outbound;
   let socket = Lwt_zmq.Socket.of_socket router in
-  let connector = Connector.create 3.0 in
+  let connector = Connector.create 1.0 in
 
   let workers = Array.init 5 (fun _ ->
       let open Zmq_obj_pb in
@@ -75,43 +100,101 @@ module M = struct
 
   let push instance ~msgs ~ids =
     let open Zmq_obj_pb in
+    let input = {
+      channel = instance.chan_name;
+      action = Write_input {
+          atomic = None;
+          ids = (Array.to_list ids);
+        }
+    }
+    in
+    let%lwt (output, _) = handler instance input (Array.to_list msgs) in
+    match output.action with
+    | Write_output write -> return (Option.value ~default:0 write.saved)
+    | Error_output -> fail_with "Upstream returned Error_Output instead of Write_Output"
+    | Read_output _ -> fail_with "Upstream returned Read_Output instead of Write_Output"
+    | Count_output _ -> fail_with "Upstream returned Count_Output instead of Write_Output"
+    | Delete_output -> fail_with "Upstream returned Delete_Output instead of Write_Output"
+    | Health_output -> fail_with "Upstream returned Health_Output instead of Write_Output"
 
-    (* Build request *)
-    let input = { channel = instance.chan_name; action = Write_input { atomic = None; ids = (Array.to_list ids); } } in
-    let encoder = Pbrt.Encoder.create () in
-    encode_input input encoder;
-    let input = Pbrt.Encoder.to_bytes encoder in
-
-    (* Register and send request *)
-    let uid = Id.uuid_bytes () in
-    let thread = Connector.submit instance.connector uid in
-    let%lwt () = Lwt_zmq.Socket.send_all instance.socket (uid::input::(Array.to_list msgs)) in
-
-    (* Wait for response *)
-    let%lwt frames = thread in
-
-    (* Process response *)
-    let output = decode_output (Pbrt.Decoder.of_bytes (List.hd_exn frames)) in
-    match output.errors with
-    | [] ->
-      begin match output.action with
-        | Write_output write -> return (Option.value ~default:0 write.saved)
-        | Error_output -> fail_with "Upstream returned Error_Output instead of Write_Output"
-        | Read_output _ -> fail_with "Upstream returned Read_Output instead of Write_Output"
-        | Count_output _ -> fail_with "Upstream returned Count_Output instead of Write_Output"
-        | Delete_output -> fail_with "Upstream returned Delete_Output instead of Write_Output"
-        | Health_output -> fail_with "Upstream returned Health_Output instead of Write_Output"
+  let pull instance ~search ~fetch_last =
+    let open Zmq_obj_pb in
+    let (mode, limit) = Search.mode_and_limit search in
+    let input = {
+      channel = instance.chan_name;
+      action = Read_input {
+          mode = Mode.Read.to_string mode;
+          limit = Some limit;
+        }
+    }
+    in
+    let%lwt (output, msgs) = handler instance input [] in
+    match output.action with
+    | Read_output read ->
+      let arr_msgs = List.to_array msgs in
+      if Int.(<>) read.length (Array.length arr_msgs)
+      then async (fun () ->
+          Logger.warning (sprintf "Lengths don't match: Read [%d] messages, but 'length' is %d" read.length (Array.length arr_msgs))
+        );
+      let meta = begin match read with
+        | { last_id = Some l_id; last_timens = Some l_ts; } -> Some (l_id, l_ts)
+        | _ -> None
       end
-    | errors -> fail (Exception.Multiple_exn errors)
+      in
+      return (arr_msgs, None, meta)
 
-  let pull instance ~search ~fetch_last = fail_with "Unimplemented: Fifo pull"
+    | Error_output -> fail_with "Upstream returned Error_Output instead of Read_Output"
+    | Write_output _ -> fail_with "Upstream returned Write_Output instead of Read_Output"
+    | Count_output _ -> fail_with "Upstream returned Count_Output instead of Read_Output"
+    | Delete_output -> fail_with "Upstream returned Delete_Output instead of Read_Output"
+    | Health_output -> fail_with "Upstream returned Health_Output instead of Read_Output"
 
-  let size instance = fail_with "Unimplemented: Fifo size"
+  let size instance =
+    let open Zmq_obj_pb in
+    let input = {
+      channel = instance.chan_name;
+      action = Count_input;
+    }
+    in
+    let%lwt (output, _) = handler instance input [] in
+    match output.action with
+    | Count_output count -> return (Option.value ~default:Int64.zero count.count)
+    | Error_output -> fail_with "Upstream returned Error_Output instead of Count_Output"
+    | Write_output _ -> fail_with "Upstream returned Write_Output instead of Count_Output"
+    | Read_output _ -> fail_with "Upstream returned Read_Output instead of Count_Output"
+    | Delete_output -> fail_with "Upstream returned Delete_Output instead of Count_Output"
+    | Health_output -> fail_with "Upstream returned Health_Output instead of Count_Output"
 
-  let delete instance = fail_with "Unimplemented: Fifo delete"
+  let delete instance =
+    let open Zmq_obj_pb in
+    let input = {
+      channel = instance.chan_name;
+      action = Delete_input;
+    }
+    in
+    let%lwt (output, _) = handler instance input [] in
+    match output.action with
+    | Delete_output -> return_unit
+    | Error_output -> fail_with "Upstream returned Error_Output instead of Delete_Output"
+    | Write_output _ -> fail_with "Upstream returned Write_Output instead of Delete_Output"
+    | Read_output _ -> fail_with "Upstream returned Read_Output instead of Delete_Output"
+    | Count_output _ -> fail_with "Upstream returned Count_Output instead of Delete_Output"
+    | Health_output -> fail_with "Upstream returned Health_Output instead of Delete_Output"
 
   let health instance =
-    (* TODO *)
-    return []
+    let open Zmq_obj_pb in
+    let input = {
+      channel = instance.chan_name;
+      action = Health_input { global = false };
+    }
+    in
+    let%lwt (output, _) = handler instance input [] in
+    match output.action with
+    | Health_output -> return []
+    | Error_output -> fail_with "Upstream returned Error_Output instead of Health_Output"
+    | Write_output _ -> fail_with "Upstream returned Write_Output instead of Health_Output"
+    | Read_output _ -> fail_with "Upstream returned Read_Output instead of Health_Output"
+    | Count_output _ -> fail_with "Upstream returned Count_Output instead of Health_Output"
+    | Delete_output -> fail_with "Upstream returned Delete_Output instead of Health_Output"
 
 end

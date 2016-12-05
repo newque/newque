@@ -1,19 +1,23 @@
 module.exports = function (backend, backendSettings, raw) {
   var delay = backend === 'elasticsearch' ? C.esDelay : 0
   describe('Push ' + backend + (!!raw ? ' raw' : ''), function () {
-    var processes = []
+    var env
     before(function () {
       this.timeout(C.setupTimeout)
       return Proc.setupEnvironment(backend, backendSettings, raw)
-      .then(function (env) {
-        env.processes.forEach((p) => processes.push(p))
+      .then(function (pEnv) {
+        env = pEnv
         return Promise.delay(C.spawnDelay)
       })
     })
+    beforeEach(function () {
+      Scenarios.clear()
+    })
 
     describe('Single', function () {
-      if (backend !== 'elasticsearch') {
+      if (backend !== 'elasticsearch') { // Because they test 'Single'
         it('No header', function () {
+          this.timeout(5000)
           var buf = 'abc\ndef'
           return Fn.call('POST', 8000, '/v1/example', buf)
           .then(Fn.shouldHaveWritten(1))
@@ -102,7 +106,7 @@ module.exports = function (backend, backendSettings, raw) {
     }
 
     describe('Custom IDs', function () {
-      // Set up an initial ID to track...
+    // Set up an initial ID to track...
       var lastID = 'initial'
       before(function () {
         var buf = '{"abc":"bzzz"}'
@@ -113,6 +117,9 @@ module.exports = function (backend, backendSettings, raw) {
       if (backend !== 'elasticsearch') {
         it('Without separator, single mode', function () {
           var buf = 'A abc\nA def\nA ghi\nA jkl'
+          Scenarios.set('example', 'last_id', lastID)
+          Scenarios.set('example', 'last_timens', 999)
+
           return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'single'], [C.idHeader, 'id1']])
           .then(Fn.shouldHaveWritten(1))
           // Check that only one was added after the previous lastID, then update the lastID
@@ -123,6 +130,9 @@ module.exports = function (backend, backendSettings, raw) {
 
         it('With separator, single mode', function () {
           var buf = 'B abc\nB def\nB ghi\nB jkl'
+          Scenarios.set('example', 'last_id', lastID)
+          Scenarios.set('example', 'last_timens', 999)
+
           return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'single'], [C.idHeader, 'id1,id2']])
           .then(Fn.shouldHaveWritten(1))
           // Check that only one was added after the previous lastID, then update the lastID
@@ -133,6 +143,9 @@ module.exports = function (backend, backendSettings, raw) {
 
         it('Without separator', function () {
           var buf = 'abcdef'
+          Scenarios.set('example', 'last_id', lastID)
+          Scenarios.set('example', 'last_timens', 999)
+
           return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'single'], [C.idHeader, 'id10,id11,id12,id13']])
           .then(Fn.shouldHaveWritten(1))
           // Check that only one was added after the previous lastID, then update the lastID
@@ -143,6 +156,9 @@ module.exports = function (backend, backendSettings, raw) {
 
         it('With separator', function () {
           var buf = 'C abc\nC def\nC ghi\nC jkl'
+          Scenarios.set('example', 'last_id', lastID)
+          Scenarios.set('example', 'last_timens', 999)
+
           return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'multiple'], [C.idHeader, 'id10,id11,id12,id13']])
           .then(Fn.shouldHaveWritten(4))
           // Check that 4 were added after the previous lastID, then update the lastID
@@ -179,6 +195,9 @@ module.exports = function (backend, backendSettings, raw) {
       if (!raw && backend !== 'elasticsearch') {
         it('With separator, atomic', function () {
           var buf = 'H abc\nH def\nH ghi'
+          Scenarios.set('example', 'last_id', lastID)
+          Scenarios.set('example', 'last_timens', 999)
+
           return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'atomic'], [C.idHeader, 'id60,id61,id62,']])
           .then(Fn.shouldHaveWritten(1))
           // Check that 3 were added after the previous lastID, then update the lastID
@@ -188,7 +207,7 @@ module.exports = function (backend, backendSettings, raw) {
         })
       }
 
-      if (backend !== 'elasticsearch') {
+      if (backend !== 'elasticsearch' && backend !== 'fifo') {
         it('With separator, skip existing', function () {
           var buf = 'I abc\nI def\nI ghi'
           return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'multiple'], [C.idHeader, 'id70,id70,id1']])
@@ -202,9 +221,9 @@ module.exports = function (backend, backendSettings, raw) {
     })
 
     describe('Forward to channels', function () {
-      it ('Should also write to sinks (2 sinks, ack)', function () {
+      it('Should also write to sinks (2 sinks, ack)', function () {
         this.timeout(3500)
-        var buf = '{"somefield":"Forwardinging 1 abc"}\n{"somefield":"Forwardinging 1 def"}\n{"somefield":"Forwardinging 1 ghi"}\n{"somefield":"Forwardinging 1 jkl"}'
+        var buf = '{"somefield":"Forwarding 1 abc"}\n{"somefield":"Forwarding 1 def"}\n{"somefield":"Forwarding 1 ghi"}\n{"somefield":"Forwarding 1 jkl"}'
         return Fn.call('POST', 8000, '/v1/forwardingAck', buf, [[C.modeHeader, 'multiple']])
         .then(Fn.shouldHaveWritten(4))
         .delay(delay)
@@ -215,9 +234,12 @@ module.exports = function (backend, backendSettings, raw) {
         .then(Fn.shouldHaveCounted(4))
       })
 
-      it ('Should also write to sinks (1 sink, no ack)', function () {
+      it('Should also write to sinks (1 sink, no ack)', function () {
         this.timeout(3500)
-        var buf = '{"somefield":"Forwardinging 2 abc"}\n{"somefield":"Forwardinging 2 def"}\n{"somefield":"Forwardinging 2 ghi"}\n{"somefield":"Forwardinging 2 jkl"}'
+        var buf = '{"somefield":"Forwarding 2 abc"}\n{"somefield":"Forwarding 2 def"}\n{"somefield":"Forwarding 2 ghi"}\n{"somefield":"Forwarding 2 jkl"}'
+        Scenarios.set('sink1', 'count', 8)
+        Scenarios.set('sink2', 'count', 4)
+
         return Fn.call('POST', 8000, '/v1/forwardingNoAck', buf, [[C.modeHeader, 'multiple']])
         .delay(25)
         .then(Fn.shouldHaveWrittenAsync())
@@ -333,6 +355,7 @@ module.exports = function (backend, backendSettings, raw) {
         var buf2 = Fn.makeJsonBuffer(['{"xyz":"fgh"}'], null, false)
         var t0 = Date.now()
         var t1
+        Scenarios.set('batching', 'count', 8)
         // This call should be instant, because it fills up the queue
         return Fn.call('POST', 8000, '/v1/batching', buf1)
         .then(Fn.shouldHaveWritten(5))
@@ -358,6 +381,8 @@ module.exports = function (backend, backendSettings, raw) {
         it('Should work with atomics', function () {
             var buf1 = Fn.makeJsonBuffer(['aaa', 'bbb'], null, false)
             var buf2 = Fn.makeJsonBuffer(['ccc', 'ddd'], null, true)
+            Scenarios.set('batching', 'count', 8)
+            Scenarios.set('batching', 'count', 11)
 
             return Fn.call('GET', 8000, '/v1/batching/count')
             .then(Fn.shouldHaveCounted(8))
@@ -377,7 +402,7 @@ module.exports = function (backend, backendSettings, raw) {
     })
 
     after(function () {
-      return Proc.teardown(processes, backend, backendSettings)
+      return Proc.teardown(env, backend, backendSettings)
     })
   })
 }

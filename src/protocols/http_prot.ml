@@ -151,7 +151,7 @@ let handler http routing ((ch, _) as conn) req body =
                     Header.add_list (Header.init ()) [
                       (Header_names.length, Int.to_string (Array.length payloads));
                       (Header_names.last_id, metadata.last_id);
-                      (Header_names.last_ts, metadata.last_timens);
+                      (Header_names.last_ts, (Int64.to_string metadata.last_timens));
                     ]
                 in
                 let open Read_settings in
