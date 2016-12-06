@@ -9,9 +9,6 @@ let conf_chan_dir = "./conf/channels/"
 let data_dir = "./data/"
 let data_chan_dir = "./data/channels/"
 
-let format_unix_exn code name param =
-  sprintf "%s {call: %s(%s)}" (String.uppercase (Unix.error_message code)) name param
-
 let healthy_fd fd =
   try%lwt
     Lwt_unix.check_descriptor fd;

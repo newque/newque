@@ -20,7 +20,7 @@ let register_listeners router listeners =
     let entry = String.Table.create () in
     match String.Table.add router.table ~key:listen.id ~data:entry with
     | `Ok -> None
-    | `Duplicate -> Some (sprintf "Cannot register listener %s because it already exists" listen.id)
+    | `Duplicate -> Some (sprintf "Cannot register listener [%s] because it already exists" listen.id)
   )
   |> fun ll -> if List.length ll = 0 then Ok () else Error ll
 
@@ -66,7 +66,7 @@ let write_shared router ~listen_name ~chan ~write ~msgs ~ids =
   let open Write_settings in
   begin match ((Message.length ~raw:chan.raw msgs), (Array.length ids)) with
     | (0, _) -> return (Error [sprintf "Nothing to write."])
-    | (msgs_l, ids_l) when Int.(<>) msgs_l ids_l -> return (Error [sprintf "Length mismatch between messages (%d) and IDs (%d)" msgs_l ids_l])
+    | (msgs_l, ids_l) when Int.(<>) msgs_l ids_l -> return (Error [sprintf "Length mismatch between messages [%d] and IDs [%d]" msgs_l ids_l])
     | _ ->
       let save_t =
         let%lwt count = Channel.push chan msgs ids in

@@ -3,16 +3,14 @@ open Lwt
 open Config_t
 
 let parse_main path =
-  let parse path =
+  try%lwt
     let%lwt contents = Lwt_io.chars_of_file path |> Lwt_stream.to_string in
     return (Config_j.config_newque_of_string contents)
-  in
-  try%lwt
-    Util.parse_async_bind parse path
   with
-  | Failure err ->
-    let str = sprintf "Error while parsing %s: %s" path err in
-    let%lwt () = Log.stdout Lwt_log.Fatal str in
+  | ex ->
+    let failure, stack = Exception.human_bt ex in
+    let str = sprintf "[%s] %s" path failure in
+    let%lwt () = Log.stdout Lwt_log.Fatal (sprintf "%s\n%s" str stack) in
     fail_with str
 
 let apply_main config watcher =
@@ -27,24 +25,26 @@ let parse_channels config path =
   let open Channel in
   let%lwt files = Fs.list_files path in
   Lwt_list.map_p (fun filename ->
-    let fragments = String.split ~on:'.' filename in
+    let fragments =
+      String.split ~on:'.' filename
+      |> List.filter ~f:(fun str -> String.is_empty str |> not)
+    in
     let%lwt () = if (List.length fragments < 2) || (List.last_exn fragments <> "json")
       then fail_with (sprintf "Channel file %s must end in .json" filename)
       else return_unit
     in
     let filepath = sprintf "%s%s" path filename in
     let%lwt contents = Lwt_stream.to_string (Lwt_io.chars_of_file filepath) in
-    let mapper = fun str ->
-      let parsed = Config_j.config_channel_of_string str in
+    try%lwt
+      let parsed = Config_j.config_channel_of_string contents in
       let name = List.slice fragments 0 (-1) |> String.concat ~sep:"." in
       Channel.create name parsed
-    in
-    try%lwt
-      Util.parse_async_bind mapper contents
     with
-    | Failure err ->
-      let%lwt () = Log.stdout Lwt_log.Fatal err in
-      fail_with (sprintf "Error while parsing %s: %s" filepath err)
+    | ex ->
+      let failure, stack = Exception.human_bt ex in
+      let str = sprintf "[%s] %s" filepath failure in
+      let%lwt () = Log.stdout Lwt_log.Fatal (sprintf "%s\n%s" str stack) in
+      fail_with str
   ) files
 
 let apply_channels w channels =

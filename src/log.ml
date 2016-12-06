@@ -1,8 +1,8 @@
 open Core.Std
 open Lwt
 
-let outlog = Fs.log_dir ^ "out.log"
-let errlog = Fs.log_dir ^ "err.log"
+let outlog = sprintf "%s%s" Fs.log_dir "out.log"
+let errlog = sprintf "%s%s" Fs.log_dir "err.log"
 
 let log_level_of_variant variant =
   match variant with

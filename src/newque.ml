@@ -10,14 +10,14 @@ let () = Lwt_engine.set ~transfer:true ~destroy:true (new Lwt_engine.libev)
 
 let () = Lwt.async_exception_hook := fun ex ->
     let str = match ex with
-      | Unix.Unix_error (c, n, p) -> Fs.format_unix_exn c n p
+      (* | Unix.Unix_error (c, n, p) -> Fs.format_unix_exn c n p *)
       | Failure str -> str
       | ex -> Exn.to_string ex
     in
     print_endline (sprintf "UNCAUGHT EXCEPTION: %s" str);
     print_endline (Exn.backtrace ())
 
-let () = Lwt_preemptive.init 4 25 (fun str -> async (fun () -> Log.stdout Lwt_log.Info str))
+let () = Lwt_preemptive.init 4 25 (fun str -> async (fun () -> Log.stdout Lwt_log.Info "********************"))
 
 (* Only for startup, replaced by newque.json settings later *)
 let () = Lwt_log.add_rule "*" Lwt_log.Debug
@@ -70,29 +70,36 @@ let start config_path =
     let router = Watcher.router watcher in
     let priv = Listener.(private_listener.id) in
     let%lwt () = Logger.info "Running global health check..." in
-    match%lwt Router.health router ~listen_name:priv ~chan_name:None ~mode:`Health with
-    | (_::_) as errors ->
-      Logger.error (String.concat ~sep:"\n" errors)
-    | [] ->
-      let%lwt () = Logger.info "Global health check succeeded" in
-      let%lwt () = Logger.info "Server started" in
-      let pairs = List.map (Int.Table.to_alist (Watcher.table watcher)) ~f:(fun (port, listener) ->
-          let name = listener.Listener.id in
-          let channels = match String.Table.find router.table name with
-            | None -> []
-            | Some chan_table -> String.Table.keys chan_table
-          in
-          name, `Assoc [
-            "protocol", `String (Listener.get_prot listener);
-            "port", `Int port;
-            "channels", `List (List.map channels ~f:(fun s -> `String s))
-          ]
-        )
-      in
-      print_endline (Yojson.Basic.pretty_to_string (`Assoc pairs));
-      (* Run forever *)
-      fst (wait ())
+    try%lwt
+      match%lwt Router.health router ~listen_name:priv ~chan_name:None ~mode:`Health with
+      | (_::_) as errors ->
+        Logger.error (String.concat ~sep:"\n" errors)
+      | [] ->
+        let%lwt () = Logger.info "Global health check succeeded" in
+        let%lwt () = Logger.info "*** SERVER STARTED **" in
+        let pairs = List.map (Int.Table.to_alist (Watcher.table watcher)) ~f:(fun (port, listener) ->
+            let name = listener.Listener.id in
+            let channels = match String.Table.find router.table name with
+              | None -> []
+              | Some chan_table -> String.Table.keys chan_table
+            in
+            name, `Assoc [
+              "protocol", `String (Listener.get_prot listener);
+              "port", `Int port;
+              "channels", `List (List.map channels ~f:(fun s -> `String s))
+            ]
+          )
+        in
+        print_endline (Yojson.Basic.pretty_to_string (`Assoc pairs));
+        (* Run forever *)
+        fst (wait ())
+    with
+    | ex ->
+      Logger.fatal (sprintf
+          "Critical failure during startup process.\nCould not complete Global Health Check.\n%s"
+          (Exception.full ex)
+      )
 
 
 let _ =
-  Lwt_unix.run (start (Fs.conf_dir ^ "newque.json"))
+  Lwt_unix.run (start (sprintf "%s%s" Fs.conf_dir "newque.json"))

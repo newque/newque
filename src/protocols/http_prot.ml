@@ -35,17 +35,17 @@ let default_filter _ req _ =
     | ""::"v1"::"health"::_ ->
       begin match Request.meth req with
         | `GET -> Ok (None, `Health)
-        | meth -> Error (405, [sprintf "Invalid HTTP method %s for health" (Code.string_of_method meth)])
+        | meth -> Error (405, [sprintf "Invalid HTTP method [%s] for health" (Code.string_of_method meth)])
       end
     | ""::"v1"::chan_name::"health"::_ ->
       begin match Request.meth req with
         | `GET -> Ok (Some chan_name, `Health)
-        | meth -> Error (405, [sprintf "Invalid HTTP method %s for health" (Code.string_of_method meth)])
+        | meth -> Error (405, [sprintf "Invalid HTTP method [%s] for health" (Code.string_of_method meth)])
       end
     | ""::"v1"::chan_name::"count"::_ ->
       begin match Request.meth req with
         | `GET -> Ok (Some chan_name, `Count)
-        | meth -> Error (405, [sprintf "Invalid HTTP method %s for count" (Code.string_of_method meth)])
+        | meth -> Error (405, [sprintf "Invalid HTTP method [%s] for count" (Code.string_of_method meth)])
       end
     | ""::"v1"::chan_name::_ ->
       let mode_opt = Header.get (Request.headers req) Header_names.mode in
@@ -69,7 +69,7 @@ let default_filter _ req _ =
         | meth, Error _ ->
           Error (400, [sprintf "Invalid {Method, Mode} pair: {%s, %s}" (Code.string_of_method meth) mode_string])
       end
-    | _ -> Error (400, [sprintf "Invalid path %s (should begin with /v1/)" path])
+    | _ -> Error (400, [sprintf "Invalid path [%s] (should begin with /v1/)" path])
   in
   return result
 
@@ -157,7 +157,7 @@ let handler http routing ((ch, _) as conn) req body =
                 let open Read_settings in
                 let (body, headers) = match channel.Channel.read with
                   | None ->
-                    let err = sprintf "Impossible case: Missing readSettings for channel %s" chan_name in
+                    let err = sprintf "Impossible case: Missing readSettings for channel [%s]" chan_name in
                     async (fun () -> Logger.error err);
                     let headers = Header.add headers "content-type" "application/json" in
                     let body = Json_obj_j.(string_of_read { code = 500; errors = [err]; messages = [| |]; }) in
@@ -216,9 +216,7 @@ let handler http routing ((ch, _) as conn) req body =
       | Ok (None, _) -> fail_with "Invalid routing"
     end
   with
-  | Exception.Multiple_exn errors -> handle_errors 500 errors
-  | Failure str -> handle_errors 500 [str]
-  | ex -> handle_errors 500 [Exn.to_string ex]
+  | ex -> handle_errors 500 (Exception.human_list ex)
 
 let open_sockets = Int.Table.create ~size:5 ()
 

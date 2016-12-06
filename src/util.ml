@@ -121,36 +121,11 @@ let sexp_of_atdgen_exn str =
   | `String s -> Sexp.Atom s
   | _ -> Sexp.Atom str
 
-let json_error_regexp = Str.regexp "[ \\\n]"
 let parse_sync parser str =
   try
     Ok (parser str)
   with
-  | Unix.Unix_error (c, n, p) -> Error (Fs.format_unix_exn c n p)
-  | Ag_oj_run.Error str
-  | Yojson.Json_error str ->
-    let replaced = Str.global_replace json_error_regexp " " str in
-    Error replaced
-
-let parse_async parser str =
-  try
-    return (parser str)
-  with
-  | Unix.Unix_error (c, n, p) -> fail_with (Fs.format_unix_exn c n p)
-  | Ag_oj_run.Error str
-  | Yojson.Json_error str ->
-    let replaced = Str.global_replace json_error_regexp " " str in
-    fail_with replaced
-
-let parse_async_bind parser str =
-  try
-    parser str
-  with
-  | Unix.Unix_error (c, n, p) -> fail_with (Fs.format_unix_exn c n p)
-  | Ag_oj_run.Error str
-  | Yojson.Json_error str ->
-    let replaced = Str.global_replace json_error_regexp " " str in
-    fail_with replaced
+  | ex -> Error (Exception.human ex)
 
 let header_name_to_int64_opt headers name =
   Option.bind

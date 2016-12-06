@@ -24,7 +24,6 @@ let submit connector uid =
 let resolve connector uid obj =
   match String.Table.find_and_remove connector.table uid with
   | None ->
-    print_endline (sprintf "Unknown UID received: %s" uid);
     fail_with (sprintf "Unknown UID received: %s" uid)
   | Some wakener ->
     wakeup_later wakener obj;

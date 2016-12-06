@@ -50,14 +50,14 @@ module M = struct
     let json = Yojson.Basic.from_string body_str in
     match json |> member "errors" with
     | `Bool false ->
-      let%lwt parsed = Util.parse_async bulk_response_of_string body_str in
+      let parsed = bulk_response_of_string body_str in
       let total = List.fold_left parsed.items ~init:0 ~f:(fun acc item ->
           if Int.(=) item.index.status 201 then (succ acc) else acc
         )
       in
       return total
     | `Bool true ->
-      let%lwt () = Logger.error body_str in
+      let%lwt () = Logger.error (sprintf "[%s] ES errors: %s" (Uri.to_string uri) body_str) in
       wrap (fun () ->
         let items = json |> member "items" |> to_list in
         let strings = List.filter_map items ~f:(fun item ->
@@ -75,9 +75,9 @@ module M = struct
               end
           )
         in
-        failwith (sprintf "ES errors: [%s]" (String.concat ~sep:", " strings))
+        failwith (sprintf "[%s] ES errors: %s" (Uri.to_string uri) (String.concat ~sep:", " strings))
       )
-    | err -> fail_with (sprintf "Incorrect ES bulk json: %s" body_str)
+    | _ -> fail_with (sprintf "Incorrect ES bulk json: %s" body_str)
 
   let pull instance ~search ~fetch_last = fail_with "Unimplemented: ES pull"
 
@@ -88,11 +88,14 @@ module M = struct
     let%lwt body_str = Cohttp_lwt_body.to_string body in
     begin match Code.code_of_status (Response.status response) with
       | 200 ->
-        let%lwt parsed = Util.parse_async es_size_of_string body_str in
+        let parsed = es_size_of_string body_str in
         return parsed.es_count
       | code ->
         let%lwt () = Logger.error body_str in
-        failwith (sprintf "Couldn't get count from ES (HTTP %s)" (Code.string_of_status (Response.status response)))
+        failwith (sprintf
+            "[%s] Couldn't get count from ES (HTTP %s)"
+            (Uri.to_string uri) (Code.string_of_status (Response.status response))
+        )
     end
 
   let delete instance = fail_with "Unimplemented: ES delete"
@@ -108,12 +111,12 @@ module M = struct
           let%lwt () = Logger.error body_str in
           return [
             sprintf
-              "Couldn't validate index [%s] at %s (HTTP %s)"
-              instance.index (Uri.to_string uri) (Code.string_of_status (Response.status response))
+              "[%s] Couldn't validate index [%s] (HTTP %s)"
+              (Uri.to_string uri) instance.index
+              (Code.string_of_status (Response.status response))
           ]
       end
     with
-    | Unix.Unix_error (c, n, _) -> return [Fs.format_unix_exn c n (Uri.to_string uri)]
-    | err -> return [Exn.to_string err]
+    | ex -> return (Exception.human_list ex)
 
 end

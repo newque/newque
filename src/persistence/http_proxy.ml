@@ -63,7 +63,7 @@ module M = struct
     let uri = get_base instance in
     let%lwt (response, body) = Client.call ~headers ~body ~chunked:false `POST uri in
     let%lwt body_str = Cohttp_lwt_body.to_string body in
-    let%lwt parsed = Util.parse_async write_of_string body_str in
+    let parsed = write_of_string body_str in
     match parsed.errors with
     | [] -> return (Option.value ~default:0 parsed.saved)
     | errors -> fail_with (String.concat ~sep:", " errors)
@@ -86,14 +86,14 @@ module M = struct
       | _, Http_format.Plaintext ->
         begin match Header.get response_headers "content-type" with
           | Some "application/json" ->
-            let%lwt parsed = Util.parse_async errors_of_string body_str in
+            let parsed = errors_of_string body_str in
             return (parsed.errors, [| |])
           | _ ->
             let msgs = Util.split ~sep:instance.chan_separator body_str in
             return ([], Array.of_list_map ~f:B64.decode msgs)
         end
       | _, Http_format.Json ->
-        let%lwt parsed = Util.parse_async read_of_string body_str in
+        let parsed = read_of_string body_str in
         return (parsed.errors, parsed.messages)
     in
     match errors with
@@ -114,7 +114,7 @@ module M = struct
     let uri = Util.append_to_path (get_base instance) "count" in
     let%lwt (response, body) = Client.call ~headers ~chunked:false `GET uri in
     let%lwt body_str = Cohttp_lwt_body.to_string body in
-    let%lwt parsed = Util.parse_async count_of_string body_str in
+    let parsed = count_of_string body_str in
     match parsed.errors with
     | [] -> return (Option.value ~default:Int64.zero parsed.count)
     | errors -> fail_with (String.concat ~sep:", " errors)
@@ -125,7 +125,7 @@ module M = struct
     let uri = Util.append_to_path (get_base instance) "delete" in
     let%lwt (response, body) = Client.call ~headers ~chunked:false `DELETE uri in
     let%lwt body_str = Cohttp_lwt_body.to_string body in
-    let%lwt parsed = Util.parse_async errors_of_string body_str in
+    let parsed = errors_of_string body_str in
     match parsed.errors with
     | [] -> return_unit
     | errors -> fail_with (String.concat ~sep:", " errors)
@@ -137,7 +137,7 @@ module M = struct
     try%lwt
       let%lwt (response, body) = Client.call ~headers ~chunked:false `GET uri in
       let%lwt body_str = Cohttp_lwt_body.to_string body in
-      let%lwt parsed = Util.parse_async errors_of_string body_str in
+      let parsed = errors_of_string body_str in
       begin match parsed.errors with
         | [] ->
           begin match parsed.code, parsed.errors with
@@ -147,7 +147,6 @@ module M = struct
         | errors -> return errors
       end
     with
-    | Unix.Unix_error (c, n, _) -> return [Fs.format_unix_exn c n (Uri.to_string uri)]
-    | err -> return [Exn.to_string err]
+    | ex -> return [sprintf "[%s] %s" (Uri.to_string uri) (Exception.human ex)]
 
 end

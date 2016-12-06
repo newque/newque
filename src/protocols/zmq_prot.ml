@@ -115,13 +115,7 @@ let handler zmq routing socket frames =
         end
       with
       | ex ->
-        let errors = begin match ex with
-          | Exception.Multiple_exn errors -> errors
-          | Protobuf.Decoder.Failure err -> [sprintf "Protobuf Decoder Error: %s" (Protobuf.Decoder.error_to_string err)]
-          | Failure str -> [str]
-          | ex -> [Exn.to_string ex]
-        end
-        in
+        let errors = Exception.human_list ex in
         return ({ errors; action = Error_output }, [||])
     end
     in
@@ -138,7 +132,7 @@ let handler zmq routing socket frames =
   | strs ->
     let printable = Yojson.Basic.to_string (`List (List.map ~f:(fun s -> `String s) strs)) in
     let%lwt () = Logger.warning (sprintf "Received invalid msg parts on %s: %s" zmq.inbound printable) in
-    let error = sprintf "Received invalid msg parts on %s. Expected [id], [meta], [msgs...]." zmq.inbound in
+    let error = sprintf "Received invalid msg parts on %s. Expected [id], [input], [msgs...]." zmq.inbound in
     Lwt_zmq.Socket.send_all socket (strs @ [error])
 
 let start generic specific routing =
@@ -178,7 +172,7 @@ let start generic specific routing =
             let%lwt frames = Lwt_zmq.Socket.recv_all socket in
             callback socket frames
           with
-          | ex -> Logger.error (Exn.to_string ex)
+          | ex -> Logger.error (Exception.full ex)
         in
         loop socket
       in

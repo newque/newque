@@ -85,11 +85,7 @@ let create ~chan_name host port =
             | uid::frames ->
               Connector.resolve connector uid frames
           with ex ->
-            let str = match ex with
-              | Failure str -> str
-              | ex -> Exn.to_string ex
-            in
-            Logger.error (sprintf "Error on channel [%s]: %s" chan_name str)
+            Logger.error (sprintf "Error on channel [%s]: %s" chan_name (Exception.full ex))
         in
         loop socket
       in
@@ -184,8 +180,8 @@ module M = struct
 
   let health instance =
     (* The connector has its own timeout and fails with Failure.
-    If no consumer reads or answers within time_limit, we consider
-    the health check as passed. *)
+       If no consumer reads or answers within time_limit, we consider
+       the health check as passed. *)
     let time_limit = 5.0 in
     let thread =
       let input = {
