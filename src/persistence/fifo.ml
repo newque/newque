@@ -49,18 +49,20 @@ let handler instance input messages =
 
   (* Register and send request *)
   let uid = Id.uuid_bytes () in
-  let thread = Connector.submit instance.connector uid in
+  let thunk = Connector.submit instance.connector uid in
   let%lwt () = Lwt_zmq.Socket.send_all instance.socket (uid::input::messages) in
 
   (* Wait for response *)
-  let%lwt frames = thread in
+  let%lwt frames = thunk () in
 
   (* Process response *)
   let%lwt (output, msgs_recv) as pair = match frames with
     | [] -> fail_with "No frames received"
     | head::msgs_recv ->
-      let output = decode_output (Pbrt.Decoder.of_bytes head) in
-      return (output, msgs_recv)
+      wrap2 (fun head msgs_recv ->
+        let output = decode_output (Pbrt.Decoder.of_bytes head) in
+        (output, msgs_recv)
+      ) head msgs_recv
   in
   match output.errors with
   | [] -> return pair
@@ -73,7 +75,7 @@ let create ~chan_name host port =
   (* TODO: ZMQ Options *)
   ZMQ.Socket.bind router outbound;
   let socket = Lwt_zmq.Socket.of_socket router in
-  let connector = Connector.create 1.0 in
+  let connector = Connector.create 3.0 in
 
   let workers = Array.init 5 (fun _ ->
       let rec loop socket =
@@ -152,7 +154,7 @@ module M = struct
     let arr_msgs = List.to_array msgs in
     if Int.(<>) read.length (Array.length arr_msgs)
     then async (fun () ->
-        Logger.warning (sprintf "Lengths don't match: Read [%d] messages, but 'length' is %d" read.length (Array.length arr_msgs))
+        Logger.warning (sprintf "Lengths don't match: Read [%d] messages, but 'length' is [%d]" read.length (Array.length arr_msgs))
       );
     let meta = begin match read with
       | { last_id = Some l_id; last_timens = Some l_ts; } -> Some (l_id, l_ts)
@@ -181,13 +183,29 @@ module M = struct
     unwrap_action output.action Delete_action "Delete_Output"
 
   let health instance =
-    let input = {
-      channel = instance.chan_name;
-      action = Health_input { global = false };
-    }
+    (* The connector has its own timeout and fails with Failure.
+    If no consumer reads or answers within time_limit, we consider
+    the health check as passed. *)
+    let time_limit = 5.0 in
+    let thread =
+      let input = {
+        channel = instance.chan_name;
+        action = Health_input { global = false };
+      }
+      in
+      let%lwt (output, _) = handler instance input [] in
+      let%lwt () = unwrap_action output.action Health_action "Health_Output" in
+      return []
     in
-    let%lwt (output, _) = handler instance input [] in
-    let%lwt () = unwrap_action output.action Health_action "Health_Output" in
-    return []
+    try%lwt
+      pick [thread; Lwt_unix.timeout time_limit]
+    with
+    | Lwt_unix.Timeout ->
+      let%lwt () = Logger.warning (sprintf
+            "Channel [%s]: No consumer read or answered health check within %f seconds. OK by default."
+            instance.chan_name time_limit
+        )
+      in
+      return []
 
 end

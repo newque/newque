@@ -13,12 +13,13 @@ let create expiration =
 let submit connector uid =
   let thread, wakener = wait () in
   String.Table.add_exn connector.table ~key:uid ~data:wakener;
-  try%lwt
-    pick [thread; Lwt_unix.timeout connector.expiration]
-  with
-  | Lwt_unix.Timeout ->
-    String.Table.remove connector.table uid;
-    fail_with (sprintf "No response from upstream within %f seconds" connector.expiration)
+  fun () ->
+    try%lwt
+      pick [thread; Lwt_unix.timeout connector.expiration]
+    with
+    | Lwt_unix.Timeout ->
+      String.Table.remove connector.table uid;
+      fail_with (sprintf "No response from upstream within %f seconds" connector.expiration)
 
 let resolve connector uid obj =
   match String.Table.find_and_remove connector.table uid with

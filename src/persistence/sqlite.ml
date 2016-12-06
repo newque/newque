@@ -26,12 +26,7 @@ type t = {
    because it is only retried when the db is locked.
    We only want it to fail in catastrophic cases. *)
 let default_retries = 3
-
-  #ifdef DEBUG
-let insert_batch_size = 2
-  #else
 let insert_batch_size = 500
-  #endif
 
 (******************
    LOW LEVEL FUNCTIONS

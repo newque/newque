@@ -7,13 +7,16 @@ open Lwt
 open Http_prot
 
 let () = Lwt_engine.set ~transfer:true ~destroy:true (new Lwt_engine.libev)
+
 let () = Lwt.async_exception_hook := fun ex ->
     let str = match ex with
       | Unix.Unix_error (c, n, p) -> Fs.format_unix_exn c n p
       | Failure str -> str
       | ex -> Exn.to_string ex
     in
-    print_endline (sprintf "UNCAUGHT EXCEPTION: %s" str)
+    print_endline (sprintf "UNCAUGHT EXCEPTION: %s" str);
+    print_endline (Exn.backtrace ())
+
 let () = Lwt_preemptive.init 4 25 (fun str -> async (fun () -> Log.stdout Lwt_log.Info str))
 
 (* Only for startup, replaced by newque.json settings later *)
@@ -69,7 +72,7 @@ let start config_path =
     let%lwt () = Logger.info "Running global health check..." in
     match%lwt Router.health router ~listen_name:priv ~chan_name:None ~mode:`Health with
     | (_::_) as errors ->
-      Logger.error (String.concat ~sep:", " errors)
+      Logger.error (String.concat ~sep:"\n" errors)
     | [] ->
       let%lwt () = Logger.info "Global health check succeeded" in
       let%lwt () = Logger.info "Server started" in

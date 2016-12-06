@@ -36,6 +36,7 @@ let invalid_read_output = Zmq_obj_pb.({ length = 0; last_id = None; last_timens 
 
 let handler zmq routing socket frames =
   let open Routing in
+  (* let%lwt () = Logger.debug (String.concat ~sep:"--" frames) in *)
   let%lwt zmq = zmq in
   match frames with
   | header::id::meta::msgs ->
