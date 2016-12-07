@@ -1,6 +1,11 @@
 module.exports = function (backend, backendSettings, raw) {
-  var delay = backend === 'elasticsearch' ? C.esDelay : 0
   describe('Count ' + backend + (!!raw ? ' raw' : ''), function () {
+    if (backend === 'elasticsearch') {
+      var delay = C.esDelay
+      this.timeout(3000)
+    } else {
+      var delay = 0
+    }
     var env
     before(function () {
       this.timeout(C.setupTimeout)

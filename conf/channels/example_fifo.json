@@ -6,9 +6,7 @@
     "port": 8007
   },
   "acknowledgement": "saved",
-  "readSettings": {
-    "onlyOnce": true
-  },
+  "readSettings": {},
   "writeSettings": {
     "forward": [],
     "batching": {

@@ -155,7 +155,7 @@ __Example__
   "backend": "disk",
   "acknowledgement": "saved",
   "readSettings": {
-    "onlyOnce": true
+    "onlyOnce": false
   },
   "writeSettings": {
     "forward": ["sinkChannel"]
@@ -229,7 +229,7 @@ __Read Settings Object__
 |----------|------|----------|---------|-------------|
 | `httpFormat` | String | No | `json` | Format that the Channel uses to send back read results. One of `plaintext` or `json`. |
 | `streamSliceSize` | Integer | No | `500` | How many messages return per 'slice' when streaming. |
-| `onlyOnce` | Boolean | Yes | | Whether to automatically delete messages while reading them. This only has an effect for the `memory` and `disk` backends, as they are the only backends where Newque manages storage itself. |
+| `onlyOnce` | Boolean | No | `false` | Whether to automatically delete messages while reading them. This only has an effect for the `memory` and `disk` backends, as they are the only backends where Newque manages storage itself. |
 
 __Write Settings Object__
 

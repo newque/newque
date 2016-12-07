@@ -30,8 +30,8 @@ type config_http_settings = {
 }
 type config_zmq_settings = {
   ~concurrency <ocaml default="20">: int;
-  ~receive_hwm <json name="receiveHighWaterMark"> <ocaml default="5000">: int;
-  ~send_hwm <json name="sendHighWaterMark"> <ocaml default="5000">: int;
+  ~receive_hwm <json name="receiveHighWaterMark"><ocaml default="5000">: int;
+  ~send_hwm <json name="sendHighWaterMark"><ocaml default="5000">: int;
 }
 
 type config_proto = [
@@ -102,16 +102,16 @@ type config_batching = {
 } <ocaml field_prefix="c_">
 
 type config_channel_write = {
-  ~http_format <json name="httpFormat"> <ocaml default="C_json">: config_channel_format;
+  ~http_format <json name="httpFormat"><ocaml default="C_json">: config_channel_format;
   ~ack <json name="acknowledgement"><ocaml default="C_saved">: config_channel_acknowledgement;
   forward: string list;
   ?batching: config_batching nullable;
 } <ocaml field_prefix="c_">
 
 type config_channel_read = {
-  ~http_format <json name="httpFormat"> <ocaml default="C_json">: config_channel_format;
-  ~stream_slice_size <json name="streamSliceSize"> <ocaml default="500">: int;
-  only_once <json name="onlyOnce">: bool;
+  ~http_format <json name="httpFormat"><ocaml default="C_json">: config_channel_format;
+  ~stream_slice_size <json name="streamSliceSize"><ocaml default="500">: int;
+  ~only_once <json name="onlyOnce"><ocaml default="false">: bool;
 } <ocaml field_prefix="c_">
 
 (* TODO: Validate that the separators are non-empty *)
@@ -123,9 +123,9 @@ type config_channel = {
   read_settings <json name="readSettings">: config_channel_read nullable;
   write_settings <json name="writeSettings">: config_channel_write nullable;
   ~separator <ocaml default="\"\n\"">: string;
-  ~buffer_size <json name="averageSize"> <ocaml default="256">: int;
-  ~max_read <json name="maxRead"> <ocaml default="1000">: int;
-  ~avg_read <json name="averageRead"> <ocaml default="32">: int;
+  ~buffer_size <json name="averageSize"><ocaml default="256">: int;
+  ~max_read <json name="maxRead"><ocaml default="1000">: int;
+  ~avg_read <json name="averageRead"><ocaml default="32">: int;
 }
 
 

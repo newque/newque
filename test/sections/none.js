@@ -1,5 +1,4 @@
 module.exports = function (backend, backendSettings, raw) {
-  var delay = backend === 'elasticsearch' ? C.esDelay : 0
   describe('None', function () {
     var env
     before(function () {

@@ -109,7 +109,7 @@ var getEnvironment = function () {
 }
 
 var str = s => s ? s.toString('utf8') : s
-var setupFifoClient = function (backendSettings, fifoPorts) {
+var setupFifoClient = function (backend, backendSettings, fifoPorts) {
   var sockets = {}
   var handler = function (name) {
     return function (uid, input) {
@@ -192,7 +192,6 @@ var setupFifoClient = function (backendSettings, fifoPorts) {
           var output = specs.Output.encode(obj)
 
         } else if (decoded.health_input) {
-
           var obj = {
             errors: [],
             health_output: {}
@@ -311,7 +310,7 @@ exports.setupEnvironment = function (backend, backendSettings, raw) {
       })
     }))
   })
-  .then(() => setupFifoClient(backendSettings, fifoPorts))
+  .then(() => setupFifoClient(backend, backendSettings, fifoPorts))
   .then(function (pSockets) {
     sockets = pSockets
     var processes = []

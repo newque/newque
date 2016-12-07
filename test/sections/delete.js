@@ -1,5 +1,4 @@
 module.exports = function (backend, backendSettings, raw) {
-  var delay = backend === 'elasticsearch' ? C.esDelay : 0
   describe('Delete ' + backend + (!!raw ? ' raw' : ''), function () {
     var env
     before(function () {
@@ -13,7 +12,6 @@ module.exports = function (backend, backendSettings, raw) {
         var buf = `{"a":"abc"}\n{"a":"def"}\n{"a":"ghi"}\n{"a":"jkl"}`
         return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'multiple']])
         .then(Fn.shouldHaveWritten(4))
-        .delay(delay)
       })
     })
     beforeEach(function () {

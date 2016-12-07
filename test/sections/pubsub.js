@@ -6,7 +6,6 @@ var socket1 = zmq.socket('sub')
 var socket2 = zmq.socket('sub')
 
 module.exports = function (backend, backendSettings, raw) {
-  var delay = backend === 'elasticsearch' ? C.esDelay : 0
   describe('Pubsub' + (!!raw ? ' raw' : ''), function () {
     var env
     before(function () {
