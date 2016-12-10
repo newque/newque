@@ -81,7 +81,7 @@ module M = struct
       )
     | _ -> fail_with (sprintf "Incorrect ES bulk json: %s" body_str)
 
-  let pull instance ~search ~fetch_last = fail_with "Unimplemented: ES pull"
+  let pull instance ~search ~fetch_last = fail_with "Unimplemented: ES read"
 
   let size instance =
     let open Json_obj_j in

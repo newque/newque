@@ -47,7 +47,7 @@ type config_listener = {
 }
 
 
-(* PERSISTENCE *)
+(* BACKENDS *)
 type config_redis = {
   host <json name="host">: string;
   port <json name="port">: int;
@@ -81,7 +81,7 @@ type config_elasticsearch = {
   timeout: int <ocaml repr="float">;
 }
 
-type config_persistence = [
+type config_backend = [
   | None <json name="none">
   | Memory <json name="memory">
   | Disk <json name="disk">
@@ -120,7 +120,7 @@ type config_channel_read = {
 (* TODO: Validate that the separators are non-empty *)
 type config_channel = {
   endpoint_names <json name="listeners">: string list;
-  persistence_settings <json name="backendSettings" tag_field="backend">: config_persistence;
+  backend_settings <json name="backendSettings" tag_field="backend">: config_backend;
   emptiable: bool;
   raw: bool;
   read_settings <json name="readSettings">: config_channel_read nullable;

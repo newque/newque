@@ -28,7 +28,7 @@ let create name conf_channel =
   let write = Option.map conf_channel.write_settings ~f:Write_settings.create in
   let batching = Option.bind write (fun w -> w.Write_settings.batching) in
 
-  let module Persist = (val (match conf_channel.persistence_settings with
+  let module Persist = (val (match conf_channel.backend_settings with
     | `None ->
       let module Arg = struct
         module IO = None.M
@@ -78,9 +78,9 @@ let create name conf_channel =
       (module Persistence.Make (Arg) : Persistence.S)
 
     | `Pubsub pubsub ->
-      if not conf_channel.raw then failwith (sprintf "Channel [%s] has persistence type [pubsub], setting 'raw' must be set to true" name) else
-      if Option.is_some read then failwith (sprintf "Channel [%s] has persistence type [pubsub], reading must be disabled" name) else
-      if conf_channel.emptiable then failwith (sprintf "Channel [%s] has persistence type [pubsub], setting 'emptiable' must be set to false" name) else
+      if not conf_channel.raw then failwith (sprintf "Channel [%s] has backend type [pubsub], setting 'raw' must be set to true" name) else
+      if Option.is_some read then failwith (sprintf "Channel [%s] has backend type [pubsub], reading must be disabled" name) else
+      if conf_channel.emptiable then failwith (sprintf "Channel [%s] has backend type [pubsub], setting 'emptiable' must be set to false" name) else
       let module Arg = struct
         module IO = Pubsub.M
         let create () = Pubsub.create
@@ -108,9 +108,9 @@ let create name conf_channel =
       (module Persistence.Make (Arg) : Persistence.S)
 
     | `Elasticsearch es ->
-      if not conf_channel.raw then failwith (sprintf "Channel [%s] has persistence type [elasticsearch], setting 'raw' must be set to true" name) else
-      if Option.is_some read then failwith (sprintf "Channel [%s] has persistence type [elasticsearch], reading must be disabled" name) else
-      if conf_channel.emptiable then failwith (sprintf "Channel [%s] has persistence type [elasticsearch], setting 'emptiable' must be set to false" name) else
+      if not conf_channel.raw then failwith (sprintf "Channel [%s] has backend type [elasticsearch], setting 'raw' must be set to true" name) else
+      if Option.is_some read then failwith (sprintf "Channel [%s] has backend type [elasticsearch], reading must be disabled" name) else
+      if conf_channel.emptiable then failwith (sprintf "Channel [%s] has backend type [elasticsearch], setting 'emptiable' must be set to false" name) else
       let module Arg = struct
         module IO = Elasticsearch.M
         let create () = Elasticsearch.create

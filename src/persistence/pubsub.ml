@@ -50,11 +50,11 @@ module M = struct
     let%lwt () = Lwt_zmq.Socket.send_all instance.socket (input::(Array.to_list msgs)) in
     return (Array.length msgs)
 
-  let pull instance ~search ~fetch_last = fail_with "Unimplemented: Pubsub delete"
+  let pull instance ~search ~fetch_last = fail_with "Invalid operation: Pubsub read"
 
-  let size instance = fail_with "Unimplemented: Pubsub size"
+  let size instance = fail_with "Invalid operation: Pubsub size"
 
-  let delete instance = fail_with "Unimplemented: Pubsub delete"
+  let delete instance = fail_with "Invalid operation: Pubsub count"
 
   let health instance =
     match Util.parse_sync ZMQ.Socket.get_fd instance.pub with
