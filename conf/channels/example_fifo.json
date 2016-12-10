@@ -3,7 +3,8 @@
   "backend": "fifo",
   "backendSettings": {
     "host": "0.0.0.0",
-    "port": 8007
+    "port": 8007,
+    "timeout": 3000
   },
   "acknowledgement": "saved",
   "readSettings": {},
