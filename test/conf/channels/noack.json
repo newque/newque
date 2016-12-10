@@ -8,7 +8,7 @@
   "writeSettings": {
     "acknowledgement": "none",
     "httpFormat": "plaintext",
-    "copyToChannels": []
+    "forward": []
   },
   "emptiable": true
 }

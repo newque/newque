@@ -13,7 +13,7 @@ type batching = {
 type t = {
   http_format: Http_format.t;
   ack: ack;
-  copy_to: string list;
+  forward: string list;
   batching: batching option;
 } [@@deriving sexp]
 
@@ -24,11 +24,11 @@ let create config_channel_write =
     | C_saved -> Saved
   in
   let http_format = Http_format.create config_channel_write.c_http_format in
-  let copy_to = config_channel_write.c_copy_to in
+  let forward = config_channel_write.c_forward in
   let batching = Option.map config_channel_write.c_batching ~f:(fun conf_batching ->
       {
         max_time = conf_batching.c_max_time;
         max_size = conf_batching.c_max_size;
       }
     ) in
-  { http_format; ack; copy_to; batching; }
+  { http_format; ack; forward; batching; }

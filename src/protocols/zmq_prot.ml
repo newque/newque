@@ -18,7 +18,6 @@ type t = {
   workers: worker array;
   proxy: unit Lwt.t;
   stop_w: unit Lwt.u;
-  ctx: ZMQ.Context.t;
 }
 let sexp_of_t zmq =
   let open Config_t in
@@ -33,13 +32,11 @@ let sexp_of_t zmq =
     ];
   ]
 
-let ctx = ZMQ.Context.create ()
-let () = ZMQ.Context.set_io_threads ctx 1
-
 let invalid_read_output = Zmq_obj_pb.({ length = 0; last_id = None; last_timens = None })
 
 let handler zmq routing socket frames =
   let open Routing in
+  (* let%lwt () = Logger.debug (String.concat ~sep:"--" frames) in *)
   let%lwt zmq = zmq in
   match frames with
   | header::id::meta::msgs ->
@@ -53,8 +50,9 @@ let handler zmq routing socket frames =
           | Write_input write ->
             let ids = Array.of_list write.ids in
             let msgs = Array.of_list msgs in
+            let atomic = Option.value ~default:false write.atomic in
             let%lwt (errors, saved) =
-              begin match%lwt routing.write_zmq ~chan_name ~ids ~msgs ~atomic:write.atomic with
+              begin match%lwt routing.write_zmq ~chan_name ~ids ~msgs ~atomic with
                 | Ok ((Some _) as count) -> return ([], count)
                 | Ok None -> return ([], None)
                 | Error errors -> return (errors, (Some 0))
@@ -117,13 +115,8 @@ let handler zmq routing socket frames =
         end
       with
       | ex ->
-        let error = begin match ex with
-          | Protobuf.Decoder.Failure err -> sprintf "Protobuf Decoder Error: %s" (Protobuf.Decoder.error_to_string err)
-          | Failure str -> str
-          | ex -> Exn.to_string ex
-        end
-        in
-        return ({ errors = [error]; action = Error_output }, [||])
+        let errors = Exception.human_list ex in
+        return ({ errors; action = Error_output }, [||])
     end
     in
     let encoder = Pbrt.Encoder.create () in
@@ -133,18 +126,14 @@ let handler zmq routing socket frames =
       | [||] -> Lwt_zmq.Socket.send_all socket [header; id; reply]
       | msgs ->
         (* TODO: Benchmark this *)
-        Lwt_zmq.Socket.send_all socket ([header; id; reply] @ (Array.to_list messages))
+        Lwt_zmq.Socket.send_all socket (header::id::reply::(Array.to_list messages))
     end
 
   | strs ->
     let printable = Yojson.Basic.to_string (`List (List.map ~f:(fun s -> `String s) strs)) in
     let%lwt () = Logger.warning (sprintf "Received invalid msg parts on %s: %s" zmq.inbound printable) in
-    let error = sprintf "Received invalid msg parts on %s. Expected [id], [meta], [msgs...]." zmq.inbound in
+    let error = sprintf "Received invalid msg parts on %s. Expected [id], [input], [msgs...]." zmq.inbound in
     Lwt_zmq.Socket.send_all socket (strs @ [error])
-
-let set_hwm sock receive send =
-  ZMQ.Socket.set_receive_high_water_mark sock receive;
-  ZMQ.Socket.set_send_high_water_mark sock send
 
 let start generic specific routing =
   let open Config_t in
@@ -154,10 +143,11 @@ let start generic specific routing =
   let (instance_t, instance_w) = wait () in
   let (stop_t, stop_w) = wait () in
 
-  let frontend = ZMQ.Socket.create ctx ZMQ.Socket.router in
+  let%lwt () = Logger.info (sprintf "Creating a new TCP socket on %s:%d" generic.host generic.port) in
+  let frontend = ZMQ.Socket.create Zmq_tools.ctx ZMQ.Socket.router in
+  Zmq_tools.set_hwm frontend specific.receive_hwm specific.send_hwm;
   ZMQ.Socket.bind frontend inbound;
-  set_hwm frontend specific.receive_hwm specific.send_hwm;
-  let backend = ZMQ.Socket.create ctx ZMQ.Socket.dealer in
+  let backend = ZMQ.Socket.create Zmq_tools.ctx ZMQ.Socket.dealer in
   ZMQ.Socket.bind backend inproc;
 
   let proxy = Lwt_preemptive.detach (fun () ->
@@ -167,8 +157,6 @@ let start generic specific routing =
   async (fun () -> pick [stop_t; proxy]);
 
   (* TODO: Configurable timeout for disconnected clients *)
-  (* print_endline (sprintf "send timeout %d" (ZMQ.Socket.get_send_timeout frontend)); *)
-  (* print_endline (sprintf "receive timeout %d" (ZMQ.Socket.get_receive_timeout frontend)); *)
 
   let%lwt callback = match routing with
     | Admin _ -> fail_with "ZMQ listeners don't support Admin routing"
@@ -176,7 +164,7 @@ let start generic specific routing =
   in
 
   let workers = Array.init specific.concurrency (fun _ ->
-      let sock = ZMQ.Socket.create ctx ZMQ.Socket.dealer in
+      let sock = ZMQ.Socket.create Zmq_tools.ctx ZMQ.Socket.dealer in
       ZMQ.Socket.connect sock inproc;
       let socket = Lwt_zmq.Socket.of_socket sock in
       let rec loop socket =
@@ -184,11 +172,14 @@ let start generic specific routing =
             let%lwt frames = Lwt_zmq.Socket.recv_all socket in
             callback socket frames
           with
-          | ex -> Logger.error (Exn.to_string ex)
+          | ex -> Logger.error (Exception.full ex)
         in
         loop socket
       in
-      let accept = loop socket in
+      let accept =
+        let%lwt () = Lwt_unix.sleep Zmq_tools.start_delay in
+        loop socket
+      in
       async (fun () -> accept);
       { socket; accept; }
     )
@@ -203,7 +194,6 @@ let start generic specific routing =
     workers;
     proxy;
     stop_w;
-    ctx;
   }
   in
   wakeup instance_w instance;

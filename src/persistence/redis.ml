@@ -18,14 +18,14 @@ module M = struct
 
   let close instance = return_unit
 
-  let push instance ~msgs ~ids = fail_with "Unimplemented: Redis push"
+  let push instance ~msgs ~ids = fail_with "Invalid operation: Redis write"
 
-  let pull instance ~search ~fetch_last = fail_with "Unimplemented: Redis pull"
+  let pull instance ~search ~fetch_last = fail_with "Invalid operation: Redis read"
 
-  let size instance = fail_with "Unimplemented: Redis size"
+  let size instance = fail_with "Invalid operation: Redis count"
 
-  let delete instance = fail_with "Unimplemented: Redis delete"
+  let delete instance = fail_with "Invalid operation: Redis delete"
 
-  let health instance = fail_with "Unimplemented: Redis health"
+  let health instance = fail_with "Invalid operation: Redis health"
 
 end

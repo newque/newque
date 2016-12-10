@@ -3,6 +3,11 @@ type pair = {
   value: string;
 }
 
+type cardinality = [
+  | C_one <json name="one">
+  | C_all <json name="all">
+] <ocaml repr="classic">
+
 type config_channel_format = [
   | C_plaintext <json name="plaintext">
   | C_json <json name="json">
@@ -16,7 +21,7 @@ type config_log_level = [
   | Warning <json name="warning">
   | Error <json name="error">
   | Fatal <json name="fatal">
-] <ocaml repr="classic">
+]
 
 
 (* NETWORK *)
@@ -25,8 +30,8 @@ type config_http_settings = {
 }
 type config_zmq_settings = {
   ~concurrency <ocaml default="20">: int;
-  ~receive_hwm <json name="receiveHighWaterMark"> <ocaml default="5000">: int;
-  ~send_hwm <json name="sendHighWaterMark"> <ocaml default="5000">: int;
+  ~receive_hwm <json name="receiveHighWaterMark"><ocaml default="5000">: int;
+  ~send_hwm <json name="sendHighWaterMark"><ocaml default="5000">: int;
 }
 
 type config_proto = [
@@ -42,31 +47,47 @@ type config_listener = {
 }
 
 
-(* PERSISTENCE *)
+(* BACKENDS *)
 type config_redis = {
   host <json name="host">: string;
   port <json name="port">: int;
   ?auth <json name="auth">: string nullable;
 } <ocaml field_prefix="redis_">
 
-type config_remote_http = {
+type config_httpproxy = {
   base_urls <json name="baseUrls">: string list <ocaml repr="array">;
   base_headers <json name="baseHeaders">: pair list;
-  append_chan_name <json name="appendChannelName">: bool;
+  timeout: int <ocaml repr="float">;
+  ~append_chan_name <json name="appendChannelName"><ocaml default="false">: bool;
   ~input_format <json name="remoteInputFormat"><ocaml default="C_json">: config_channel_format;
   ~output_format <json name="remoteOutputFormat"><ocaml default="C_json">: config_channel_format;
 }
+
+type config_pubsub = {
+  host: string;
+  port: int;
+} <ocaml field_prefix="p_">
+
+type config_fifo = {
+  host: string;
+  port: int;
+  timeout: int <ocaml repr="float">;
+} <ocaml field_prefix="f_">
 
 type config_elasticsearch = {
   base_urls <json name="baseUrls">: string list <ocaml repr="array">;
   index: string;
   typename <json name="type">: string;
+  timeout: int <ocaml repr="float">;
 }
 
-type config_persistence = [
+type config_backend = [
+  | None <json name="none">
   | Memory <json name="memory">
   | Disk <json name="disk">
-  | Remote_http <json name="http"> of config_remote_http
+  | Http_proxy <json name="httpproxy"> of config_httpproxy
+  | Pubsub <json name="pubsub"> of config_pubsub
+  | Fifo <json name="fifo"> of config_fifo
   | Elasticsearch <json name="elasticsearch"> of config_elasticsearch
   | Redis <json name="redis"> of config_redis
 ]
@@ -84,30 +105,30 @@ type config_batching = {
 } <ocaml field_prefix="c_">
 
 type config_channel_write = {
-  ~http_format <json name="httpFormat"> <ocaml default="C_json">: config_channel_format;
+  ~http_format <json name="httpFormat"><ocaml default="C_json">: config_channel_format;
   ~ack <json name="acknowledgement"><ocaml default="C_saved">: config_channel_acknowledgement;
-  copy_to <json name="copyToChannels">: string list;
+  forward: string list;
   ?batching: config_batching nullable;
 } <ocaml field_prefix="c_">
 
 type config_channel_read = {
-  ~http_format <json name="httpFormat"> <ocaml default="C_json">: config_channel_format;
-  ~stream_slice_size <json name="streamSliceSize"> <ocaml default="500">: int;
-  only_once <json name="onlyOnce">: bool;
+  ~http_format <json name="httpFormat"><ocaml default="C_json">: config_channel_format;
+  ~stream_slice_size <json name="streamSliceSize"><ocaml default="500">: int;
+  ~only_once <json name="onlyOnce"><ocaml default="false">: bool;
 } <ocaml field_prefix="c_">
 
 (* TODO: Validate that the separators are non-empty *)
 type config_channel = {
   endpoint_names <json name="listeners">: string list;
-  persistence_settings <json name="backendSettings" tag_field="backend">: config_persistence;
+  backend_settings <json name="backendSettings" tag_field="backend">: config_backend;
   emptiable: bool;
-  ~raw <ocaml default="false">: bool;
+  raw: bool;
   read_settings <json name="readSettings">: config_channel_read nullable;
   write_settings <json name="writeSettings">: config_channel_write nullable;
   ~separator <ocaml default="\"\n\"">: string;
-  ~buffer_size <json name="averageSize"> <ocaml default="256">: int;
-  ~max_read <json name="maxRead"> <ocaml default="1000">: int;
-  ~avg_read <json name="averageRead"> <ocaml default="32">: int;
+  ~buffer_size <json name="averageSize"><ocaml default="256">: int;
+  ~max_read <json name="maxRead"><ocaml default="1000">: int;
+  ~avg_read <json name="averageRead"><ocaml default="32">: int;
 }
 
 

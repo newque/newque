@@ -1,13 +1,12 @@
 module.exports = function (backend, backendSettings, raw) {
-  var delay = backend === 'elasticsearch' ? C.esDelay : 0
   describe('Pull ' + backend + (!!raw ? ' raw' : ''), function () {
-    var processes = []
+    var env
     before(function () {
       this.timeout(C.setupTimeout)
       return Proc.setupEnvironment(backend, backendSettings, raw)
-      .then(function (procs) {
-        procs.forEach((p) => processes.push(p))
-        return Promise.delay(C.spawnDelay * processes.length)
+      .then(function (pEnv) {
+        env = pEnv
+        return Promise.delay(C.spawnDelay)
       })
       .then(function () {
         var buf = 'M abc\nM def\nM ghi\nM jkl'
@@ -24,6 +23,9 @@ module.exports = function (backend, backendSettings, raw) {
         return Fn.call('POST', 8000, '/v1/json', buf, [[C.modeHeader, 'multiple']])
         .then(Fn.shouldHaveWritten(3))
       })
+    })
+    beforeEach(function () {
+      Scenarios.clear()
     })
 
     var transports = [
@@ -44,38 +46,54 @@ module.exports = function (backend, backendSettings, raw) {
         })
 
         it('One', function () {
+          Scenarios.push('example', [['M abc']])
+          Scenarios.set('example', 'last_id', 'something')
+          Scenarios.set('example', 'last_timens', 999)
           return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'one']].concat(transports[ii].headers))
           .then(Fn.shouldHaveRead(['M abc'], '\n'))
         })
 
         it('One, secondary channel', function () {
+          Scenarios.push('secondary', [['XYZ']])
+          Scenarios.set('secondary', 'last_id', 'something')
+          Scenarios.set('secondary', 'last_timens', 999)
           return Fn.call('GET', 8000, '/v1/secondary', null, [[C.modeHeader, 'one']].concat(transports[ii].headers))
           .then(Fn.shouldHaveRead(['XYZ'], '\n'))
         })
 
         it('Many, smaller than count', function () {
+          Scenarios.push('example', [['M abc', 'M def', 'M ghi']])
+          Scenarios.set('example', 'last_id', 'something')
+          Scenarios.set('example', 'last_timens', 999)
           return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'Many 3']].concat(transports[ii].headers))
           .then(Fn.shouldHaveRead(['M abc', 'M def', 'M ghi'], '\n'))
         })
 
         it('Many, greater than count', function () {
+          Scenarios.push('example', [['M abc', 'M def', 'M ghi', 'M jkl'], []])
+          Scenarios.set('example', 'last_id', 'something')
+          Scenarios.set('example', 'last_timens', 999)
           return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'Many 30']].concat(transports[ii].headers))
           .then(Fn.shouldHaveRead(['M abc', 'M def', 'M ghi', 'M jkl'], '\n'))
         })
 
         it('Many, secondary channel (max read, different separator)', function () {
+          Scenarios.push('secondary', [['XYZ', 'ABCD']])
+          Scenarios.set('secondary', 'last_id', 'something')
+          Scenarios.set('secondary', 'last_timens', 999)
           return Fn.call('GET', 8000, '/v1/secondary', null, [[C.modeHeader, 'many 3']].concat(transports[ii].headers))
           .then(Fn.shouldHaveRead(['XYZ', 'ABCD'], '--'))
         })
 
         it('Many, empty channel', function () {
+          Scenarios.push('empty', [[]])
           return Fn.call('GET', 8000, '/v1/empty', null, [[C.modeHeader, 'many 10']].concat(transports[ii].headers))
           .then(Fn.shouldHaveRead([], '\n'))
         })
 
-
         describe('Read only', function () {
           it('Should pull', function () {
+            Scenarios.push('readonly', [[]])
             return Fn.call('GET', 8000, '/v1/readonly', null, [[C.modeHeader, 'one']].concat(transports[ii].headers))
             .then(Fn.shouldHaveRead([], '\n'))
           })
@@ -92,48 +110,63 @@ module.exports = function (backend, backendSettings, raw) {
 
     describe('JSON', function () {
       it('Many', function () {
+        Scenarios.push('json', [['123', '456', '']])
+        Scenarios.set('json', 'last_id', 'something')
+        Scenarios.set('json', 'last_timens', 999)
         return Fn.call('GET', 8000, '/v1/json', null, [[C.modeHeader, 'many 3']])
         .then(Fn.shouldHaveRead(['123', '456', ''], null))
       })
 
       it('Empty', function () {
+        Scenarios.push('json', [[]])
         return Fn.call('GET', 8000, '/v1/json', null, [[C.modeHeader, 'after_id thisdoesntexist']])
         .then(Fn.shouldHaveRead([], null))
       })
     })
 
-    // This only works on non-stream
-    it('After_id', function () {
-      return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'one']])
-      .then(Fn.shouldHaveRead(['M abc'], '\n'))
-      .then(function (result) {
-        var lastId = result.res.headers[C.lastIdHeader]
-        return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'after_id ' + lastId]])
+    describe('After_ filters', function () {
+      // This only works on non-stream
+      it('After_id', function () {
+        Scenarios.push('example', [['M abc'], ['M def', 'M ghi', 'M jkl']])
+        Scenarios.set('example', 'last_id', 'something', 2)
+        Scenarios.set('example', 'last_timens', 999, 2)
+        return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'one']])
+        .then(Fn.shouldHaveRead(['M abc'], '\n'))
+        .then(function (result) {
+          var lastId = result.res.headers[C.lastIdHeader]
+          return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'after_id ' + lastId]])
+        })
+        .then(Fn.shouldHaveRead(['M def', 'M ghi', 'M jkl'], '\n'))
       })
-      .then(Fn.shouldHaveRead(['M def', 'M ghi', 'M jkl'], '\n'))
-    })
 
-    // This only works on non-stream
-    it('After_ts', function () {
-      var lastTs = null
-      return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'one']])
-      .then(Fn.shouldHaveRead(['M abc'], '\n'))
-      .then(function (result) {
-        lastTs = parseInt(result.res.headers[C.lastTsHeader], 10)
-        // All added in the same batch, so it should return nothing
-        return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'After_ts ' + lastTs]])
+      // This only works on non-stream
+      it('After_ts', function () {
+        var lastTs = null
+        Scenarios.push('example', [['M abc'], [], ['M abc', 'M def', 'M ghi', 'M jkl']])
+        Scenarios.set('example', 'last_id', 'something', 3)
+        Scenarios.set('example', 'last_timens', 999, 3)
+        return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'one']])
+        .then(Fn.shouldHaveRead(['M abc'], '\n'))
+        .then(function (result) {
+          lastTs = parseInt(result.res.headers[C.lastTsHeader], 10)
+          // All added in the same batch, so it should return nothing
+          return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'After_ts ' + lastTs]])
+        })
+        .then(Fn.shouldHaveRead([], '\n'))
+        .then(function () {
+          // Removing a 1 nanosecond will return all of them, but JS numbers don't have enough precision
+          // at that scale, so we remove more
+          return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'After_ts ' + (lastTs - 1000)]])
+        })
+        .then(Fn.shouldHaveRead(['M abc', 'M def', 'M ghi', 'M jkl'], '\n'))
       })
-      .then(Fn.shouldHaveRead([], '\n'))
-      .then(function () {
-        // Removing a 1 nanosecond will return all of them, but JS numbers don't have enough precision
-        // at that scale, so we remove more
-        return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'After_ts ' + (lastTs - 1000)]])
-      })
-      .then(Fn.shouldHaveRead(['M abc', 'M def', 'M ghi', 'M jkl'], '\n'))
     })
 
     describe('Only Once', function () {
       it('Should delete after reading (sync)', function () {
+        Scenarios.push('onlyOnce', [['abc'], ['def'], ['ghi', 'jkl'], []])
+        Scenarios.set('onlyOnce', 'last_id', 'something', 3)
+        Scenarios.set('onlyOnce', 'last_timens', 999, 3)
         var buf = Fn.makeJsonBuffer(['abc', 'def', 'ghi', 'jkl'])
         return Fn.call('POST', 8000, '/v1/onlyOnce', buf, null)
         .then(Fn.shouldHaveWritten(4))
@@ -148,6 +181,9 @@ module.exports = function (backend, backendSettings, raw) {
       })
 
       it('Should delete after reading (async)', function () {
+        Scenarios.push('onlyOnce', [['ABC', 'DEF'], ['GHI', 'JKL'], [], []])
+        Scenarios.set('onlyOnce', 'last_id', 'something', 2)
+        Scenarios.set('onlyOnce', 'last_timens', 999, 2)
         var buf = Fn.makeJsonBuffer(['ABC', 'DEF', 'GHI', 'JKL'])
         return Fn.call('POST', 8000, '/v1/onlyOnce', buf, null)
         .then(function () {
@@ -182,7 +218,7 @@ module.exports = function (backend, backendSettings, raw) {
     })
 
     after(function () {
-      return Proc.teardown(processes, backend, backendSettings)
+      return Proc.teardown(env, backend, backendSettings)
     })
   })
 }

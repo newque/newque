@@ -33,7 +33,9 @@ var call = exports.call = function (method, port, path, buf, headers) {
   })
   .catch(function (err) {
     console.log('Fn.call ERROR!!!')
+    console.log(method, port, path, buf, headers)
     console.log(err.stack)
+    return Promise.reject(err)
   })
 }
 
@@ -131,11 +133,17 @@ var shouldHaveRead = exports.shouldHaveRead = function (values, separator) {
         assert(parseInt(result.res.headers[C.lengthHeader], 10) === values.length)
         assert(parseInt(result.res.headers['content-length'], 10) === result.res.buffer.length)
         if (parseInt(result.res.headers[C.lengthHeader], 10) > 0) {
-          assert(result.res.headers[C.lastIdHeader].length > 0)
+          assert(result.res.headers[C.lastIdHeader] != null)
           assert(parseInt(result.res.headers[C.lastTsHeader], 10) > 0)
         }
       }
       return resolve(result)
+    })
+    .catch(function (err) {
+      console.log(result.res.statusCode)
+      console.log(result.body)
+      console.log(result.res.headers)
+      throw err
     })
   }
 }

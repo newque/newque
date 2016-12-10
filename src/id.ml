@@ -3,6 +3,7 @@ open Core.Std
 type t = string
 
 let uuid () = Uuidm.to_string (Uuidm.v `V4)
+let uuid_bytes () = Uuidm.to_bytes (Uuidm.v `V4)
 
 let default_separator = ","
 

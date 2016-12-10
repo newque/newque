@@ -26,6 +26,11 @@ let zip_group ~size arr1 arr2 =
     )
   )
 
+let array_to_list_rev_mapi ~mapper arr =
+  Array.foldi arr ~init:[] ~f:(fun i acc elt ->
+    (mapper i elt)::acc
+  )
+
 (* An efficient lazy stream flattener *)
 let stream_map_array_s ~batch_size ~mapper arr_stream =
   let capacity = Int.min batch_size 10000 in (* Sanity check... *)
@@ -116,41 +121,16 @@ let sexp_of_atdgen_exn str =
   | `String s -> Sexp.Atom s
   | _ -> Sexp.Atom str
 
-let json_error_regexp = Str.regexp "[ \\\n]"
 let parse_sync parser str =
   try
     Ok (parser str)
   with
-  | Unix.Unix_error (c, n, p) -> Error (Fs.format_unix_exn c n p)
-  | Ag_oj_run.Error str
-  | Yojson.Json_error str ->
-    let replaced = Str.global_replace json_error_regexp " " str in
-    Error replaced
-
-let parse_async parser str =
-  try
-    return (parser str)
-  with
-  | Unix.Unix_error (c, n, p) -> fail_with (Fs.format_unix_exn c n p)
-  | Ag_oj_run.Error str
-  | Yojson.Json_error str ->
-    let replaced = Str.global_replace json_error_regexp " " str in
-    fail_with replaced
-
-let parse_async_bind parser str =
-  try
-    parser str
-  with
-  | Unix.Unix_error (c, n, p) -> fail_with (Fs.format_unix_exn c n p)
-  | Ag_oj_run.Error str
-  | Yojson.Json_error str ->
-    let replaced = Str.global_replace json_error_regexp " " str in
-    fail_with replaced
+  | ex -> Error (Exception.human ex)
 
 let header_name_to_int64_opt headers name =
   Option.bind
     (Header.get headers name)
-    (fun x -> Option.try_with (fun () -> Int64.of_string x))
+    parse_int64
 
 let rec make_interval every callback () =
   let%lwt () = Lwt_unix.sleep every in
@@ -160,9 +140,3 @@ let rec make_interval every callback () =
 let time_ns_int64 () = Int63.to_int64 (Time_ns.to_int63_ns_since_epoch (Time_ns.now ()))
 let time_ns_int63 () = Time_ns.to_int63_ns_since_epoch (Time_ns.now ())
 let time_ms_float () = Time.to_float (Time.now ()) *. 1000.
-
-let append_to_path uri append =
-  let base_path = Uri.path uri in
-  if String.(=) (String.suffix base_path 1) "/"
-  then Uri.with_path uri (sprintf "%s%s" base_path append)
-  else Uri.with_path uri (sprintf "%s/%s" base_path append)

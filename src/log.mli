@@ -3,6 +3,7 @@ open Core.Std
 val outlog : string
 val errlog : string
 
+val log_level_of_variant : Config_t.config_log_level -> Lwt_log.level
 val int_of_level : Lwt_log.level -> int
 val lazy_level : int ref
 

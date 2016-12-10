@@ -16,7 +16,6 @@ type t = {
   workers: worker array;
   proxy: unit Lwt.t;
   stop_w: unit Lwt.u;
-  ctx: ZMQ.Context.t;
 } [@@deriving sexp_of]
 
 val start :

@@ -28,7 +28,17 @@ let create name conf_channel =
   let write = Option.map conf_channel.write_settings ~f:Write_settings.create in
   let batching = Option.bind write (fun w -> w.Write_settings.batching) in
 
-  let module Persist = (val (match conf_channel.persistence_settings with
+  let module Persist = (val (match conf_channel.backend_settings with
+    | `None ->
+      let module Arg = struct
+        module IO = None.M
+        let create () = None.create ()
+        let stream_slice_size = stream_slice_size
+        let raw = conf_channel.raw
+        let batching = batching
+      end in
+      (module Persistence.Make (Arg) : Persistence.S)
+
     | `Memory ->
       let module Arg = struct
         module IO = Local.M
@@ -49,16 +59,17 @@ let create name conf_channel =
       end in
       (module Persistence.Make (Arg) : Persistence.S)
 
-    | `Remote_http remote ->
+    | `Http_proxy httpproxy ->
       let module Arg = struct
-        module IO = Remote.M
-        let create () = Remote.create
-            (if remote.append_chan_name
-             then Array.map ~f:(fun b -> sprintf "%s%s" b name) remote.base_urls
-             else remote.base_urls)
-            remote.base_headers
-            ~input:remote.input_format
-            ~output:remote.output_format
+        module IO = Http_proxy.M
+        let create () = Http_proxy.create
+            (if httpproxy.append_chan_name
+             then Array.map ~f:(fun b -> sprintf "%s%s" b name) httpproxy.base_urls
+             else httpproxy.base_urls)
+            httpproxy.base_headers
+            httpproxy.timeout
+            ~input:httpproxy.input_format
+            ~output:httpproxy.output_format
             ~chan_separator:conf_channel.separator
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
@@ -66,13 +77,47 @@ let create name conf_channel =
       end in
       (module Persistence.Make (Arg) : Persistence.S)
 
+    | `Pubsub pubsub ->
+      if not conf_channel.raw then failwith (sprintf "Channel [%s] has backend type [pubsub], setting 'raw' must be set to true" name) else
+      if Option.is_some read then failwith (sprintf "Channel [%s] has backend type [pubsub], reading must be disabled" name) else
+      if conf_channel.emptiable then failwith (sprintf "Channel [%s] has backend type [pubsub], setting 'emptiable' must be set to false" name) else
+      let module Arg = struct
+        module IO = Pubsub.M
+        let create () = Pubsub.create
+            ~chan_name:name
+            pubsub.p_host
+            pubsub.p_port
+        let stream_slice_size = stream_slice_size
+        let raw = conf_channel.raw
+        let batching = batching
+      end in
+      (module Persistence.Make (Arg) : Persistence.S)
+
+    | `Fifo fifo ->
+      let module Arg = struct
+        module IO = Fifo.M
+        let create () = Fifo.create
+            ~chan_name:name
+            fifo.f_host
+            fifo.f_port
+            fifo.f_timeout
+        let stream_slice_size = stream_slice_size
+        let raw = conf_channel.raw
+        let batching = batching
+      end in
+      (module Persistence.Make (Arg) : Persistence.S)
+
     | `Elasticsearch es ->
-      if not conf_channel.raw then failwith (sprintf "Channel [%s] has persistence type [elasticsearch], setting 'raw' must be set to true" name) else
-      if Option.is_some read then failwith (sprintf "Channel [%s] has persistence type [elasticsearch], reading must be disabled" name) else
-      if conf_channel.emptiable then failwith (sprintf "Channel [%s] has persistence type [elasticsearch], setting 'emptiable' must be set to false" name) else
+      if not conf_channel.raw then failwith (sprintf "Channel [%s] has backend type [elasticsearch], setting 'raw' must be set to true" name) else
+      if Option.is_some read then failwith (sprintf "Channel [%s] has backend type [elasticsearch], reading must be disabled" name) else
+      if conf_channel.emptiable then failwith (sprintf "Channel [%s] has backend type [elasticsearch], setting 'emptiable' must be set to false" name) else
       let module Arg = struct
         module IO = Elasticsearch.M
-        let create () = Elasticsearch.create es.base_urls ~index:es.index ~typename:es.typename
+        let create () = Elasticsearch.create
+            es.base_urls
+            ~index:es.index
+            ~typename:es.typename
+            es.timeout
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
         let batching = batching
@@ -90,7 +135,7 @@ let create name conf_channel =
       (module Persistence.Make (Arg) : Persistence.S)
   ) : Persistence.S)
   in
-  {
+  let instance = {
     name;
     endpoint_names = conf_channel.endpoint_names;
     push = Persist.push;
@@ -107,6 +152,9 @@ let create name conf_channel =
     buffer_size = conf_channel.buffer_size;
     max_read = Int.to_int64 (conf_channel.max_read);
   }
+  in
+  let%lwt () = Persist.ready () in
+  return instance
 
 let push chan msgs ids = chan.push msgs ids
 

@@ -7,7 +7,7 @@
   },
   "writeSettings": {
     "acknowledgement": "none",
-    "copyToChannels": ["sink"]
+    "forward": ["sink"]
   },
   "emptiable": true
 }

@@ -2,7 +2,7 @@
 message Input {
 
   message Write_Input {
-    required bool atomic = 1;
+    optional bool atomic = 1;
     repeated bytes ids = 2;
   }
 
@@ -42,7 +42,7 @@ message Output {
   message Read_Output {
     required int32 length = 1 [(ocaml_type) = int_t];
     optional bytes last_id = 2;
-    optional bytes last_timens = 3;
+    optional int64 last_timens = 3;
   }
 
   message Count_Output {

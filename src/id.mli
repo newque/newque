@@ -3,6 +3,7 @@ open Core.Std
 type t = string
 
 val uuid : unit -> string
+val uuid_bytes : unit -> string
 
 val default_separator : string
 

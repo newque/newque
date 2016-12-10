@@ -1,5 +1,5 @@
 {
-  "logLevel": "notice",
+  "logLevel": "debug",
   "admin": {
     "host": "0.0.0.0",
     "port": 8101

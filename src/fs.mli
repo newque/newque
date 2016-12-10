@@ -7,7 +7,7 @@ val conf_chan_dir : string
 val data_dir : string
 val data_chan_dir : string
 
-val format_unix_exn : Unix.error -> string -> string -> string
+val healthy_fd : Lwt_unix.file_descr -> bool Lwt.t
 
 val is_directory : ?create:bool -> string -> bool Lwt.t
 

@@ -1,5 +1,0 @@
-(* SIZE *)
-
-type size = {
-  count: int;
-}

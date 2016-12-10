@@ -1,0 +1,14 @@
+{
+  "listeners": ["http8000","zmq8005"],
+  "backend": "disk",
+  "readSettings": {
+    "httpFormat":"plaintext",
+    "onlyOnce": false
+  },
+  "writeSettings": {
+    "acknowledgement": "saved",
+    "httpFormat": "plaintext",
+    "forward": ["sink1", "sink2"]
+  },
+  "emptiable": true
+}

@@ -8,7 +8,7 @@
   "writeSettings": {
     "acknowledgement": "none",
     "httpFormat": "plaintext",
-    "copyToChannels": ["sink1"]
+    "forward": ["sink1"]
   },
   "emptiable": true
 }

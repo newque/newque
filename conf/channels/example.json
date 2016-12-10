@@ -6,7 +6,7 @@
     "onlyOnce": true
   },
   "writeSettings": {
-    "copyToChannels": []
+    "forward": []
   },
   "raw": true,
   "emptiable": true

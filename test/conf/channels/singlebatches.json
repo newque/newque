@@ -1,14 +1,17 @@
 {
   "listeners": ["http8000","zmq8005"],
-  "backend": "disk",
+  "backend": "pubsub",
   "readSettings": {
-    "httpFormat":"plaintext",
     "onlyOnce": false
   },
   "writeSettings": {
     "acknowledgement": "saved",
     "httpFormat": "plaintext",
-    "copyToChannels": ["sink1", "sink2"]
+    "forward": [],
+    "batching": {
+      "maxTime": 100,
+      "maxSize": 1
+    }
   },
   "emptiable": true
 }

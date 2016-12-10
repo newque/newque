@@ -1,19 +1,23 @@
 module.exports = function (backend, backendSettings, raw) {
-  var delay = backend === 'elasticsearch' ? C.esDelay : 0
   describe('Health ' + backend + (!!raw ? ' raw' : ''), function () {
-    var processes = []
+    var env
+    if (backend === 'elasticsearch') {
+      var delay = C.esDelay
+      this.timeout(C.esTimeout)
+    } else {
+      var delay = 0
+    }
     before(function () {
       this.timeout(C.setupTimeout)
       return Proc.setupEnvironment(backend, backendSettings, raw)
-      .then(function (procs) {
-        procs.forEach((p) => processes.push(p))
-        return Promise.delay(C.spawnDelay * processes.length)
+      .then(function (pEnv) {
+        env = pEnv
+        return Promise.delay(C.spawnDelay)
       })
     })
-
-    var makeItFail = {
-
-    }
+    beforeEach(function () {
+      Scenarios.clear()
+    })
 
     it('Global', function () {
       return Fn.call('GET', 8000, '/v1/health')
@@ -31,7 +35,8 @@ module.exports = function (backend, backendSettings, raw) {
     })
 
     after(function () {
-      return Proc.teardown(processes, backend, backendSettings)
+      this.timeout(C.esTimeout)
+      return Proc.teardown(env, backend, backendSettings)
     })
   })
 }

@@ -1,8 +1,6 @@
 open Core.Std
 open Lwt
 
-module Logger = Log.Make (struct let path = Log.outlog let section = "Message" end)
-
 type t =
   | Multiple of string array
   | Atomic of string array
@@ -72,9 +70,14 @@ let serialize_raw msg =
   | Atomic m -> m
 
 let parse_full_exn blob =
-  match Protobuf.Decoder.decode_exn flat_from_protobuf blob with
-  | F_single s -> [| s |]
-  | F_atomic m -> m
+  try
+    match Protobuf.Decoder.decode_exn flat_from_protobuf blob with
+    | F_single s -> [| s |]
+    | F_atomic m -> m
+  with
+  | Protobuf.Decoder.Failure err ->
+    let str = Protobuf.Decoder.error_to_string err in
+    failwith (sprintf "Unable to parse the wrapped messages, did it get corrupted? Reason: %s" str)
 
 let length ~raw msg =
   match msg with

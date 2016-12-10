@@ -1,23 +1,25 @@
 module.exports = function (backend, backendSettings, raw) {
-  var delay = backend === 'elasticsearch' ? C.esDelay : 0
   describe('Delete ' + backend + (!!raw ? ' raw' : ''), function () {
-    var processes = []
+    var env
     before(function () {
       this.timeout(C.setupTimeout)
       return Proc.setupEnvironment(backend, backendSettings, raw)
-      .then(function (procs) {
-        procs.forEach((p) => processes.push(p))
-        return Promise.delay(C.spawnDelay * processes.length)
+      .then(function (pEnv) {
+        env = pEnv
+        return Promise.delay(C.spawnDelay)
       })
       .then(function () {
         var buf = `{"a":"abc"}\n{"a":"def"}\n{"a":"ghi"}\n{"a":"jkl"}`
         return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'multiple']])
         .then(Fn.shouldHaveWritten(4))
-        .delay(delay)
       })
+    })
+    beforeEach(function () {
+      Scenarios.clear()
     })
 
     it('Deletes', function () {
+      Scenarios.set('example', 'count', 4)
       return Fn.call('GET', 8000, '/v1/example/count')
       .then(Fn.shouldHaveCounted(4))
       .then(() => Fn.call('DELETE', 8000, '/v1/example'))
@@ -42,7 +44,7 @@ module.exports = function (backend, backendSettings, raw) {
     })
 
     after(function () {
-      return Proc.teardown(processes, backend, backendSettings)
+      return Proc.teardown(env, backend, backendSettings)
     })
   })
 }

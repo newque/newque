@@ -1,48 +1,50 @@
 open Core.Std
 open Lwt
 
-module Logger = Log.Make (struct let path = Log.outlog let section = "Batcher" end)
-
-type ('a, 'b) t = {
-  left: 'a Queue.t;
-  right: 'b Queue.t;
+type ('a, 'b, 'c) t = {
+  lefts: 'a Queue.t;
+  rights: 'b Queue.t;
   max_time: float; (* milliseconds *)
   max_size: int;
-  handler: 'a array -> 'b array -> int Lwt.t;
-  mutable thread: unit Lwt.t sexp_opaque;
-  mutable wake: unit Lwt.u sexp_opaque;
+  handler: 'a array -> 'b array -> 'c Lwt.t;
+  mutable thread: 'c Lwt.t sexp_opaque;
+  mutable wake: 'c Lwt.u sexp_opaque;
   mutable last_flush: float;
 } [@@deriving sexp]
 
 let get_data batcher =
-  let lefts = Queue.to_array batcher.left in
-  let rights = Queue.to_array batcher.right in
-  Queue.clear batcher.left;
-  Queue.clear batcher.right;
-  let old_wake = batcher.wake in
+  let lefts = Queue.to_array batcher.lefts in
+  let rights = Queue.to_array batcher.rights in
+  Queue.clear batcher.lefts;
+  Queue.clear batcher.rights;
+  (lefts, rights)
+
+let do_flush batcher =
+  let (lefts, rights) = get_data batcher in
+  batcher.last_flush <- Util.time_ms_float ();
+  let%lwt () = try%lwt
+      let%lwt saved = batcher.handler lefts rights in
+      wakeup batcher.wake saved;
+      return_unit
+    with
+    | err ->
+      wakeup_exn batcher.wake err;
+      return_unit
+  in
   let () =
     let (thr, wake) = wait () in
     batcher.thread <- thr;
     batcher.wake <- wake
   in
-  wakeup old_wake ();
-  (lefts, rights)
+  return_unit
 
-let do_flush batcher =
-  try%lwt
-    let (lefts, rights) = get_data batcher in
-    let%lwt _ = batcher.handler lefts rights in
-    return_unit
-  with
-  | err -> Logger.error (Exn.to_string err)
-
-let length batcher = Queue.length batcher.left
+let length batcher = Queue.length batcher.lefts
 
 let create ~max_time ~max_size ~handler =
   let (thread, wake) = wait () in
   let batcher = {
-    left = Queue.create ~capacity:max_size ();
-    right = Queue.create ~capacity:max_size ();
+    lefts = Queue.create ~capacity:max_size ();
+    rights = Queue.create ~capacity:max_size ();
     max_time;
     max_size;
     handler;
@@ -54,22 +56,28 @@ let create ~max_time ~max_size ~handler =
   async (
     Util.make_interval (max_time /. 1000.) (fun () ->
       if Float.(>) (Util.time_ms_float ()) (batcher.last_flush +. batcher.max_time)
-      && Int.(>) (length batcher) 0
+      && Int.is_positive (length batcher)
       then do_flush batcher
       else return_unit
     )
   );
   batcher
 
-let check_max_size batcher add_n =
-  if (((length batcher) + add_n) >= batcher.max_size) && length batcher > 0
-  then do_flush batcher
-  else return_unit
+let discard thread =
+  let%lwt _ = thread in
+  return_unit
 
-let submit batcher lefts rights =
-  let old_thread = batcher.thread in
-  let%lwt () = check_max_size batcher (Array.length lefts) in
-  Array.iter ~f:(Queue.enqueue batcher.left) lefts;
-  Array.iter ~f:(Queue.enqueue batcher.right) rights;
-  let%lwt () = check_max_size batcher (Array.length lefts) in
-  old_thread
+let submit batcher left_arr right_arr =
+  let threads = Array.foldi left_arr ~init:[] ~f:(fun i acc elt ->
+      Queue.enqueue batcher.lefts elt;
+      Queue.enqueue batcher.rights (Array.get right_arr i);
+      if (Int.(=) (length batcher) batcher.max_size)
+      then
+        let bound = discard batcher.thread in
+        ignore (do_flush batcher);
+        (bound::acc)
+      else acc
+    )
+  in
+  let threads = if List.is_empty threads then [discard batcher.thread] else threads in
+  join threads

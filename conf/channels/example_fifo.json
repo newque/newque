@@ -1,0 +1,19 @@
+{
+  "listeners": ["http8000", "zmq8005"],
+  "backend": "fifo",
+  "backendSettings": {
+    "host": "0.0.0.0",
+    "port": 8007
+  },
+  "acknowledgement": "saved",
+  "readSettings": {},
+  "writeSettings": {
+    "forward": [],
+    "batching": {
+      "maxSize": 2,
+      "maxTime": 1000
+    }
+  },
+  "raw": true,
+  "emptiable": false
+}

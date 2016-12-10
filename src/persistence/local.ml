@@ -13,12 +13,15 @@ type local_t = {
 
 let create ~file ~chan_name ~avg_read =
   let mutex = Lwt_mutex.create () in
-  let%lwt () = Logger.info (sprintf "Initializing %s (%s)" file chan_name) in
+  let%lwt () = Logger.info (sprintf "[%s] Initializing %s." chan_name file) in
   let%lwt db = try%lwt
       Sqlite.create file ~avg_read
     with
     | ex ->
-      let%lwt () = Logger.error (sprintf "Failed to create DB %s with error %s. The channel %s will not work." file (Exn.to_string ex) chan_name) in
+      let%lwt () = Logger.error (sprintf
+            "[%s] Failed to create %s. %s" chan_name file (Exception.full ex)
+        )
+      in
       fail ex
   in
   return {db; avg_read; file; chan_name; mutex}
@@ -32,7 +35,10 @@ module M = struct
       Sqlite.close instance.db
     with
     | ex ->
-      let%lwt () = Logger.error (sprintf "Failed to close %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex)) in
+      let%lwt () = Logger.error (sprintf
+            "[%s] Failed to close %s. %s" instance.chan_name instance.file (Exception.full ex)
+        )
+      in
       fail ex
 
   let close instance = Lwt_mutex.with_lock instance.mutex (fun () -> close_nolock instance)
@@ -42,7 +48,9 @@ module M = struct
         close_nolock instance
       with
       | ex ->
-        Logger.error (sprintf "Failed to restart %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex))
+        Logger.error (sprintf
+            "[%s] Failed to restart %s. %s" instance.chan_name instance.file (Exception.full ex)
+        )
     in
     create ~file:instance.file ~chan_name:instance.chan_name ~avg_read:instance.avg_read
 
@@ -58,7 +66,10 @@ module M = struct
         Sqlite.push instance.db msgs ids
       with
       | ex ->
-        handle_failure instance ex ~errstr:(sprintf "Failed to write to %s (%s) with error %s. Restarting." instance.file instance.chan_name (Exn.to_string ex))
+        handle_failure instance ex ~errstr:(sprintf
+            "[%s] Failed to write to %s. %s"
+            instance.chan_name instance.file (Exception.full ex)
+        )
     )
 
   let pull instance ~search ~fetch_last =
@@ -67,7 +78,10 @@ module M = struct
         Sqlite.pull instance.db ~search ~fetch_last
       with
       | ex ->
-        handle_failure instance ex ~errstr:(sprintf "Failed to query from %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex))
+        handle_failure instance ex ~errstr:(sprintf
+            "[%s] Failed to read from %s. %s"
+            instance.chan_name instance.file (Exception.full ex)
+        )
     )
 
   let size instance =
@@ -76,7 +90,10 @@ module M = struct
         Sqlite.size instance.db
       with
       | ex ->
-        handle_failure instance ex ~errstr:(sprintf "Failed to count %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex))
+        handle_failure instance ex ~errstr:(sprintf
+            "[%s] Failed to count from %s. %s"
+            instance.chan_name instance.file (Exception.full ex)
+        )
     )
 
   let delete instance =
@@ -85,7 +102,10 @@ module M = struct
         Sqlite.delete instance.db
       with
       | ex ->
-        handle_failure instance ex ~errstr:(sprintf "Failed to delete %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex))
+        handle_failure instance ex ~errstr:(sprintf
+            "[%s] Failed to delete from %s. %s"
+            instance.chan_name instance.file (Exception.full ex)
+        )
     )
 
   let health instance =
@@ -94,7 +114,10 @@ module M = struct
         Sqlite.health instance.db
       with
       | ex ->
-        handle_failure instance ex ~errstr:(sprintf "Failed to check health %s (%s) with error %s." instance.file instance.chan_name (Exn.to_string ex))
+        handle_failure instance ex ~errstr:(sprintf
+            "[%s] Failed to check health of %s. %s"
+            instance.chan_name instance.file (Exception.full ex)
+        )
     )
 
 end

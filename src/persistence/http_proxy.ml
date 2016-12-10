@@ -3,15 +3,18 @@ open Lwt
 open Cohttp
 open Cohttp_lwt_unix
 
-type remote_t = {
+module Logger = Log.Make (struct let path = Log.outlog let section = "Httpproxy" end)
+
+type httpproxy_t = {
   base_urls: Uri.t array;
   base_headers: Header.t;
+  timeout: float; (* seconds *)
   input_format: Http_format.t;
   output_format: Http_format.t;
   chan_separator: string;
 } [@@deriving sexp]
 
-let create base_urls base_headers ~input ~output ~chan_separator =
+let create base_urls base_headers timeout_ms ~input ~output ~chan_separator =
   let base_urls = Array.map ~f:Uri.of_string base_urls in
   let base_headers = Config_t.(
       Header.add_list
@@ -19,9 +22,15 @@ let create base_urls base_headers ~input ~output ~chan_separator =
         (List.map ~f:(fun pair -> (pair.key, pair.value)) base_headers)
     )
   in
-  let input_format = Http_format.create input in
-  let output_format = Http_format.create output in
-  let instance = { base_urls; base_headers; input_format; output_format; chan_separator; } in
+  let instance = {
+    base_urls;
+    base_headers;
+    timeout = Float.(/) timeout_ms 1000.;
+    input_format = Http_format.create input;
+    output_format = Http_format.create output;
+    chan_separator;
+  }
+  in
   return instance
 
 let get_base instance =
@@ -30,7 +39,7 @@ let get_base instance =
 
 module M = struct
 
-  type t = remote_t [@@deriving sexp]
+  type t = httpproxy_t [@@deriving sexp]
 
   let close instance = return_unit
 
@@ -59,21 +68,16 @@ module M = struct
 
     (* Call *)
     let uri = get_base instance in
-    let%lwt (response, body) = Client.call ~headers ~body ~chunked:false `POST uri in
+    let%lwt (response, body) = Http_tools.call ~headers ~body ~chunked:false ~timeout:instance.timeout `POST uri in
     let%lwt body_str = Cohttp_lwt_body.to_string body in
-    let%lwt parsed = Util.parse_async write_of_string body_str in
+    let parsed = write_of_string body_str in
     match parsed.errors with
     | [] -> return (Option.value ~default:0 parsed.saved)
     | errors -> fail_with (String.concat ~sep:", " errors)
 
   let pull instance ~search ~fetch_last =
     let open Json_obj_j in
-    let open Persistence in
-    let (mode, limit) = match search with
-      | { filters = [| ((`After_id _) as mode) |]; limit; _ }
-      | { filters = [| ((`After_ts _) as mode) |]; limit; _ } -> (mode, limit)
-      | { limit; _ } -> ((`Many limit), limit)
-    in
+    let (mode, limit) = Search.mode_and_limit search in
     let headers = Header.add_list instance.base_headers [
         Header_names.mode, (Mode.Read.to_string mode);
         Header_names.limit, (Int64.to_string limit);
@@ -81,7 +85,7 @@ module M = struct
 
     (* Call *)
     let uri = get_base instance in
-    let%lwt (response, body) = Client.call ~headers ~chunked:false `GET uri in
+    let%lwt (response, body) = Http_tools.call ~headers ~chunked:false ~timeout:instance.timeout `GET uri in
     let%lwt body_str = Cohttp_lwt_body.to_string body in
     let response_headers = Response.headers response in
     let%lwt (errors, messages) = match ((Response.status response), (instance.output_format)) with
@@ -89,14 +93,14 @@ module M = struct
       | _, Http_format.Plaintext ->
         begin match Header.get response_headers "content-type" with
           | Some "application/json" ->
-            let%lwt parsed = Util.parse_async errors_of_string body_str in
+            let parsed = errors_of_string body_str in
             return (parsed.errors, [| |])
           | _ ->
             let msgs = Util.split ~sep:instance.chan_separator body_str in
             return ([], Array.of_list_map ~f:B64.decode msgs)
         end
       | _, Http_format.Json ->
-        let%lwt parsed = Util.parse_async read_of_string body_str in
+        let parsed = read_of_string body_str in
         return (parsed.errors, parsed.messages)
     in
     match errors with
@@ -114,10 +118,10 @@ module M = struct
   let size instance =
     let open Json_obj_j in
     let headers = instance.base_headers in
-    let uri = Util.append_to_path (get_base instance) "count" in
-    let%lwt (response, body) = Client.call ~headers ~chunked:false `GET uri in
+    let uri = Http_tools.append_to_path (get_base instance) "count" in
+    let%lwt (response, body) = Http_tools.call ~headers ~chunked:false ~timeout:instance.timeout `GET uri in
     let%lwt body_str = Cohttp_lwt_body.to_string body in
-    let%lwt parsed = Util.parse_async count_of_string body_str in
+    let parsed = count_of_string body_str in
     match parsed.errors with
     | [] -> return (Option.value ~default:Int64.zero parsed.count)
     | errors -> fail_with (String.concat ~sep:", " errors)
@@ -125,10 +129,10 @@ module M = struct
   let delete instance =
     let open Json_obj_j in
     let headers = instance.base_headers in
-    let uri = Util.append_to_path (get_base instance) "delete" in
-    let%lwt (response, body) = Client.call ~headers ~chunked:false `DELETE uri in
+    let uri = Http_tools.append_to_path (get_base instance) "delete" in
+    let%lwt (response, body) = Http_tools.call ~headers ~chunked:false ~timeout:instance.timeout `DELETE uri in
     let%lwt body_str = Cohttp_lwt_body.to_string body in
-    let%lwt parsed = Util.parse_async errors_of_string body_str in
+    let parsed = errors_of_string body_str in
     match parsed.errors with
     | [] -> return_unit
     | errors -> fail_with (String.concat ~sep:", " errors)
@@ -136,21 +140,12 @@ module M = struct
   let health instance =
     let open Json_obj_j in
     let headers = instance.base_headers in
-    let uri = Util.append_to_path (get_base instance) "health" in
+    let uri = Http_tools.append_to_path (get_base instance) "health" in
     try%lwt
-      let%lwt (response, body) = Client.call ~headers ~chunked:false `GET uri in
+      let%lwt (response, body) = Http_tools.call ~headers ~chunked:false ~timeout:instance.timeout `GET uri in
       let%lwt body_str = Cohttp_lwt_body.to_string body in
-      let%lwt parsed = Util.parse_async errors_of_string body_str in
-      begin match parsed.errors with
-        | [] ->
-          begin match parsed.code, parsed.errors with
-            | (200, []) -> return []
-            | (_, errors) -> return errors
-          end
-        | errors -> return errors
-      end
-    with
-    | Unix.Unix_error (c, n, _) -> return [Fs.format_unix_exn c n (Uri.to_string uri)]
-    | err -> return [Exn.to_string err]
+      let parsed = errors_of_string body_str in
+      return parsed.errors
+    with ex -> return (Exception.human_list ex)
 
 end
