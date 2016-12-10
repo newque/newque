@@ -2,7 +2,7 @@
 
 ## Overview
 
-Newque is a fast, declarative message broker.
+Newque - pronounced `nuke` - is a fast, declarative message broker.
 
 It can be used for log aggregation, message passing, request batching, pubsub, proxying, routing, optimizing ElasticSearch ingestion rates, and more.
 
@@ -18,8 +18,9 @@ The current Backend options are:
 - Memory
 - Disk
 - Proxy to a remote HTTP or Newque server
-- Publish to pubsub
 - ElasticSearch
+- Publish to pubsub (1-to-many, no ack)
+- Publish to a FIFO queue (1-to-1, with ack)
 - ...more coming soon (Redis)
 
 The main operations are:
@@ -27,8 +28,8 @@ The main operations are:
 - Writing to a Channel
 - Reading from Channel
 - Streaming from Channel
-- Counting the size of a Channel's Backend
-- Deleting all data in a Channel's Backend
+- Counting the number of messages in a Channel's Backend
+- Deleting all data from a Channel's Backend
 - Checking the Health of a Channel
 - Checking the Health of all Channels
 
@@ -169,7 +170,7 @@ __Example__
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `listeners` | Array of strings | Yes | | The name of all the Listeners this Channel will be available from. |
-| `backend` | String | Yes | | Which type of Backend. One of `none`, `memory`, `disk`, `httpproxy`, `elasticsearch` or `pubsub`. |
+| `backend` | String | Yes | | Which type of Backend. One of `none`, `memory`, `disk`, `httpproxy`, `elasticsearch`, `pubsub` or `fifo`. |
 | `backendSettings` | Object | No | | The right Settings object for the `backend` value. |
 | `emtiable` | Boolean | Yes | | Whether the Delete operation can be used on this Channel. |
 | `raw` | Boolean | Yes | | Whether the messages should be wrapped when writing to the Backend. |
@@ -198,6 +199,7 @@ __`httpproxy` `backendSettings` Object__
 |----------|------|----------|---------|-------------|
 | `baseUrls` | Array of strings | Yes | | Base URLs to use for the remote HTTP server(s). |
 | `baseHeaders` | Array of Objects | Yes | | Headers to add to every request to the remote server. |
+| `timeout` | Number | Yes | | Number of milliseconds before calls to the remote server are cancelled with an error. |
 | `appendChannelName` | Boolean | No | `false` | Append the channel name to the URL path. |
 | `remoteInputFormat` | String | No | `json` | Format that the remote server accepts for writes. One of `plaintext` or `json`. |
 | `remoteOutputFormat` | String | No | `json` | Format that the remote server uses to send read results. One of `plaintext` or `json`. |
@@ -213,6 +215,7 @@ __`elasticsearch` `backendSettings` Object__
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `baseUrls` | Array of strings | Yes | | Base URLs to use for the ES server(s). |
+| `timeout` | Number | Yes | | Number of milliseconds before calls to the ES server are cancelled with an error. |
 | `index` | String | Yes | | The ES index name to use as a Backend. |
 | `type` | String | Yes | | The ES type name to use as a Backend. |
 
@@ -220,8 +223,16 @@ __`pubsub` `backendSettings` Object__
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
-| `host` | String | Yes | | Address on which to messages will be broadcasted |
-| `port` | Integer | Yes | | Address on which to messages will be broadcasted |
+| `host` | String | Yes | | Address on which the messages will be broadcasted |
+| `port` | Integer | Yes | | Port on which the messages will be broadcasted |
+
+__`fifo` `backendSettings` Object__
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `host` | String | Yes | | Address on which the messages will queued up for clients to accept |
+| `port` | Integer | Yes | | Port on which the messages will queued up for clients to accept |
+| `timeout` | Number | Yes | | Number of milliseconds before requests are cancelled with an error. The timer begins once an upstream accepts a request. |
 
 __Read Settings Object__
 
@@ -500,9 +511,11 @@ ZMQ is (much) faster and easier to use, once the boilerplate is in place.
 
 So go ahead and use your language's code generator for `.proto` files. Send `Input` Protobuf objects as defined in [the spec](https://github.com/SGrondin/newque/blob/master/protobuf/zmq_obj.proto) and Newque will return `Output` objects.
 
-Then open a ZMQ socket in `dealer` mode and `connect` to a Newque ZMQ Listener.
+Then open a ZMQ socket in `dealer` mode and `connect` to a Newque ZMQ Listener using the address `tcp://ListenerHost:ListenerPort`.
 
-A complete Node.js example is available [here](https://github.com/SGrondin/newque/blob/master/test/zmq.js).
+A complete Node.js example is available [here](https://github.com/SGrondin/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/zmq.js).
+
+### Basic operations
 
 #### Write
 
@@ -537,3 +550,23 @@ Newque will return [`UID`, `Output`].
 Send [`UID`, `Input`] on the ZMQ socket.
 
 Newque will return [`UID`, `Output`].
+
+### Backend integrations
+
+#### Pubsub
+
+To receive messages from a `pubsub` backend, open a ZMQ socket in `sub` mode and `connect` to the Channel using the address `tcp://PubsubChannelHost:PubsubChannelPort` and finally subscribe to all messages.
+
+Newque will be sending data in the following format: [`Input`, message1, message2, etc].
+
+A full example is available [here](https://github.com/SGrondin/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/pubsub.js).
+
+#### FIFO
+
+To receive messages from a `fifo` backend, open a ZMQ socket in `dealer` mode and `connect` to the Channel using the address `tcp://FifoChannelHost:FifoChannelPort`.
+
+Newque will be sending data in the following format: [`UID`, `Input`].
+
+`fifo` requires an Acknowledgement or else the client making a request to Newque will receive a timeout error. Using the same socket, send [`UID`, `Output`] back to Newque.
+
+A full example is available [here](https://github.com/SGrondin/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/fifo.js).

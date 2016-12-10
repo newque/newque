@@ -1,6 +1,12 @@
 module.exports = function (backend, backendSettings, raw) {
   describe('Health ' + backend + (!!raw ? ' raw' : ''), function () {
     var env
+    if (backend === 'elasticsearch') {
+      var delay = C.esDelay
+      this.timeout(C.esTimeout)
+    } else {
+      var delay = 0
+    }
     before(function () {
       this.timeout(C.setupTimeout)
       return Proc.setupEnvironment(backend, backendSettings, raw)
@@ -29,6 +35,7 @@ module.exports = function (backend, backendSettings, raw) {
     })
 
     after(function () {
+      this.timeout(C.esTimeout)
       return Proc.teardown(env, backend, backendSettings)
     })
   })

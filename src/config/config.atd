@@ -57,6 +57,7 @@ type config_redis = {
 type config_httpproxy = {
   base_urls <json name="baseUrls">: string list <ocaml repr="array">;
   base_headers <json name="baseHeaders">: pair list;
+  timeout: int <ocaml repr="float">;
   ~append_chan_name <json name="appendChannelName"><ocaml default="false">: bool;
   ~input_format <json name="remoteInputFormat"><ocaml default="C_json">: config_channel_format;
   ~output_format <json name="remoteOutputFormat"><ocaml default="C_json">: config_channel_format;
@@ -70,12 +71,14 @@ type config_pubsub = {
 type config_fifo = {
   host: string;
   port: int;
+  timeout: int <ocaml repr="float">;
 } <ocaml field_prefix="f_">
 
 type config_elasticsearch = {
   base_urls <json name="baseUrls">: string list <ocaml repr="array">;
   index: string;
   typename <json name="type">: string;
+  timeout: int <ocaml repr="float">;
 }
 
 type config_persistence = [

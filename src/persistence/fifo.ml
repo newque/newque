@@ -8,6 +8,7 @@ type fifo_t = {
   chan_name: string;
   host: string;
   port: int;
+  timeout: float; (* in seconds *)
   outbound: string;
   router: [`Dealer] ZMQ.Socket.t sexp_opaque;
   socket: [`Dealer] Lwt_zmq.Socket.t sexp_opaque;
@@ -49,7 +50,7 @@ let handler instance input messages =
 
   (* Register and send request *)
   let uid = Id.uuid_bytes () in
-  let thunk = Connector.submit instance.connector uid in
+  let thunk = Connector.submit instance.connector uid instance.outbound in
   let%lwt () = Lwt_zmq.Socket.send_all instance.socket (uid::input::messages) in
 
   (* Wait for response *)
@@ -68,14 +69,15 @@ let handler instance input messages =
   | [] -> return pair
   | errors -> fail (Exception.Multiple_exn errors)
 
-let create ~chan_name host port =
+let create ~chan_name host port timeout_ms =
   let outbound = sprintf "tcp://%s:%d" host port in
   let%lwt () = Logger.info (sprintf "Creating a new TCP socket on %s:%d" host port) in
+  let timeout = Float.(/) timeout_ms 1000. in
   let router = ZMQ.Socket.create Zmq_tools.ctx ZMQ.Socket.dealer in
   (* TODO: ZMQ Options *)
   ZMQ.Socket.bind router outbound;
   let socket = Lwt_zmq.Socket.of_socket router in
-  let connector = Connector.create 3.0 in
+  let connector = Connector.create timeout in
 
   let workers = Array.init 5 (fun _ ->
       let rec loop socket =
@@ -102,6 +104,7 @@ let create ~chan_name host port =
     chan_name;
     host;
     port;
+    timeout;
     outbound;
     router;
     socket;

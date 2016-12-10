@@ -8,12 +8,13 @@ module Logger = Log.Make (struct let path = Log.outlog let section = "Httpproxy"
 type httpproxy_t = {
   base_urls: Uri.t array;
   base_headers: Header.t;
+  timeout: float; (* seconds *)
   input_format: Http_format.t;
   output_format: Http_format.t;
   chan_separator: string;
 } [@@deriving sexp]
 
-let create base_urls base_headers ~input ~output ~chan_separator =
+let create base_urls base_headers timeout_ms ~input ~output ~chan_separator =
   let base_urls = Array.map ~f:Uri.of_string base_urls in
   let base_headers = Config_t.(
       Header.add_list
@@ -21,9 +22,15 @@ let create base_urls base_headers ~input ~output ~chan_separator =
         (List.map ~f:(fun pair -> (pair.key, pair.value)) base_headers)
     )
   in
-  let input_format = Http_format.create input in
-  let output_format = Http_format.create output in
-  let instance = { base_urls; base_headers; input_format; output_format; chan_separator; } in
+  let instance = {
+    base_urls;
+    base_headers;
+    timeout = Float.(/) timeout_ms 1000.;
+    input_format = Http_format.create input;
+    output_format = Http_format.create output;
+    chan_separator;
+  }
+  in
   return instance
 
 let get_base instance =
@@ -61,7 +68,7 @@ module M = struct
 
     (* Call *)
     let uri = get_base instance in
-    let%lwt (response, body) = Client.call ~headers ~body ~chunked:false `POST uri in
+    let%lwt (response, body) = Http_tools.call ~headers ~body ~chunked:false ~timeout:instance.timeout `POST uri in
     let%lwt body_str = Cohttp_lwt_body.to_string body in
     let parsed = write_of_string body_str in
     match parsed.errors with
@@ -78,7 +85,7 @@ module M = struct
 
     (* Call *)
     let uri = get_base instance in
-    let%lwt (response, body) = Client.call ~headers ~chunked:false `GET uri in
+    let%lwt (response, body) = Http_tools.call ~headers ~chunked:false ~timeout:instance.timeout `GET uri in
     let%lwt body_str = Cohttp_lwt_body.to_string body in
     let response_headers = Response.headers response in
     let%lwt (errors, messages) = match ((Response.status response), (instance.output_format)) with
@@ -111,8 +118,8 @@ module M = struct
   let size instance =
     let open Json_obj_j in
     let headers = instance.base_headers in
-    let uri = Util.append_to_path (get_base instance) "count" in
-    let%lwt (response, body) = Client.call ~headers ~chunked:false `GET uri in
+    let uri = Http_tools.append_to_path (get_base instance) "count" in
+    let%lwt (response, body) = Http_tools.call ~headers ~chunked:false ~timeout:instance.timeout `GET uri in
     let%lwt body_str = Cohttp_lwt_body.to_string body in
     let parsed = count_of_string body_str in
     match parsed.errors with
@@ -122,8 +129,8 @@ module M = struct
   let delete instance =
     let open Json_obj_j in
     let headers = instance.base_headers in
-    let uri = Util.append_to_path (get_base instance) "delete" in
-    let%lwt (response, body) = Client.call ~headers ~chunked:false `DELETE uri in
+    let uri = Http_tools.append_to_path (get_base instance) "delete" in
+    let%lwt (response, body) = Http_tools.call ~headers ~chunked:false ~timeout:instance.timeout `DELETE uri in
     let%lwt body_str = Cohttp_lwt_body.to_string body in
     let parsed = errors_of_string body_str in
     match parsed.errors with
@@ -133,20 +140,12 @@ module M = struct
   let health instance =
     let open Json_obj_j in
     let headers = instance.base_headers in
-    let uri = Util.append_to_path (get_base instance) "health" in
+    let uri = Http_tools.append_to_path (get_base instance) "health" in
     try%lwt
-      let%lwt (response, body) = Client.call ~headers ~chunked:false `GET uri in
+      let%lwt (response, body) = Http_tools.call ~headers ~chunked:false ~timeout:instance.timeout `GET uri in
       let%lwt body_str = Cohttp_lwt_body.to_string body in
       let parsed = errors_of_string body_str in
-      begin match parsed.errors with
-        | [] ->
-          begin match parsed.code, parsed.errors with
-            | (200, []) -> return []
-            | (_, errors) -> return errors
-          end
-        | errors -> return errors
-      end
-    with
-    | ex -> return [sprintf "[%s] %s" (Uri.to_string uri) (Exception.human ex)]
+      return parsed.errors
+    with ex -> return (Exception.human_list ex)
 
 end

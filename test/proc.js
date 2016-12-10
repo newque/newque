@@ -111,14 +111,13 @@ var getEnvironment = function () {
 var str = s => s ? s.toString('utf8') : s
 var setupFifoClient = function (backend, backendSettings, fifoPorts) {
   var sockets = {}
-  var handler = function (name) {
+  var handler = function (name, addr) {
     return function (uid, input) {
       try {
         var sendMsgs = []
         var decoded = specs.Input.decode(input)
 
         if (decoded.write_input) {
-
           var ids = decoded.write_input.ids
           if (Scenarios.peek(name, 'encounteredIds') == null) {
             Scenarios.set(name, 'encounteredIds', {})
@@ -142,11 +141,9 @@ var setupFifoClient = function (backend, backendSettings, fifoPorts) {
           if (saved != null) {
             obj.write_output.saved = saved
           }
-          var output = specs.Output.encode(obj)
           Scenarios.push(name, [recvMsgs])
 
         } else if (decoded.read_input) {
-
           var mode = str(decoded.read_input.mode)
           Fn.assert(mode.length > 0)
           var msgs = Scenarios.take(name)
@@ -167,10 +164,7 @@ var setupFifoClient = function (backend, backendSettings, fifoPorts) {
             obj.read_output.last_timens = last_timens
           }
 
-          var output = specs.Output.encode(obj)
-
         } else if (decoded.count_input) {
-
           var obj = {
             errors: [],
             count_output: {
@@ -181,26 +175,23 @@ var setupFifoClient = function (backend, backendSettings, fifoPorts) {
           if (count != null) {
             obj.count_output.count = count
           }
-          var output = specs.Output.encode(obj)
 
         } else if (decoded.delete_input) {
-
           var obj = {
             errors: [],
             delete_output: {}
           }
-          var output = specs.Output.encode(obj)
 
         } else if (decoded.health_input) {
           var obj = {
             errors: [],
             health_output: {}
           }
-          var output = specs.Output.encode(obj)
 
         } else {
           console.log(decoded)
         }
+        var output = specs.Output.encode(obj)
         sockets[name].socket.send([uid, output].concat(sendMsgs))
       } catch (err) {
         console.log('ZMQ tests handler error')
@@ -210,11 +201,10 @@ var setupFifoClient = function (backend, backendSettings, fifoPorts) {
       }
     }
   }
-
   for (var name in fifoPorts) {
     var sock = zmq.socket('dealer')
     var addr = 'tcp://' + backendSettings.host + ':' + fifoPorts[name]
-    sock.on('message', handler(name))
+    sock.on('message', handler(name, addr))
     sock.connect(addr)
     sockets[name] = {
       socket: sock,
@@ -225,6 +215,7 @@ var setupFifoClient = function (backend, backendSettings, fifoPorts) {
   return Promise.resolve(sockets)
 }
 
+var portIncr = 9000
 exports.setupEnvironment = function (backend, backendSettings, raw) {
   var type = backend.split(' ')[0]
   var remoteType = backend.split(' ')[1]
@@ -263,7 +254,6 @@ exports.setupEnvironment = function (backend, backendSettings, raw) {
   .then(function (channels) {
     return Promise.all(channels.map(function (channel, i) {
       var channelName = channel.split('.json')[0]
-      var portIncr = backendSettings.port + i
       return readFile(confDir + '/channels/' + channel)
       .then(function (contents) {
         var parsed = JSON.parse(contents.toString('utf8'))
@@ -291,12 +281,14 @@ exports.setupEnvironment = function (backend, backendSettings, raw) {
             })
           })
         } else if (type === 'pubsub') {
+          portIncr++
           parsed.readSettings = null
           parsed.emptiable = false
           pubsubPorts[channelName] = portIncr
           parsed.backendSettings.port = portIncr
           var promise = Promise.resolve()
         } else if (type === 'fifo') {
+          portIncr++
           fifoPorts[channelName] = portIncr
           parsed.backendSettings.port = portIncr
           var promise = Promise.resolve()
@@ -310,11 +302,15 @@ exports.setupEnvironment = function (backend, backendSettings, raw) {
       })
     }))
   })
-  .then(() => setupFifoClient(backend, backendSettings, fifoPorts))
+  .then(function () {
+    if (type === 'fifo' && remoteType !== 'no-consumer') {
+      setupFifoClient(backend, backendSettings, fifoPorts)
+    }
+  })
   .then(function (pSockets) {
     sockets = pSockets
     var processes = []
-    if (type === 'httpproxy') {
+    if (type === 'httpproxy' && remoteType !== 'no-consumer') {
       processes.push(spawnExecutable(newquePath, remoteRunningDir))
     }
     var delay = processes.length > 0 ? C.spawnDelay : 0

@@ -67,6 +67,7 @@ let create name conf_channel =
              then Array.map ~f:(fun b -> sprintf "%s%s" b name) httpproxy.base_urls
              else httpproxy.base_urls)
             httpproxy.base_headers
+            httpproxy.timeout
             ~input:httpproxy.input_format
             ~output:httpproxy.output_format
             ~chan_separator:conf_channel.separator
@@ -82,7 +83,10 @@ let create name conf_channel =
       if conf_channel.emptiable then failwith (sprintf "Channel [%s] has persistence type [pubsub], setting 'emptiable' must be set to false" name) else
       let module Arg = struct
         module IO = Pubsub.M
-        let create () = Pubsub.create ~chan_name:name pubsub.p_host pubsub.p_port
+        let create () = Pubsub.create
+            ~chan_name:name
+            pubsub.p_host
+            pubsub.p_port
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
         let batching = batching
@@ -92,7 +96,11 @@ let create name conf_channel =
     | `Fifo fifo ->
       let module Arg = struct
         module IO = Fifo.M
-        let create () = Fifo.create ~chan_name:name fifo.f_host fifo.f_port
+        let create () = Fifo.create
+            ~chan_name:name
+            fifo.f_host
+            fifo.f_port
+            fifo.f_timeout
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
         let batching = batching
@@ -105,7 +113,11 @@ let create name conf_channel =
       if conf_channel.emptiable then failwith (sprintf "Channel [%s] has persistence type [elasticsearch], setting 'emptiable' must be set to false" name) else
       let module Arg = struct
         module IO = Elasticsearch.M
-        let create () = Elasticsearch.create es.base_urls ~index:es.index ~typename:es.typename
+        let create () = Elasticsearch.create
+            es.base_urls
+            ~index:es.index
+            ~typename:es.typename
+            es.timeout
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
         let batching = batching

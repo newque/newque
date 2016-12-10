@@ -9,11 +9,13 @@ global.Proc = require('./proc')
 var httpJsonSettings = {
   baseUrls: ['http://127.0.0.1:' + C.remotePort + '/v1/'],
   baseHeaders: [{key: 'secret-token', value: 'supersecret'}],
+  timeout: 1000,
   appendChannelName: true
 }
 var httpPlaintextSettings = {
   baseUrls: ['http://127.0.0.1:' + C.remotePort + '/v1/'],
   baseHeaders: [{key: 'secret-token', value: 'supersecret'}],
+  timeout: 1000,
   appendChannelName: true,
   remoteInputFormat: 'plaintext',
   remoteOutputFormat: 'plaintext'
@@ -21,7 +23,8 @@ var httpPlaintextSettings = {
 var esSettings = {
   baseUrls: ['http://127.0.0.1:9200'],
   // index is configured in the setup
-  type: 'test-type'
+  type: 'test-type',
+  timeout: C.esTimeout
 }
 var pubsubSettings = {
   host: '0.0.0.0',
@@ -29,7 +32,8 @@ var pubsubSettings = {
 }
 var fifoSettings = {
   host: '0.0.0.0',
-  port: 8500
+  port: 8500,
+  timeout: 1000
 }
 
 Proc.pathExists(Proc.newquePath)
@@ -96,6 +100,9 @@ Proc.pathExists(Proc.newquePath)
 
   require('./sections/none')('none', {}, false)
   require('./sections/pubsub')('pubsub', pubsubSettings, true)
+  require('./sections/fifo')('fifo no-consumer', fifoSettings, true)
+  require('./sections/httpproxy')('httpproxy no-consumer', httpJsonSettings, true)
+  require('./sections/elasticsearch')('elasticsearch', esSettings, true)
 
   run()
 })

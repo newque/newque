@@ -140,9 +140,3 @@ let rec make_interval every callback () =
 let time_ns_int64 () = Int63.to_int64 (Time_ns.to_int63_ns_since_epoch (Time_ns.now ()))
 let time_ns_int63 () = Time_ns.to_int63_ns_since_epoch (Time_ns.now ())
 let time_ms_float () = Time.to_float (Time.now ()) *. 1000.
-
-let append_to_path uri append =
-  let base_path = Uri.path uri in
-  if String.(=) (String.suffix base_path 1) "/"
-  then Uri.with_path uri (sprintf "%s%s" base_path append)
-  else Uri.with_path uri (sprintf "%s/%s" base_path append)

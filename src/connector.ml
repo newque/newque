@@ -10,7 +10,7 @@ let create expiration =
   let table = String.Table.create () in
   { table; expiration; }
 
-let submit connector uid =
+let submit connector uid outbound =
   let thread, wakener = wait () in
   String.Table.add_exn connector.table ~key:uid ~data:wakener;
   fun () ->
@@ -19,7 +19,9 @@ let submit connector uid =
     with
     | Lwt_unix.Timeout ->
       String.Table.remove connector.table uid;
-      fail_with (sprintf "No response from upstream within %f seconds" connector.expiration)
+      fail_with (sprintf "No response from upstream [ZMQ %s] within %f seconds"
+          outbound connector.expiration
+      )
 
 let resolve connector uid obj =
   match String.Table.find_and_remove connector.table uid with

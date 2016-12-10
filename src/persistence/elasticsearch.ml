@@ -9,17 +9,19 @@ type elasticsearch_t = {
   base_urls: Uri.t array;
   index: string;
   typename: string;
+  timeout: float; (* in seconds *)
 } [@@deriving sexp]
 
 let get_base instance =
   let arr = instance.base_urls in
   Array.get arr (Random.int (Array.length arr))
 
-let create base_urls ~index ~typename =
+let create base_urls ~index ~typename timeout_ms =
   let instance = {
     base_urls = Array.map ~f:Uri.of_string base_urls;
     index = String.lowercase index;
     typename = String.lowercase typename;
+    timeout = Float.(/) timeout_ms 1000.;
   }
   in
   return instance
@@ -32,7 +34,7 @@ module M = struct
 
   let push instance ~msgs ~ids =
     let open Json_obj_j in
-    let uri = Util.append_to_path (get_base instance) (sprintf "%s/_bulk" instance.index) in
+    let uri = Http_tools.append_to_path (get_base instance) (sprintf "%s/_bulk" instance.index) in
     let bulk_format = Array.concat_mapi msgs ~f:(fun i msg ->
         let json = `Assoc [
             "index", `Assoc [
@@ -44,7 +46,7 @@ module M = struct
         [| Yojson.Basic.to_string json; "\n"; msg; "\n" |]
       ) in
     let body = Cohttp_lwt_body.of_stream (Lwt_stream.of_array bulk_format) in
-    let%lwt (response, body) = Client.call ~body ~chunked:false `POST uri in
+    let%lwt (response, body) = Http_tools.call ~body ~chunked:false ~timeout:instance.timeout `POST uri in
     let%lwt body_str = Cohttp_lwt_body.to_string body in
     let open Yojson.Basic.Util in
     let json = Yojson.Basic.from_string body_str in
@@ -83,8 +85,8 @@ module M = struct
 
   let size instance =
     let open Json_obj_j in
-    let uri = Util.append_to_path (get_base instance) (sprintf "%s/_count" instance.index) in
-    let%lwt (response, body) = Client.call ~chunked:false `GET uri in
+    let uri = Http_tools.append_to_path (get_base instance) (sprintf "%s/_count" instance.index) in
+    let%lwt (response, body) = Http_tools.call ~chunked:false ~timeout:instance.timeout `GET uri in
     let%lwt body_str = Cohttp_lwt_body.to_string body in
     begin match Code.code_of_status (Response.status response) with
       | 200 ->
@@ -101,9 +103,9 @@ module M = struct
   let delete instance = fail_with "Unimplemented: ES delete"
 
   let health instance =
-    let uri = Util.append_to_path (get_base instance) (sprintf "%s/_stats/docs" instance.index) in
+    let uri = Http_tools.append_to_path (get_base instance) (sprintf "%s/_stats/docs" instance.index) in
     try%lwt
-      let%lwt (response, body) = Client.call ~chunked:false `GET uri in
+      let%lwt (response, body) = Http_tools.call ~chunked:false ~timeout:instance.timeout `GET uri in
       let%lwt body_str = Cohttp_lwt_body.to_string body in
       begin match Code.code_of_status (Response.status response) with
         | 200 -> return []

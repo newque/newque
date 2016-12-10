@@ -2,7 +2,7 @@ module.exports = function (backend, backendSettings, raw) {
   describe('Count ' + backend + (!!raw ? ' raw' : ''), function () {
     if (backend === 'elasticsearch') {
       var delay = C.esDelay
-      this.timeout(3000)
+      this.timeout(C.esTimeout)
     } else {
       var delay = 0
     }
@@ -63,6 +63,7 @@ module.exports = function (backend, backendSettings, raw) {
     })
 
     after(function () {
+      this.timeout(C.esTimeout)
       return Proc.teardown(env, backend, backendSettings)
     })
   })
