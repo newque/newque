@@ -1,6 +1,7 @@
 module M : Persistence.Template
 
 val create :
+  chan_name:string ->
   string array ->
   Config_t.pair list ->
   float ->

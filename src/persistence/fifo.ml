@@ -173,6 +173,7 @@ module M = struct
     return (Option.value ~default:Int64.zero count.count)
 
   let delete instance =
+    let%lwt () = Logger.info (sprintf "Deleting data in [%s]" instance.chan_name) in
     let input = {
       channel = instance.chan_name;
       action = Delete_input;

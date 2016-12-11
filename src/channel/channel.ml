@@ -63,6 +63,7 @@ let create name conf_channel =
       let module Arg = struct
         module IO = Http_proxy.M
         let create () = Http_proxy.create
+            ~chan_name:name
             (if httpproxy.append_chan_name
              then Array.map ~f:(fun b -> sprintf "%s%s" b name) httpproxy.base_urls
              else httpproxy.base_urls)

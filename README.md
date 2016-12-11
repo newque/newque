@@ -232,7 +232,7 @@ __`fifo` `backendSettings` Object__
 |----------|------|----------|---------|-------------|
 | `host` | String | Yes | | Address on which the messages will queued up for clients to accept |
 | `port` | Integer | Yes | | Port on which the messages will queued up for clients to accept |
-| `timeout` | Number | Yes | | Number of milliseconds before requests are cancelled with an error. The timer begins once an upstream accepts a request. |
+| `timeout` | Number | Yes | | Number of milliseconds before requests are cancelled with an error. |
 
 __Read Settings Object__
 

@@ -24,7 +24,15 @@ let create ~file ~chan_name ~avg_read =
       in
       fail ex
   in
-  return {db; avg_read; file; chan_name; mutex}
+  let instance = {
+    db;
+    avg_read;
+    file;
+    chan_name;
+    mutex;
+  }
+  in
+  return instance
 
 module M = struct
 
@@ -98,6 +106,7 @@ module M = struct
 
   let delete instance =
     Lwt_mutex.with_lock instance.mutex (fun () ->
+      let%lwt () = Logger.info (sprintf "Deleting data in [%s]" instance.chan_name) in
       try%lwt
         Sqlite.delete instance.db
       with

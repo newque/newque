@@ -6,6 +6,7 @@ open Cohttp_lwt_unix
 module Logger = Log.Make (struct let path = Log.outlog let section = "Httpproxy" end)
 
 type httpproxy_t = {
+  chan_name: string;
   base_urls: Uri.t array;
   base_headers: Header.t;
   timeout: float; (* seconds *)
@@ -14,7 +15,7 @@ type httpproxy_t = {
   chan_separator: string;
 } [@@deriving sexp]
 
-let create base_urls base_headers timeout_ms ~input ~output ~chan_separator =
+let create ~chan_name base_urls base_headers timeout_ms ~input ~output ~chan_separator =
   let base_urls = Array.map ~f:Uri.of_string base_urls in
   let base_headers = Config_t.(
       Header.add_list
@@ -23,6 +24,7 @@ let create base_urls base_headers timeout_ms ~input ~output ~chan_separator =
     )
   in
   let instance = {
+    chan_name;
     base_urls;
     base_headers;
     timeout = Float.(/) timeout_ms 1000.;
@@ -128,6 +130,7 @@ module M = struct
 
   let delete instance =
     let open Json_obj_j in
+    let%lwt () = Logger.info (sprintf "Deleting data in [%s]" instance.chan_name) in
     let headers = instance.base_headers in
     let uri = Http_tools.append_to_path (get_base instance) "delete" in
     let%lwt (response, body) = Http_tools.call ~headers ~chunked:false ~timeout:instance.timeout `DELETE uri in
