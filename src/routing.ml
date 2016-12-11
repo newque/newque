@@ -1,8 +1,8 @@
 open Core.Std
 
 type admin_routing = {
-  (* Channels (accessed by name) by listener.id *)
-  table: Channel.t String.Table.t String.Table.t;
+  listeners_by_port: int option -> Yojson.Basic.json;
+  channels_by_name: string option -> Yojson.Basic.json Lwt.t;
 }
 
 type standard_routing = {

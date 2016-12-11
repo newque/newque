@@ -5,7 +5,7 @@ module Logger = Log.Make (struct let path = Log.outlog let section = "Router" en
 
 type t = {
   table: Channel.t String.Table.t String.Table.t; (* Channels (accessed by name) by listener.id *)
-} [@@deriving sexp]
+}
 
 let create () =
   let table = String.Table.create () in
@@ -56,6 +56,11 @@ let find_chan router ~listen_name ~chan_name =
       | Some chan -> Ok chan
     end
 
+let all_channels router =
+  match String.Table.find router.table Listener.(private_listener.id) with
+  | None -> fail_with "Cannot find internal private listener"
+  | Some priv -> return (String.Table.to_alist priv)
+
 (******************
    WRITE
  ******************)
@@ -65,7 +70,7 @@ let write_shared router ~listen_name ~chan ~write ~msgs ~ids =
   let open Channel in
   let open Write_settings in
   begin match ((Message.length ~raw:chan.raw msgs), (Array.length ids)) with
-    | (0, _) -> return (Error [sprintf "Nothing to write."])
+    | (0, _) -> return (Error [sprintf "Nothing to write"])
     | (msgs_l, ids_l) when Int.(<>) msgs_l ids_l -> return (Error [sprintf "Length mismatch between messages [%d] and IDs [%d]" msgs_l ids_l])
     | _ ->
       let save_t =
@@ -76,11 +81,11 @@ let write_shared router ~listen_name ~chan ~write ~msgs ~ids =
         (* Forward to other channels if needed. *)
         let%lwt () = Lwt_list.iter_p (fun forward_chan_name ->
             begin match find_chan router ~listen_name:Listener.(private_listener.id) ~chan_name:forward_chan_name with
-              | Error _ -> Logger.warning_lazy (lazy (sprintf "Cannot forward from [%s] to [%s] because [%s] doesn't exist." chan.name forward_chan_name forward_chan_name))
+              | Error _ -> Logger.warning_lazy (lazy (sprintf "Cannot forward from [%s] to [%s] because [%s] doesn't exist" chan.name forward_chan_name forward_chan_name))
               | Ok forward_chan ->
                 let%lwt forward_count = Channel.push forward_chan msgs ids in
                 if forward_count <> count then async (fun () ->
-                    Logger.warning_lazy (lazy (sprintf "Mismatch while forwarding from [%s] (wrote %d) to [%s] (wrote %d). Possible ID collision(s)." chan.name count forward_chan_name forward_count)
+                    Logger.warning_lazy (lazy (sprintf "Mismatch while forwarding from [%s] (wrote %d) to [%s] (wrote %d). Possible ID collision(s)" chan.name count forward_chan_name forward_count)
                     ));
                 return_unit
             end
@@ -103,7 +108,7 @@ let write_http router ~listen_name ~chan_name ~id_header ~mode stream =
   | Ok chan ->
     let open Channel in
     begin match chan.write with
-      | None -> return (Error [sprintf "Channel [%s] doesn't support Writing to it." chan_name])
+      | None -> return (Error [sprintf "Channel [%s] doesn't support Writing to it" chan_name])
       | Some write ->
         let open Write_settings in
 
@@ -146,7 +151,7 @@ let write_zmq router ~listen_name ~chan_name ~ids ~msgs ~atomic =
   | Ok chan ->
     let open Channel in
     begin match chan.write with
-      | None -> return (Error [sprintf "Channel [%s] doesn't support Writing to it." chan_name])
+      | None -> return (Error [sprintf "Channel [%s] doesn't support Writing to it" chan_name])
       | Some write ->
         let msgs = Message.of_string_array ~atomic msgs in
         let ids = if Array.is_empty ids then Id.array_random (Message.length ~raw:chan.raw msgs) else ids in
@@ -162,7 +167,7 @@ let read_slice router ~listen_name ~chan_name ~mode ~limit =
   | (Error _) as err -> return err
   | Ok chan ->
     begin match chan.Channel.read with
-      | None -> return (Error [sprintf "Channel [%s] doesn't support Reading from it." chan_name])
+      | None -> return (Error [sprintf "Channel [%s] doesn't support Reading from it" chan_name])
       | Some read ->
         let limit = begin match limit with
           | None -> Int64.max_value
@@ -182,7 +187,7 @@ let read_stream router ~listen_name ~chan_name ~mode =
   | (Error _) as err -> return err
   | Ok chan ->
     begin match chan.Channel.read with
-      | None -> return (Error [sprintf "Channel [%s] doesn't support Reading from it." chan_name])
+      | None -> return (Error [sprintf "Channel [%s] doesn't support Reading from it" chan_name])
       | Some read ->
         let%lwt stream = Channel.pull_stream chan ~mode ~only_once:read.Read_settings.only_once in
         ignore_result (Logger.debug_lazy (lazy (
@@ -214,7 +219,7 @@ let delete router ~listen_name ~chan_name ~mode =
   | (Error _) as err -> return err
   | Ok chan ->
     begin match chan.Channel.emptiable with
-      | false -> return (Error [sprintf "Channel [%s] doesn't support Deleting from it." chan_name])
+      | false -> return (Error [sprintf "Channel [%s] doesn't support Deleting from it" chan_name])
       | true ->
         let%lwt () = Channel.delete chan in
         ignore_result (Logger.debug_lazy (lazy (
@@ -234,7 +239,7 @@ let rec health router ~listen_name ~chan_name ~mode =
   | None ->
     let priv = Listener.(private_listener.id) in
     begin match String.Table.find router.table priv with
-      | None -> fail_with "Cannot find internal private listener."
+      | None -> fail_with "Cannot find internal private listener"
       | Some channels_table ->
         let channels = String.Table.data channels_table in
         let%lwt error_lists = Lwt_list.map_p (fun chan ->

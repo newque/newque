@@ -2,14 +2,15 @@ open Core.Std
 open Lwt
 
 type t = {
+  conf_channel: Config_t.config_channel;
   name: string;
   endpoint_names: string list;
-  push: Message.t -> Id.t array -> int Lwt.t sexp_opaque;
-  pull_slice: int64 -> mode:Mode.Read.t -> only_once:bool -> Persistence.slice Lwt.t sexp_opaque;
-  pull_stream: int64 -> mode:Mode.Read.t -> only_once:bool -> string Lwt_stream.t Lwt.t sexp_opaque;
-  size: unit -> int64 Lwt.t sexp_opaque;
-  delete: unit -> unit Lwt.t sexp_opaque;
-  health: unit -> string list Lwt.t sexp_opaque;
+  push: Message.t -> Id.t array -> int Lwt.t;
+  pull_slice: int64 -> mode:Mode.Read.t -> only_once:bool -> Persistence.slice Lwt.t;
+  pull_stream: int64 -> mode:Mode.Read.t -> only_once:bool -> string Lwt_stream.t Lwt.t;
+  size: unit -> int64 Lwt.t;
+  delete: unit -> unit Lwt.t;
+  health: unit -> string list Lwt.t;
   emptiable: bool;
   raw: bool;
   read: Read_settings.t option;
@@ -17,7 +18,7 @@ type t = {
   separator: string;
   buffer_size: int;
   max_read: int64;
-} [@@deriving sexp]
+}
 
 let create name conf_channel =
   let open Config_t in
@@ -137,6 +138,7 @@ let create name conf_channel =
   ) : Persistence.S)
   in
   let instance = {
+    conf_channel;
     name;
     endpoint_names = conf_channel.endpoint_names;
     push = Persist.push;
@@ -168,3 +170,5 @@ let size chan = chan.size ()
 let delete chan = chan.delete ()
 
 let health chan = chan.health ()
+
+let to_json chan = Yojson.Basic.from_string (Config_j.string_of_config_channel chan.conf_channel)

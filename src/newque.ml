@@ -55,7 +55,7 @@ let start config_path =
   let%lwt () = Configtools.apply_main config watcher in
 
   (* Create admin server *)
-  let%lwt (admin_server , success_str) = Configtools.create_admin_server watcher config in
+  let%lwt (_, success_str) = Watcher.create_admin_server watcher config in
   let%lwt () = Logger.info success_str in
 
   (* Load channel config files *)
@@ -65,7 +65,6 @@ let start config_path =
   | Error errors ->
     Logger.error (String.concat ~sep:", " errors)
   | Ok () ->
-    let open Router in
     let router = Watcher.router watcher in
     let priv = Listener.(private_listener.id) in
     let%lwt () = Logger.info "Running global health check..." in
@@ -76,20 +75,8 @@ let start config_path =
       | [] ->
         let%lwt () = Logger.info "Global health check succeeded" in
         let%lwt () = Logger.info "*** SERVER STARTED **" in
-        let pairs = List.map (Int.Table.to_alist (Watcher.table watcher)) ~f:(fun (port, listener) ->
-            let name = listener.Listener.id in
-            let channels = match String.Table.find router.table name with
-              | None -> []
-              | Some chan_table -> String.Table.keys chan_table
-            in
-            name, `Assoc [
-              "protocol", `String (Listener.get_prot listener);
-              "port", `Int port;
-              "channels", `List (List.map channels ~f:(fun s -> `String s))
-            ]
-          )
-        in
-        print_endline (Yojson.Basic.pretty_to_string (`Assoc pairs));
+        let listeners_json = Watcher.listeners_to_json watcher None in
+        print_endline (Yojson.Basic.pretty_to_string listeners_json);
         (* Run forever *)
         fst (wait ())
     with

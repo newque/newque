@@ -1,4 +1,5 @@
 type t = {
+  conf_channel: Config_t.config_channel;
   name : string;
   endpoint_names : string list;
   push : Message.t -> Id.t array -> int Lwt.t;
@@ -14,7 +15,7 @@ type t = {
   separator : string;
   buffer_size : int;
   max_read: int64;
-} [@@deriving sexp]
+}
 
 val create : string -> Config_t.config_channel -> t Lwt.t
 
@@ -29,3 +30,5 @@ val size : t  -> int64 Lwt.t
 val delete : t -> unit Lwt.t
 
 val health : t -> string list Lwt.t
+
+val to_json : t -> Yojson.Basic.json
