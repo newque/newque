@@ -9,6 +9,7 @@ type fifo_t = {
   host: string;
   port: int;
   timeout: float; (* in seconds *)
+  health_time_limit: float; (* in seconds *)
   outbound: string;
   router: [`Dealer] ZMQ.Socket.t sexp_opaque;
   socket: [`Dealer] Lwt_zmq.Socket.t sexp_opaque;
@@ -69,7 +70,7 @@ let handler instance input messages =
   | [] -> return pair
   | errors -> fail (Exception.Multiple_exn errors)
 
-let create ~chan_name host port timeout_ms =
+let create ~chan_name ~host ~port ~timeout_ms ~health_time_limit_ms =
   let outbound = sprintf "tcp://%s:%d" host port in
   let%lwt () = Logger.info (sprintf "Creating a new TCP socket on %s:%d" host port) in
   let timeout = Float.(/) timeout_ms 1000. in
@@ -105,6 +106,7 @@ let create ~chan_name host port timeout_ms =
     host;
     port;
     timeout;
+    health_time_limit = Float.(/) health_time_limit_ms 1000.;
     outbound;
     router;
     socket;
@@ -186,7 +188,7 @@ module M = struct
     (* The connector has its own timeout and fails with Failure.
        If no consumer reads or answers within time_limit, we consider
        the health check as passed. *)
-    let time_limit = 5.0 in
+    let time_limit = instance.health_time_limit in
     let thread =
       let input = {
         channel = instance.chan_name;

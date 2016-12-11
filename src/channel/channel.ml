@@ -100,9 +100,10 @@ let create name conf_channel =
         module IO = Fifo.M
         let create () = Fifo.create
             ~chan_name:name
-            fifo.f_host
-            fifo.f_port
-            fifo.f_timeout
+            ~host:fifo.f_host
+            ~port:fifo.f_port
+            ~timeout_ms:fifo.f_timeout
+            ~health_time_limit_ms:fifo.f_health_time_limit
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
         let batching = batching

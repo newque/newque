@@ -233,6 +233,7 @@ __`fifo` `backendSettings` Object__
 | `host` | String | Yes | | Address on which the messages will queued up for clients to accept |
 | `port` | Integer | Yes | | Port on which the messages will queued up for clients to accept |
 | `timeout` | Number | Yes | | Number of milliseconds before requests are cancelled with an error. |
+| `healthTimeLimit` | Number | No | `5000` | Number of milliseconds before unanswered health calls are resolved as successful. This is useful when no consumers are currently listening. |
 
 __Read Settings Object__
 
