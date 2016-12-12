@@ -15,7 +15,7 @@ type t = {
   raw: bool;
   read: Read_settings.t option;
   write: Write_settings.t option;
-  separator: string;
+  splitter: Util.splitter;
   buffer_size: int;
   max_read: int64;
 }
@@ -40,20 +40,28 @@ let create name conf_channel =
       end in
       (module Persistence.Make (Arg) : Persistence.S)
 
-    | `Memory ->
+    | `Memory memory ->
       let module Arg = struct
         module IO = Local.M
-        let create () = Local.create ~file:":memory:" ~chan_name:name ~avg_read:conf_channel.avg_read
+        let create () = Local.create
+            ~file:":memory:"
+            ~chan_name:name
+            ~avg_read:conf_channel.avg_read
+            ~insert_batch_size:memory.insert_batch_size
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
         let batching = batching
       end in
       (module Persistence.Make (Arg) : Persistence.S)
 
-    | `Disk ->
+    | `Disk disk ->
       let module Arg = struct
         module IO = Local.M
-        let create () = Local.create ~file:(sprintf "%s%s.data" Fs.data_chan_dir name) ~chan_name:name ~avg_read:conf_channel.avg_read
+        let create () = Local.create
+            ~file:(sprintf "%s%s.data" Fs.data_chan_dir name)
+            ~chan_name:name
+            ~avg_read:conf_channel.avg_read
+            ~insert_batch_size:disk.insert_batch_size
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
         let batching = batching
@@ -152,7 +160,7 @@ let create name conf_channel =
     raw = conf_channel.raw;
     read = Option.map conf_channel.read_settings ~f:Read_settings.create;
     write;
-    separator = conf_channel.separator;
+    splitter = Util.make_splitter ~sep:conf_channel.separator;
     buffer_size = conf_channel.buffer_size;
     max_read = Int.to_int64 (conf_channel.max_read);
   }

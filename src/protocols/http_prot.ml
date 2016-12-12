@@ -121,7 +121,7 @@ let handler http routing ((ch, _) as conn) req body =
                         (Header_names.length, "0");
                       ])
                 in
-                let sep = channel.Channel.separator in
+                let sep = channel.Channel.conf_channel.Config_t.separator in
                 let body_stream = Lwt_stream.map_list_s (fun raw ->
                     begin match%lwt Lwt_stream.is_empty stream with
                       | true -> return [raw]
@@ -164,7 +164,7 @@ let handler http routing ((ch, _) as conn) req body =
                     (body, headers)
                   | Some { http_format = Http_format.Plaintext } ->
                     let headers = Header.add headers "content-type" "application/octet-stream" in
-                    let body = String.concat_array ~sep:channel.Channel.separator payloads in
+                    let body = String.concat_array ~sep:channel.Channel.conf_channel.Config_t.separator payloads in
                     (body, headers)
                   | Some { http_format = Http_format.Json } ->
                     let headers = Header.add headers "content-type" "application/json" in

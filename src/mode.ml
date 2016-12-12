@@ -75,13 +75,14 @@ let wrap (tag : Any.t) : t = match tag with
   | `Health -> `Health
 
 (* Efficient, not pretty. *)
+let splitter = Util.make_splitter ~sep:" "
 let of_string str : ([Write.t | Read.t], string) Result.t =
   match String.lowercase str with
   | "single" -> Ok `Single
   | "multiple" -> Ok `Multiple
   | "atomic" -> Ok `Atomic
   | "one" -> Ok `One
-  | s -> begin match Util.split ~sep:" " s with
+  | s -> begin match splitter s with
       | ["after_id"; id] -> Ok (`After_id id)
       | [name; v] ->
         begin match (name, (Util.parse_int64 v)) with

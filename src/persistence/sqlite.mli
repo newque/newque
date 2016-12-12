@@ -6,7 +6,12 @@ val create : string -> avg_read:int -> t Lwt.t
 
 val close : t -> unit Lwt.t
 
-val push : t -> msgs:string array -> ids:string array -> int Lwt.t
+val push :
+  t ->
+  msgs:string array ->
+  ids:string array ->
+  insert_batch_size:int ->
+  int Lwt.t
 
 (* See comments in Persistence *)
 val pull :

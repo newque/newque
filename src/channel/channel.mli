@@ -12,7 +12,7 @@ type t = {
   raw: bool;
   read: Read_settings.t option;
   write : Write_settings.t option;
-  separator : string;
+  splitter: Util.splitter;
   buffer_size : int;
   max_read: int64;
 }

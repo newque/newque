@@ -10,14 +10,14 @@ val of_string_array :
 val of_string :
   format:Http_format.t ->
   mode:Mode.Write.t ->
-  sep:string ->
+  splitter:Util.splitter ->
   string ->
   (t, string) Result.t
 
 val of_stream :
   format:Http_format.t ->
   mode:Mode.Write.t ->
-  sep:string ->
+  splitter:Util.splitter ->
   buffer_size:int ->
   string Lwt_stream.t ->
   t Lwt.t

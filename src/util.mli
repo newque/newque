@@ -1,6 +1,8 @@
 open Core.Std
 open Cohttp
 
+type splitter = (string -> string list)
+val make_splitter : sep:string -> splitter
 val split : sep:string -> string -> string list
 
 val parse_int64 : string -> int64 option
@@ -18,7 +20,7 @@ val stream_to_string :
   string Lwt.t
 
 val stream_to_array :
-  sep:string ->
+  splitter:splitter ->
   ?init:string option ->
   string Lwt_stream.t ->
   string array Lwt.t
@@ -26,14 +28,6 @@ val stream_to_array :
 val zip_group : size:int -> 'a array -> 'b array -> ('a * 'b) array list Lwt.t
 
 val array_to_list_rev_mapi : mapper:(int -> 'a -> 'b) -> 'a array -> 'b list
-
-val json_of_sexp : Sexp.t -> Yojson.Basic.json
-val string_of_sexp : ?pretty:bool -> Sexp.t -> string
-
-val sexp_of_json_exn : Yojson.Basic.json -> Sexp.t
-val sexp_of_json_str_exn : string -> Sexp.t
-
-val sexp_of_atdgen_exn : string -> Sexp.t
 
 val parse_sync : ('a -> 'b) -> 'a -> ('b, string) Result.t
 

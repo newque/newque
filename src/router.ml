@@ -133,7 +133,7 @@ let write_http router ~listen_name ~chan_name ~id_header ~mode stream =
                 end
             end
           | Http_format.Plaintext ->
-            let%lwt msgs = Message.of_stream ~format:write.http_format ~mode ~sep:chan.separator ~buffer_size:chan.buffer_size stream in
+            let%lwt msgs = Message.of_stream ~format:write.http_format ~mode ~splitter:chan.splitter ~buffer_size:chan.buffer_size stream in
             let length_none = Message.length ~raw:chan.raw msgs in
             let ids = Id.array_of_string_opt ~mode ~length_none id_header in
             return (msgs, ids)

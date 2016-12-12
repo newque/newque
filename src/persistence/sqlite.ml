@@ -26,7 +26,6 @@ type t = {
    because it is only retried when the db is locked.
    We only want it to fail in catastrophic cases. *)
 let default_retries = 3
-let insert_batch_size = 500
 
 (******************
    LOW LEVEL FUNCTIONS
@@ -256,7 +255,7 @@ let close db =
   in
   aux 0
 
-let push db ~msgs ~ids =
+let push db ~msgs ~ids ~insert_batch_size =
   let time = Util.time_ns_int64 () in
   let make_stmt slice =
     let%lwt (st, _) as stmt = prepare db.db (insert_sql (Array.length slice)) in

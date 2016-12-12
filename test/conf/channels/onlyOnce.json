@@ -1,6 +1,7 @@
 {
   "listeners": ["http8000","zmq8005"],
   "backend": "disk",
+  "backendSettings": {},
   "maxRead": 2,
   "readSettings": {
     "onlyOnce": true

@@ -1,6 +1,7 @@
 {
   "listeners": ["http8000","zmq8005"],
   "backend": "pubsub",
+  "backendSettings": {},
   "readSettings": {
     "onlyOnce": false
   },

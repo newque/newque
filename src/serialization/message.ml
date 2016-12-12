@@ -17,7 +17,7 @@ let of_string_array ~atomic messages =
     | true -> Atomic messages
   end
 
-let of_string ~format ~mode ~sep str =
+let of_string ~format ~mode ~splitter str =
   let open Http_format in
   match format with
   | Json ->
@@ -27,20 +27,19 @@ let of_string ~format ~mode ~sep str =
       | Ok { atomic; messages } -> Ok (of_string_array ~atomic messages)
     end
   | Plaintext ->
-    let split = Util.split ~sep in
     let arr = begin match mode with
       | `Single -> Multiple [| str |]
-      | `Multiple -> of_string_array ~atomic:false (Array.of_list (split str))
-      | `Atomic -> of_string_array ~atomic:true (Array.of_list (split str))
+      | `Multiple -> of_string_array ~atomic:false (Array.of_list (splitter str))
+      | `Atomic -> of_string_array ~atomic:true (Array.of_list (splitter str))
     end in
     Ok arr
 
-let of_stream ~format ~mode ~sep ~buffer_size stream =
+let of_stream ~format ~mode ~splitter ~buffer_size stream =
   let open Http_format in
   match format with
   | Json ->
     let%lwt str = Util.stream_to_string ~buffer_size stream in
-    begin match of_string ~format ~mode ~sep str with
+    begin match of_string ~format ~mode ~splitter str with
       | Error str -> failwith str
       | Ok messages -> return messages
     end
@@ -50,10 +49,10 @@ let of_stream ~format ~mode ~sep ~buffer_size stream =
         let%lwt s = Util.stream_to_string ~buffer_size stream in
         return (Multiple [| s |])
       | `Multiple ->
-        let%lwt arr = Util.stream_to_array ~sep stream in
+        let%lwt arr = Util.stream_to_array ~splitter stream in
         return (Multiple arr)
       | `Atomic ->
-        let%lwt arr = Util.stream_to_array ~sep stream in
+        let%lwt arr = Util.stream_to_array ~splitter stream in
         return (Atomic arr)
     end
 

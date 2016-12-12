@@ -2,6 +2,11 @@ open Core.Std
 open Lwt
 open Cohttp
 
+type splitter = (string -> string list)
+let make_splitter ~sep =
+  let delim = Str.regexp_string sep in
+  Str.split_delim delim
+
 let split ~sep str =
   let delim = Str.regexp_string sep in
   Str.split_delim delim str
@@ -56,12 +61,11 @@ let stream_to_string ~buffer_size ?(init=(Some "")) stream =
   in
   return (Bigbuffer.contents buffer)
 
-let stream_to_array ~sep ?(init=(Some "")) stream =
+let stream_to_array ~splitter ?(init=(Some "")) stream =
   let queue = Queue.create () in
-  let split = split ~sep in
   let%lwt (msgs, last) = Lwt_stream.fold_s (fun read ((), leftover) ->
       let chunk = Option.value_map leftover ~default:read ~f:(fun a -> sprintf "%s%s" a read) in
-      let lines = split chunk in
+      let lines = splitter chunk in
       let (fulls, partial) = List.split_n lines (List.length lines) in
       List.iter fulls ~f:(fun raw -> Queue.enqueue queue raw);
       return ((), List.hd partial)
@@ -69,57 +73,6 @@ let stream_to_array ~sep ?(init=(Some "")) stream =
   in
   Option.iter last ~f:(fun raw -> Queue.enqueue queue raw);
   return (Queue.to_array queue)
-
-let rec is_assoc sexp =
-  match sexp with
-  | [] -> true
-  | (Sexp.Atom _)::_::tail -> is_assoc tail
-  | _ -> false
-let has_dup_keys ll =
-  List.contains_dup (List.filteri ll ~f:(fun i sexp -> Int.(=) (i mod 2) 0))
-let rec json_of_sexp sexp =
-  match sexp with
-  | Sexp.List ll when (is_assoc ll) && not (has_dup_keys ll) ->
-    `Assoc (List.map (List.groupi ll ~break:(fun i _ _ -> i mod 2 = 0)) ~f:(function
-        | [Sexp.Atom k; v] -> (k, (json_of_sexp v))
-        | _ -> failwith "Unreachable"
-      ))
-  | Sexp.List ll -> `List (List.map ~f:json_of_sexp ll)
-  | Sexp.Atom s when (String.lowercase s) = "true" -> `Bool true
-  | Sexp.Atom s when (String.lowercase s) = "false" -> `Bool false
-  | Sexp.Atom s when (String.lowercase s) = "null" -> `Null
-  | Sexp.Atom x ->
-    try
-      let f = Float.of_string x in
-      let i = Float.to_int f in
-      if (Int.to_float i) = f then `Int i else `Float f
-    with _ -> `String x
-
-let string_of_sexp ?(pretty=true) sexp =
-  if pretty then Yojson.Basic.pretty_to_string (json_of_sexp sexp)
-  else Yojson.Basic.to_string (json_of_sexp sexp)
-
-let rec sexp_of_json_exn json =
-  match json with
-  | `Assoc ll ->
-    Sexp.List (List.concat_map ll ~f:(fun (key, json) ->
-        [Sexp.Atom key; sexp_of_json_exn json]
-      ))
-  | `Bool b -> Sexp.Atom (Bool.to_string b)
-  | `Float f -> Sexp.Atom (Float.to_string f)
-  | `Int i -> Sexp.Atom (Int.to_string i)
-  | `List ll -> Sexp.List (List.map ll ~f:sexp_of_json_exn)
-  | `Null -> Sexp.Atom "null"
-  | `String s -> Sexp.Atom s
-
-let sexp_of_json_str_exn str =
-  let json = Yojson.Basic.from_string str in
-  sexp_of_json_exn json
-
-let sexp_of_atdgen_exn str =
-  match Yojson.Basic.from_string str with
-  | `String s -> Sexp.Atom s
-  | _ -> Sexp.Atom str
 
 let parse_sync parser str =
   try
