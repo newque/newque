@@ -45,6 +45,8 @@ Proc.pathExists(Proc.newquePath)
 .then(Proc.clearEs(esSettings))
 .then(function (server) {
 
+  require('./sections/admin')('none', {}, false)
+
   require('./sections/count')('disk', {}, false)
   require('./sections/count')('disk', {}, true)
   require('./sections/count')('memory', {}, false)
