@@ -177,7 +177,7 @@ module Make (Argument: Argument) : S = struct
         )
       in
       let batch_size = Option.value (Int64.to_int Argument.stream_slice_size) ~default:Int.max_value in
-      Util.stream_map_collection_s raw_stream ~batch_size ~mapper:fast_parse_exn
+      Util.coll_stream_flatten_map_s raw_stream ~batch_size ~mapper:fast_parse_exn
     ) instance max_read mode only_once
 
   (******************

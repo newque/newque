@@ -10,7 +10,7 @@ val default_separator : string
 val coll_random : int -> t Collection.t
 
 val coll_of_string_opt :
-  ?sep:string ->
+  ?splitter:Util.splitter ->
   mode:Mode.Write.t ->
   length_none:int ->
   string option ->

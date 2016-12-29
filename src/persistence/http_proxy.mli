@@ -7,5 +7,6 @@ val create :
   float ->
   input:Config_t.config_channel_format ->
   output:Config_t.config_channel_format ->
-  chan_separator: string ->
+  splitter:Util.splitter ->
+  chan_separator:string ->
   M.t Lwt.t

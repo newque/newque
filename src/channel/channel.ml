@@ -29,6 +29,8 @@ let create name conf_channel =
   let write = Option.map conf_channel.write_settings ~f:Write_settings.create in
   let batching = Option.bind write (fun w -> w.Write_settings.batching) in
 
+  let splitter = Util.make_splitter ~sep:conf_channel.separator in
+
   let module Persist = (val (match conf_channel.backend_settings with
     | `None ->
       let module Arg = struct
@@ -78,6 +80,7 @@ let create name conf_channel =
             httpproxy.timeout
             ~input:httpproxy.input_format
             ~output:httpproxy.output_format
+            ~splitter
             ~chan_separator:conf_channel.separator
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
@@ -158,7 +161,7 @@ let create name conf_channel =
     raw = conf_channel.raw;
     read = Option.map conf_channel.read_settings ~f:Read_settings.create;
     write;
-    splitter = Util.make_splitter ~sep:conf_channel.separator;
+    splitter;
     buffer_size = conf_channel.buffer_size;
     max_read = Int.to_int64 (conf_channel.max_read);
   }

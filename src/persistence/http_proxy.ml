@@ -12,10 +12,11 @@ type httpproxy_t = {
   timeout: float; (* seconds *)
   input_format: Http_format.t;
   output_format: Http_format.t;
+  splitter: Util.splitter;
   chan_separator: string;
 } [@@deriving sexp]
 
-let create ~chan_name base_urls base_headers timeout_ms ~input ~output ~chan_separator =
+let create ~chan_name base_urls base_headers timeout_ms ~input ~output ~splitter ~chan_separator =
   let base_urls = Array.map ~f:Uri.of_string base_urls in
   let base_headers = Config_t.(
       Header.add_list
@@ -30,6 +31,7 @@ let create ~chan_name base_urls base_headers timeout_ms ~input ~output ~chan_sep
     timeout = Float.(/) timeout_ms 1000.;
     input_format = Http_format.create input;
     output_format = Http_format.create output;
+    splitter;
     chan_separator;
   }
   in
@@ -95,6 +97,7 @@ module M = struct
     let uri = get_base instance in
     let%lwt (response, body) = Http_tools.call ~headers ~chunked:false ~timeout:instance.timeout `GET uri in
     let%lwt body_str = Cohttp_lwt_body.to_string body in
+
     let response_headers = Response.headers response in
     let%lwt (errors, messages) = match ((Response.status response), (instance.output_format)) with
       | `No_content, _ -> return ([], Collection.empty)
@@ -104,7 +107,7 @@ module M = struct
             let parsed = errors_of_string body_str in
             return (parsed.errors, Collection.empty)
           | _ ->
-            let msgs = Collection.of_list (Util.split ~sep:instance.chan_separator body_str) in
+            let msgs = Collection.of_list (instance.splitter body_str) in
             return ([], Collection.map ~f:B64.decode msgs)
         end
       | _, Http_format.Json ->

@@ -454,6 +454,7 @@ let concat_string ~sep coll =
   | List ll -> String.concat ~sep ll
   | Array arr | Both (arr, _) -> String.concat_array ~sep arr
   | Queue q ->
+    if Queue.is_empty q then "" else
     let len = Queue.length q in
     let buffer = Bigbuffer.create (len * (String.length sep) * 2) in
     for i = 0 to len - 2 do

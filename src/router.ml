@@ -77,7 +77,8 @@ let write_shared router ~listen_name ~chan ~write ~msgs ~ids =
         let%lwt count = Channel.push chan msgs ids in
         ignore_result (Logger.debug_lazy (lazy (
             sprintf "Wrote: (length: %d) to [%s] from [%s]" count chan.name listen_name
-          )));
+          ))
+        );
         (* Forward to other channels if needed. *)
         let%lwt () = Lwt_list.iter_p (fun forward_chan_name ->
             begin match find_chan router ~listen_name:Listener.(private_listener.id) ~chan_name:forward_chan_name with
@@ -85,8 +86,9 @@ let write_shared router ~listen_name ~chan ~write ~msgs ~ids =
               | Ok forward_chan ->
                 let%lwt forward_count = Channel.push forward_chan msgs ids in
                 if forward_count <> count then async (fun () ->
-                    Logger.warning_lazy (lazy (sprintf "Mismatch while forwarding from [%s] (wrote %d) to [%s] (wrote %d). Possible ID collision(s)" chan.name count forward_chan_name forward_count)
-                    ));
+                    Logger.warning_lazy (lazy (sprintf "Mismatch while forwarding from [%s] (wrote %d) to [%s] (wrote %d). Possible ID collision(s)" chan.name count forward_chan_name forward_count
+                    ))
+                  );
                 return_unit
             end
           ) write.forward

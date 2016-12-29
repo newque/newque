@@ -34,5 +34,5 @@ open Cohttp_lwt_unix
 #require "ocaml-protoc"
 
 #mod_use "src/exception.ml"
-#mod_use "src/util.ml"
 #mod_use "src/collection.ml"
+#mod_use "src/util.ml"

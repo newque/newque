@@ -1,13 +1,12 @@
 open Core.Std
 open Cohttp
 
-type splitter = (string -> string list)
+type splitter = (string -> string list) [@@deriving sexp]
 val make_splitter : sep:string -> splitter
-val split : sep:string -> string -> string list
 
 val parse_int64 : string -> int64 option
 
-val stream_map_collection_s :
+val coll_stream_flatten_map_s :
   batch_size:int ->
   mapper:('a Collection.t -> 'b Collection.t) ->
   'a Collection.t Lwt_stream.t ->
@@ -15,7 +14,7 @@ val stream_map_collection_s :
 
 val stream_to_string :
   buffer_size:int ->
-  ?init:string option ->
+  ?init:string ->
   string Lwt_stream.t ->
   string Lwt.t
 
