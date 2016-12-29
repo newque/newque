@@ -43,12 +43,12 @@ module M = struct
 
   let push instance ~msgs ~ids =
     let open Zmq_obj_pb in
-    let input = { channel = instance.chan_name; action = Write_input { atomic = None; ids = (Array.to_list ids); } } in
+    let input = { channel = instance.chan_name; action = Write_input { atomic = None; ids = (Collection.to_list ids |> snd); } } in
     let encoder = Pbrt.Encoder.create () in
     encode_input input encoder;
     let input = Pbrt.Encoder.to_bytes encoder in
-    let%lwt () = Lwt_zmq.Socket.send_all instance.socket (input::(Array.to_list msgs)) in
-    return (Array.length msgs)
+    let%lwt () = Lwt_zmq.Socket.send_all instance.socket (input::(Collection.to_list msgs |> snd)) in
+    return (Collection.length msgs)
 
   let pull instance ~search ~fetch_last = fail_with "Invalid operation: Pubsub read"
 

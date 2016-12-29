@@ -15,38 +15,17 @@ let parse_int64 str =
   try Some (Int64.of_string str)
   with _ -> None
 
-(* This was rewritten in c/fortran style for efficiency *)
-let zip_group ~size arr1 arr2 =
-  if Array.length arr1 <> Array.length arr2 then
-    fail_with (sprintf "Different array lengths: %d and %d" (Array.length arr1) (Array.length arr2))
-  else
-  let len = Array.length arr1 in
-  let div = len / size in
-  let groups = if div * size = len then div else div + 1 in
-  return (
-    List.init groups ~f:(fun i ->
-      Array.init (Int.min size (len - (i * size))) ~f:(fun j ->
-        (arr1.((i * size) + j), arr2.((i * size) + j))
-      )
-    )
-  )
-
-let array_to_list_rev_mapi ~mapper arr =
-  Array.foldi arr ~init:[] ~f:(fun i acc elt ->
-    (mapper i elt)::acc
-  )
-
 (* An efficient lazy stream flattener *)
-let stream_map_array_s ~batch_size ~mapper arr_stream =
-  let capacity = Int.min batch_size 10000 in (* Sanity check... *)
+let stream_map_collection_s ~batch_size ~mapper coll_stream =
+  let capacity = Int.min batch_size 100000 in (* Sanity check... *)
   let queue = Queue.create ~capacity () in
   Lwt_stream.from (fun () ->
     match Queue.dequeue queue with
     | (Some _) as x -> return x
     | None ->
-      begin match%lwt Lwt_stream.get arr_stream with
-        | Some arr ->
-          Array.iter (mapper arr) ~f:(Queue.enqueue queue);
+      begin match%lwt Lwt_stream.get coll_stream with
+        | Some coll ->
+          Collection.add_to_queue (mapper coll) queue;
           return (Queue.dequeue queue)
         | None -> return_none
       end
@@ -61,7 +40,7 @@ let stream_to_string ~buffer_size ?(init=(Some "")) stream =
   in
   return (Bigbuffer.contents buffer)
 
-let stream_to_array ~splitter ?(init=(Some "")) stream =
+let stream_to_collection ~splitter ?(init=(Some "")) stream =
   let queue = Queue.create () in
   let%lwt (msgs, last) = Lwt_stream.fold_s (fun read ((), leftover) ->
       let chunk = Option.value_map leftover ~default:read ~f:(fun a -> sprintf "%s%s" a read) in
@@ -72,7 +51,7 @@ let stream_to_array ~splitter ?(init=(Some "")) stream =
     ) stream ((), init)
   in
   Option.iter last ~f:(fun raw -> Queue.enqueue queue raw);
-  return (Queue.to_array queue)
+  return (Collection.of_queue queue)
 
 let parse_sync parser str =
   try

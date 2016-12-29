@@ -13,7 +13,7 @@ module M = struct
 
   let push instance ~msgs ~ids = return Int.zero
 
-  let pull instance ~search ~fetch_last = return ([||], None, None)
+  let pull instance ~search ~fetch_last = return (Collection.empty, None, None)
 
   let size instance = return Int64.zero
 

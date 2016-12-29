@@ -48,8 +48,8 @@ let handler zmq routing socket frames =
         begin match input.action with
 
           | Write_input write ->
-            let ids = Array.of_list write.ids in
-            let msgs = Array.of_list msgs in
+            let ids = Collection.of_list write.ids in
+            let msgs = Collection.of_list msgs in
             let atomic = Option.value ~default:false write.atomic in
             let%lwt (errors, saved) =
               begin match%lwt routing.write_zmq ~chan_name ~ids ~msgs ~atomic with
@@ -58,20 +58,20 @@ let handler zmq routing socket frames =
                 | Error errors -> return (errors, (Some 0))
               end
             in
-            return ({ errors; action = Write_output { saved } }, [||])
+            return ({ errors; action = Write_output { saved } }, Collection.empty)
 
           | Read_input read ->
             let%lwt (errors, read_output, messages) = begin match Mode.of_string read.mode with
-              | Error str -> return ([str], invalid_read_output, [||])
+              | Error str -> return ([str], invalid_read_output, Collection.empty)
               | Ok parsed_mode ->
                 begin match Mode.wrap (parsed_mode :> Mode.Any.t) with
                   | `Read mode ->
                     begin match%lwt routing.read_slice ~chan_name ~mode ~limit:read.limit with
-                      | Error errors -> return (errors, invalid_read_output, [||])
+                      | Error errors -> return (errors, invalid_read_output, Collection.empty)
                       | Ok (slice, _) ->
                         let open Persistence in
                         let read_output = {
-                          length = Array.length slice.payloads;
+                          length = Collection.length slice.payloads;
                           last_id = Option.map slice.metadata ~f:(fun m -> m.last_id);
                           last_timens = Option.map slice.metadata ~f:(fun m -> m.last_timens);
                         }
@@ -82,7 +82,7 @@ let handler zmq routing socket frames =
                     return (
                       [sprintf "[%s] is not a valid Reading mode" (Mode.to_string (parsed_mode :> Mode.Any.t))],
                       invalid_read_output,
-                      [||]
+                      Collection.empty
                     )
                 end
             end
@@ -96,7 +96,7 @@ let handler zmq routing socket frames =
                 | Error errors -> return (errors, None)
               end
             in
-            return ({ errors; action = Count_output { count } }, [||])
+            return ({ errors; action = Count_output { count } }, Collection.empty)
 
           | Delete_input ->
             let%lwt errors =
@@ -105,35 +105,37 @@ let handler zmq routing socket frames =
                 | Error errors -> return errors
               end
             in
-            return ({ errors; action = Delete_output }, [||])
+            return ({ errors; action = Delete_output }, Collection.empty)
 
           | Health_input health ->
             let chan_name = if health.global then None else Some chan_name in
             let%lwt errors = routing.health ~chan_name ~mode:`Health in
-            return ({ errors; action = Health_output }, [||])
+            return ({ errors; action = Health_output }, Collection.empty)
 
         end
       with
       | ex ->
         let errors = Exception.human_list ex in
-        return ({ errors; action = Error_output }, [||])
+        return ({ errors; action = Error_output }, Collection.empty)
     end
     in
     let encoder = Pbrt.Encoder.create () in
     encode_output output encoder;
     let reply = Pbrt.Encoder.to_bytes encoder in
-    begin match messages with
-      | [||] -> Lwt_zmq.Socket.send_all socket [header; id; reply]
-      | msgs ->
-        (* TODO: Benchmark this *)
-        Lwt_zmq.Socket.send_all socket (header::id::reply::(Array.to_list messages))
-    end
+    Lwt_zmq.Socket.send_all socket (header::id::reply::(Collection.to_list messages |> snd))
 
   | strs ->
     let printable = Yojson.Basic.to_string (`List (List.map ~f:(fun s -> `String s) strs)) in
     let%lwt () = Logger.warning (sprintf "Received invalid msg parts on %s: %s" zmq.inbound printable) in
-    let error = sprintf "Received invalid msg parts on %s. Expected [id], [input], [msgs...]." zmq.inbound in
-    Lwt_zmq.Socket.send_all socket (strs @ [error])
+    let error =
+      let open Zmq_obj_pb in
+      let errors = [sprintf "Received invalid msg parts on %s. Expected [id], [input], [msgs...]." zmq.inbound] in
+      let output = { errors; action = Error_output } in
+      let encoder = Pbrt.Encoder.create () in
+      encode_output output encoder;
+      Pbrt.Encoder.to_bytes encoder
+    in
+    Lwt_zmq.Socket.send_all socket (error::strs)
 
 let start generic specific routing =
   let open Config_t in

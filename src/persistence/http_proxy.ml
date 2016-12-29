@@ -50,19 +50,25 @@ module M = struct
     (* Body *)
     let payload = match instance.input_format with
       | Http_format.Plaintext ->
-        String.concat_array ~sep:instance.chan_separator (Array.map ~f:B64.encode msgs)
+        let coll = Collection.map ~f:B64.encode msgs in
+        Collection.concat_string ~sep:instance.chan_separator coll
       | Http_format.Json ->
-        string_of_input { atomic = false; messages = msgs; ids = Some ids; }
+        begin match Collection.to_list_or_array msgs with
+          | `List messages ->
+            string_of_input_list { atomic = false; messages; ids = Some (Collection.to_array ids |> snd); }
+          | `Array messages ->
+            string_of_input_array { atomic = false; messages; ids = Some (Collection.to_array ids |> snd); }
+        end
     in
     let body = Cohttp_lwt_body.of_string payload in
 
     (* Headers *)
     let headers = match instance.input_format with
       | Http_format.Plaintext ->
-        let mode_string = if Int.(=) (Array.length ids) 1 then "single" else "multiple" in
+        let mode_string = if Int.(=) (Collection.length ids) 1 then "single" else "multiple" in
         Header.add_list instance.base_headers [
           Header_names.mode, mode_string;
-          Header_names.id, (String.concat_array ~sep:Id.default_separator ids);
+          Header_names.id, (Collection.concat_string ~sep:Id.default_separator ids);
         ]
       | Http_format.Json ->
         Header.add instance.base_headers Header_names.mode "multiple"
@@ -91,19 +97,19 @@ module M = struct
     let%lwt body_str = Cohttp_lwt_body.to_string body in
     let response_headers = Response.headers response in
     let%lwt (errors, messages) = match ((Response.status response), (instance.output_format)) with
-      | `No_content, _ -> return ([], [| |])
+      | `No_content, _ -> return ([], Collection.empty)
       | _, Http_format.Plaintext ->
         begin match Header.get response_headers "content-type" with
           | Some "application/json" ->
             let parsed = errors_of_string body_str in
-            return (parsed.errors, [| |])
+            return (parsed.errors, Collection.empty)
           | _ ->
-            let msgs = Util.split ~sep:instance.chan_separator body_str in
-            return ([], Array.of_list_map ~f:B64.decode msgs)
+            let msgs = Collection.of_list (Util.split ~sep:instance.chan_separator body_str) in
+            return ([], Collection.map ~f:B64.decode msgs)
         end
       | _, Http_format.Json ->
-        let parsed = read_of_string body_str in
-        return (parsed.errors, parsed.messages)
+        let parsed = read_array_of_string body_str in
+        return (parsed.errors, (Collection.of_array parsed.messages))
     in
     match errors with
     | [] ->

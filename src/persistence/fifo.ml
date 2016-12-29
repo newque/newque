@@ -132,11 +132,11 @@ module M = struct
       channel = instance.chan_name;
       action = Write_input {
           atomic = None;
-          ids = (Array.to_list ids);
+          ids = (Collection.to_list ids |> snd);
         }
     }
     in
-    let%lwt (output, _) = handler instance input (Array.to_list msgs) in
+    let%lwt (output, _) = handler instance input (Collection.to_list msgs |> snd) in
     let%lwt write = unwrap_action output.action Write_action "Write_Output" in
     return (Option.value ~default:0 write.saved)
 
@@ -152,17 +152,17 @@ module M = struct
     in
     let%lwt (output, msgs) = handler instance input [] in
     let%lwt read = unwrap_action output.action Read_action "Read_Output" in
-    let arr_msgs = List.to_array msgs in
-    if Int.(<>) read.length (Array.length arr_msgs)
+    let coll_msgs = Collection.of_list msgs in
+    if Int.(<>) read.length (Collection.length coll_msgs)
     then async (fun () ->
-        Logger.warning (sprintf "Lengths don't match: Read [%d] messages, but 'length' is [%d]" read.length (Array.length arr_msgs))
+        Logger.warning (sprintf "Lengths don't match: Read [%d] messages, but 'length' is [%d]" read.length (Collection.length coll_msgs))
       );
     let meta = begin match read with
       | { last_id = Some l_id; last_timens = Some l_ts; } -> Some (l_id, l_ts)
       | _ -> None
     end
     in
-    return (arr_msgs, None, meta)
+    return (coll_msgs, None, meta)
 
   let size instance =
     let input = {

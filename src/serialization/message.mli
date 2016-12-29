@@ -1,10 +1,10 @@
 open Core.Std
 
-type t [@@deriving sexp]
+type t
 
-val of_string_array :
+val of_string_coll :
   atomic:bool ->
-  string array ->
+  string Collection.t ->
   t
 
 val of_string :
@@ -22,9 +22,9 @@ val of_stream :
   string Lwt_stream.t ->
   t Lwt.t
 
-val serialize_full : t -> string array
-val serialize_raw : t -> string array
+val serialize_full : t -> string Collection.t
+val serialize_raw : t -> string Collection.t
 
-val parse_full_exn : string -> string array
+val parse_full_exn : string -> string list
 
 val length : raw:bool -> t -> int

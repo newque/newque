@@ -7,7 +7,7 @@ type slice_metadata = {
 }
 type slice = {
   metadata: slice_metadata option;
-  payloads: string array;
+  payloads: string Collection.t;
 }
 
 module type Template = sig
@@ -15,12 +15,12 @@ module type Template = sig
 
   val close : t -> unit Lwt.t
 
-  val push : t -> msgs:string array -> ids:string array -> int Lwt.t
+  val push : t -> msgs:string Collection.t -> ids:string Collection.t -> int Lwt.t
 
   val pull : t -> search:Search.t -> fetch_last:bool ->
     (* Returns the last rowid as first option *)
     (* Returns the last id and timens as second option if fetch_last is true *)
-    (string array * int64 option * (string * int64) option) Lwt.t
+    (string Collection.t * int64 option * (string * int64) option) Lwt.t
 
   val delete : t -> unit Lwt.t
 
@@ -42,7 +42,7 @@ module type S = sig
 
   val ready : unit -> unit Lwt.t
 
-  val push : Message.t -> Id.t array -> int Lwt.t
+  val push : Message.t -> Id.t Collection.t -> int Lwt.t
 
   val pull_slice : int64 -> mode:Mode.Read.t -> only_once:bool -> slice Lwt.t
 
@@ -82,17 +82,23 @@ module Make (Argument: Argument) : S = struct
       fun msgs ids ->
         let%lwt instance = instance in
         Argument.IO.push instance ~msgs ~ids
+
     | Some { max_time; max_size = 1; _ } ->
       (* Special case optimization *)
       fun msgs ids ->
         let%lwt instance = instance in
-        let threads = Util.array_to_list_rev_mapi msgs ~mapper:(fun i msg ->
-            let%lwt _ = Argument.IO.push instance ~msgs:[| msg |] ~ids:[| Array.get ids i |] in
+        let threads =
+          Collection.to_list_mapi_two msgs ids ~f:(fun i msg id ->
+            let msgs = Collection.singleton msg in
+            let ids = Collection.singleton id in
+            let%lwt _ = Argument.IO.push instance ~msgs ~ids in
             return_unit
           )
+          |> snd
         in
         let%lwt () = join threads in
-        return (Array.length msgs)
+        return (Collection.length msgs)
+
     | Some { max_time; max_size; _ } ->
       let batcher = Batcher.create ~max_time ~max_size ~handler:(fun msgs ids ->
           let%lwt instance = instance in
@@ -101,7 +107,7 @@ module Make (Argument: Argument) : S = struct
       in
       fun msgs ids ->
         let%lwt () = Batcher.submit batcher msgs ids in
-        return (Array.length msgs)
+        return (Collection.length msgs)
 
   let push msgs ids =
     let msgs = fast_serialize msgs in
@@ -114,7 +120,9 @@ module Make (Argument: Argument) : S = struct
     match Argument.raw with
     | true -> Fn.id
     | false ->
-      fun raw_payloads -> Array.concat_map raw_payloads ~f:Message.parse_full_exn
+      fun raw_payloads ->
+        Collection.to_list_concat_map raw_payloads ~f:Message.parse_full_exn
+        |> fst
 
   let pull_slice max_read ~mode ~only_once =
     let%lwt instance = instance in
@@ -147,9 +155,9 @@ module Make (Argument: Argument) : S = struct
             | (Some rowid), _ -> Some [|`After_rowid rowid|]
             | _, Some (last_id, _) -> Some [|`After_id last_id|]
           in
-          if Array.is_empty payloads
+          if Collection.is_empty payloads
           then return_none else
-          let payloads_count = Int.to_int64 (Array.length payloads) in
+          let payloads_count = Int.to_int64 (Collection.length payloads) in
           left := Int64.(-) !left payloads_count;
           next_search := begin match filter with
             | None ->
@@ -169,7 +177,7 @@ module Make (Argument: Argument) : S = struct
         )
       in
       let batch_size = Option.value (Int64.to_int Argument.stream_slice_size) ~default:Int.max_value in
-      Util.stream_map_array_s raw_stream ~batch_size ~mapper:fast_parse_exn
+      Util.stream_map_collection_s raw_stream ~batch_size ~mapper:fast_parse_exn
     ) instance max_read mode only_once
 
   (******************

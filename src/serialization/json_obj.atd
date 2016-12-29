@@ -1,7 +1,13 @@
 (* HTTP Request body JSON objects *)
-type input = {
+type input_array = {
   ~atomic <ocaml default="false">: bool;
   messages: string list <ocaml repr="array">;
+  ?ids: string list <ocaml repr="array"> option;
+}
+
+type input_list = {
+  ~atomic <ocaml default="false">: bool;
+  messages: string list;
   ?ids: string list <ocaml repr="array"> option;
 }
 
@@ -17,10 +23,16 @@ type write = {
   ~saved: int nullable;
 }
 
-type read = {
+type read_array = {
   code: int;
   errors: string list;
   messages: string list <ocaml repr="array">;
+}
+
+type read_list = {
+  code: int;
+  errors: string list;
+  messages: string list;
 }
 
 type count = {

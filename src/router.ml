@@ -69,7 +69,7 @@ let all_channels router =
 let write_shared router ~listen_name ~chan ~write ~msgs ~ids =
   let open Channel in
   let open Write_settings in
-  begin match ((Message.length ~raw:chan.raw msgs), (Array.length ids)) with
+  begin match ((Message.length ~raw:chan.raw msgs), (Collection.length ids)) with
     | (0, _) -> return (Error [sprintf "Nothing to write"])
     | (msgs_l, ids_l) when Int.(<>) msgs_l ids_l -> return (Error [sprintf "Length mismatch between messages [%d] and IDs [%d]" msgs_l ids_l])
     | _ ->
@@ -118,24 +118,24 @@ let write_http router ~listen_name ~chan_name ~id_header ~mode stream =
           | Http_format.Json ->
             let%lwt str = Util.stream_to_string ~buffer_size:chan.buffer_size stream in
             let open Json_obj_j in
-            begin match Util.parse_sync input_of_string str with
+            begin match Util.parse_sync input_array_of_string str with
               | (Error _) as err ->
-                let dummy = Message.of_string_array ~atomic:false [||] in
+                let dummy = Message.of_string_coll ~atomic:false Collection.empty in
                 return (dummy, err)
               | Ok { atomic; messages; ids } ->
-                let msgs = Message.of_string_array ~atomic messages in
+                let msgs = Message.of_string_coll ~atomic (Collection.of_array messages) in
                 let mode = if Bool.(=) atomic true then `Atomic else `Multiple in
                 begin match ids with
-                  | Some ids -> return (msgs, Ok ids)
+                  | Some ids -> return (msgs, Ok (Collection.of_array ids))
                   | None ->
                     let length_none = Message.length ~raw:chan.raw msgs in
-                    return (msgs, (Id.array_of_string_opt ~mode ~length_none None))
+                    return (msgs, (Id.coll_of_string_opt ~mode ~length_none None))
                 end
             end
           | Http_format.Plaintext ->
             let%lwt msgs = Message.of_stream ~format:write.http_format ~mode ~splitter:chan.splitter ~buffer_size:chan.buffer_size stream in
             let length_none = Message.length ~raw:chan.raw msgs in
-            let ids = Id.array_of_string_opt ~mode ~length_none id_header in
+            let ids = Id.coll_of_string_opt ~mode ~length_none id_header in
             return (msgs, ids)
         end
         in
@@ -153,8 +153,8 @@ let write_zmq router ~listen_name ~chan_name ~ids ~msgs ~atomic =
     begin match chan.write with
       | None -> return (Error [sprintf "Channel [%s] doesn't support Writing to it" chan_name])
       | Some write ->
-        let msgs = Message.of_string_array ~atomic msgs in
-        let ids = if Array.is_empty ids then Id.array_random (Message.length ~raw:chan.raw msgs) else ids in
+        let msgs = Message.of_string_coll ~atomic msgs in
+        let ids = if Collection.is_empty ids then Id.coll_random (Message.length ~raw:chan.raw msgs) else ids in
         write_shared router ~listen_name ~chan ~write ~msgs ~ids
     end
 
@@ -177,7 +177,7 @@ let read_slice router ~listen_name ~chan_name ~mode ~limit =
         in
         let%lwt slice = Channel.pull_slice chan ~mode ~limit ~only_once:read.Read_settings.only_once in
         ignore_result (Logger.debug_lazy (lazy (
-            sprintf "Read: (size: %d) [%s] from [%s]" (Array.length slice.Persistence.payloads) chan_name listen_name
+            sprintf "Read: (size: %d) [%s] from [%s]" (Collection.length slice.Persistence.payloads) chan_name listen_name
           )));
         return (Ok (slice, chan))
     end

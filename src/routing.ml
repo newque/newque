@@ -5,6 +5,8 @@ type admin_routing = {
   channels_by_name: string option -> Yojson.Basic.json Lwt.t;
 }
 
+(* Routing Return value type *)
+
 type standard_routing = {
   write_http: (
     chan_name:string ->
@@ -14,8 +16,8 @@ type standard_routing = {
     (int option, string list) Result.t Lwt.t);
   write_zmq: (
     chan_name:string ->
-    ids:string array ->
-    msgs:string array ->
+    ids:string Collection.t ->
+    msgs:string Collection.t ->
     atomic:bool ->
     (int option, string list) Result.t Lwt.t);
   read_slice: (

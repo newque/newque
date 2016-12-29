@@ -48,10 +48,6 @@ type config_listener = {
 
 
 (* BACKENDS *)
-type config_local = {
-  ~insert_batch_size <json name="insertBatchSize"><ocaml default="1000">: int;
-}
-
 type config_redis = {
   host <json name="host">: string;
   port <json name="port">: int;
@@ -88,8 +84,8 @@ type config_elasticsearch = {
 
 type config_backend = [
   | None <json name="none">
-  | Memory <json name="memory"> of config_local
-  | Disk <json name="disk"> of config_local
+  | Memory <json name="memory">
+  | Disk <json name="disk">
   | Http_proxy <json name="httpproxy"> of config_httpproxy
   | Pubsub <json name="pubsub"> of config_pubsub
   | Fifo <json name="fifo"> of config_fifo

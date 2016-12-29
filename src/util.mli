@@ -7,10 +7,10 @@ val split : sep:string -> string -> string list
 
 val parse_int64 : string -> int64 option
 
-val stream_map_array_s :
+val stream_map_collection_s :
   batch_size:int ->
-  mapper:('a array -> 'b array) ->
-  'a array Lwt_stream.t ->
+  mapper:('a Collection.t -> 'b Collection.t) ->
+  'a Collection.t Lwt_stream.t ->
   'b Lwt_stream.t
 
 val stream_to_string :
@@ -19,15 +19,11 @@ val stream_to_string :
   string Lwt_stream.t ->
   string Lwt.t
 
-val stream_to_array :
+val stream_to_collection :
   splitter:splitter ->
   ?init:string option ->
   string Lwt_stream.t ->
-  string array Lwt.t
-
-val zip_group : size:int -> 'a array -> 'b array -> ('a * 'b) array list Lwt.t
-
-val array_to_list_rev_mapi : mapper:(int -> 'a -> 'b) -> 'a array -> 'b list
+  string Collection.t Lwt.t
 
 val parse_sync : ('a -> 'b) -> 'a -> ('b, string) Result.t
 

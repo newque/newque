@@ -35,17 +35,25 @@ module M = struct
   let push instance ~msgs ~ids =
     let open Json_obj_j in
     let uri = Http_tools.append_to_path (get_base instance) (sprintf "%s/_bulk" instance.index) in
-    let bulk_format = Array.concat_mapi msgs ~f:(fun i msg ->
+
+    let bulk_format = Collection.concat_mapi_two msgs ids ~f:(fun i msg id ->
         let json = `Assoc [
             "index", `Assoc [
               "_index", `String instance.index;
               "_type", `String instance.typename;
-              "_id", `String (Array.get ids i);
+              "_id", `String id;
             ]
-          ] in
-        [| Yojson.Basic.to_string json; "\n"; msg; "\n" |]
-      ) in
-    let body = Cohttp_lwt_body.of_stream (Lwt_stream.of_array bulk_format) in
+          ]
+        in
+        [ Yojson.Basic.to_string json; "\n"; msg; "\n" ]
+      )
+    in
+    let stream = match Collection.to_list_or_array bulk_format with
+      | `List bulk -> Lwt_stream.of_list bulk
+      | `Array bulk -> Lwt_stream.of_array bulk
+    in
+    let body = Cohttp_lwt_body.of_stream stream in
+
     let%lwt (response, body) = Http_tools.call ~body ~chunked:false ~timeout:instance.timeout `POST uri in
     let%lwt body_str = Cohttp_lwt_body.to_string body in
     let open Yojson.Basic.Util in

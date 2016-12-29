@@ -5,7 +5,7 @@ type t = {
   conf_channel: Config_t.config_channel;
   name: string;
   endpoint_names: string list;
-  push: Message.t -> Id.t array -> int Lwt.t;
+  push: Message.t -> Id.t Collection.t -> int Lwt.t;
   pull_slice: int64 -> mode:Mode.Read.t -> only_once:bool -> Persistence.slice Lwt.t;
   pull_stream: int64 -> mode:Mode.Read.t -> only_once:bool -> string Lwt_stream.t Lwt.t;
   size: unit -> int64 Lwt.t;
@@ -40,28 +40,26 @@ let create name conf_channel =
       end in
       (module Persistence.Make (Arg) : Persistence.S)
 
-    | `Memory memory ->
+    | `Memory ->
       let module Arg = struct
         module IO = Local.M
         let create () = Local.create
             ~file:":memory:"
             ~chan_name:name
             ~avg_read:conf_channel.avg_read
-            ~insert_batch_size:memory.insert_batch_size
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
         let batching = batching
       end in
       (module Persistence.Make (Arg) : Persistence.S)
 
-    | `Disk disk ->
+    | `Disk ->
       let module Arg = struct
         module IO = Local.M
         let create () = Local.create
             ~file:(sprintf "%s%s.data" Fs.data_chan_dir name)
             ~chan_name:name
             ~avg_read:conf_channel.avg_read
-            ~insert_batch_size:disk.insert_batch_size
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
         let batching = batching

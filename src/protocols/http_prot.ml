@@ -145,11 +145,11 @@ let handler http routing ((ch, _) as conn) req body =
                 let headers = match slice.metadata with
                   | None ->
                     Header.add_list (Header.init ()) [
-                      (Header_names.length, Int.to_string (Array.length payloads));
+                      (Header_names.length, Int.to_string (Collection.length payloads));
                     ]
                   | Some metadata ->
                     Header.add_list (Header.init ()) [
-                      (Header_names.length, Int.to_string (Array.length payloads));
+                      (Header_names.length, Int.to_string (Collection.length payloads));
                       (Header_names.last_id, metadata.last_id);
                       (Header_names.last_ts, (Int64.to_string metadata.last_timens));
                     ]
@@ -160,15 +160,20 @@ let handler http routing ((ch, _) as conn) req body =
                     let err = sprintf "Impossible case: Missing readSettings for channel [%s]" chan_name in
                     async (fun () -> Logger.error err);
                     let headers = Header.add headers "content-type" "application/json" in
-                    let body = Json_obj_j.(string_of_read { code = 500; errors = [err]; messages = [| |]; }) in
+                    let body = Json_obj_j.(string_of_read_list { code = 500; errors = [err]; messages = []; }) in
                     (body, headers)
                   | Some { http_format = Http_format.Plaintext } ->
                     let headers = Header.add headers "content-type" "application/octet-stream" in
-                    let body = String.concat_array ~sep:channel.Channel.conf_channel.Config_t.separator payloads in
+                    let body = Collection.concat_string ~sep:channel.Channel.conf_channel.Config_t.separator payloads in
                     (body, headers)
                   | Some { http_format = Http_format.Json } ->
                     let headers = Header.add headers "content-type" "application/json" in
-                    let body = Json_obj_j.(string_of_read { code; errors = []; messages = payloads; }) in
+                    let body = match Collection.to_list_or_array payloads with
+                      | `List messages ->
+                        Json_obj_j.(string_of_read_list { code; errors = []; messages; })
+                      | `Array messages ->
+                        Json_obj_j.(string_of_read_array { code; errors = []; messages; })
+                    in
                     (body, headers)
                 in
                 let encoding = Transfer.Fixed (Int.to_int64 (String.length body)) in

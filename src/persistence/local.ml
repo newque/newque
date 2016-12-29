@@ -8,11 +8,10 @@ type local_t = {
   file: string;
   chan_name: string;
   avg_read: int;
-  insert_batch_size: int;
   mutex: Lwt_mutex.t sexp_opaque;
 } [@@deriving sexp]
 
-let create ~file ~chan_name ~avg_read ~insert_batch_size =
+let create ~file ~chan_name ~avg_read =
   let mutex = Lwt_mutex.create () in
   let%lwt () = Logger.info (sprintf "[%s] Initializing %s." chan_name file) in
   let%lwt db = try%lwt
@@ -30,7 +29,6 @@ let create ~file ~chan_name ~avg_read ~insert_batch_size =
     file;
     chan_name;
     avg_read;
-    insert_batch_size;
     mutex;
   }
   in
@@ -62,7 +60,7 @@ module M = struct
             "[%s] Failed to restart %s. %s" instance.chan_name instance.file (Exception.full ex)
         )
     in
-    create ~file:instance.file ~chan_name:instance.chan_name ~avg_read:instance.avg_read ~insert_batch_size:instance.insert_batch_size
+    create ~file:instance.file ~chan_name:instance.chan_name ~avg_read:instance.avg_read
 
   let handle_failure instance ex ~errstr =
     let%lwt () = Logger.error errstr in
@@ -73,7 +71,7 @@ module M = struct
   let push instance ~msgs ~ids =
     Lwt_mutex.with_lock instance.mutex (fun () ->
       try%lwt
-        Sqlite.push instance.db ~msgs ~ids ~insert_batch_size:instance.insert_batch_size
+        Sqlite.push instance.db ~msgs ~ids
       with
       | ex ->
         handle_failure instance ex ~errstr:(sprintf

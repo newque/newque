@@ -8,9 +8,8 @@ val close : t -> unit Lwt.t
 
 val push :
   t ->
-  msgs:string array ->
-  ids:string array ->
-  insert_batch_size:int ->
+  msgs:string Collection.t ->
+  ids:string Collection.t ->
   int Lwt.t
 
 (* See comments in Persistence *)
@@ -18,7 +17,7 @@ val pull :
   t ->
   search:Search.t ->
   fetch_last:bool ->
-  (string array * int64 option * (string * int64) option) Lwt.t
+  (string Collection.t * int64 option * (string * int64) option) Lwt.t
 
 val size : t -> int64 Lwt.t
 

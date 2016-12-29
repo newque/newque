@@ -79,7 +79,7 @@ type _ repr =
   | FInt64 : int64 repr
   | Wrapped : Data.t array repr
 
-let query : type a. t -> ?retry:int -> destroy:bool -> S3.stmt * string -> a repr -> (a array * int64 option) Lwt.t =
+let query : type a. t -> ?retry:int -> destroy:bool -> S3.stmt * string -> a repr -> (a Collection.t * int64 option) Lwt.t =
   fun db ?(retry=default_retries) ~destroy (stmt, sql) repr ->
     Lwt_preemptive.detach (fun () ->
       async (fun () -> Logger.debug (sprintf "Querying %s" sql));
@@ -127,7 +127,7 @@ let query : type a. t -> ?retry:int -> destroy:bool -> S3.stmt * string -> a rep
           failwith (sprintf "Querying failed with code [%s] [%s]" (Rc.to_string code) (S3.errmsg db.db))
       in
       let last_rowid = run 1 None in
-      ((Queue.to_array queue), last_rowid)
+      ((Collection.of_queue queue), last_rowid)
     ) ()
 
 let transaction db ~destroy ?query stmts =
@@ -169,7 +169,7 @@ let bind ?(retry=default_retries) stmt args =
       | code ->
         failwith (sprintf "Bind failed with code [%s]" (Rc.to_string code))
     in
-    Array.iter ~f:(fun (i, arg) -> run i arg 1) args
+    Collection.iter ~f:(fun (i, arg) -> run i arg 1) args
   ) ()
 
 (***********
@@ -255,25 +255,19 @@ let close db =
   in
   aux 0
 
-let push db ~msgs ~ids ~insert_batch_size =
+let push db ~msgs ~ids =
   let time = Util.time_ns_int64 () in
-  let make_stmt slice =
-    let%lwt (st, _) as stmt = prepare db.db (insert_sql (Array.length slice)) in
-    let args = Array.concat_mapi slice ~f:(fun i (raw, id) ->
+  let%lwt stmt =
+    let%lwt (st, _) as stmt = prepare db.db (insert_sql (Collection.length msgs)) in
+    let args = Collection.concat_mapi_two msgs ids ~f:(fun i raw id ->
         let pos = i * 3 in
-        [| ((pos + 1), Data.BLOB id); ((pos + 2), Data.INT time); ((pos + 3), Data.BLOB raw) |]
+        [ ((pos + 1), Data.BLOB id); ((pos + 2), Data.INT time); ((pos + 3), Data.BLOB raw) ]
       )
     in
     let%lwt () = bind st args in
     return stmt
   in
-  match%lwt Util.zip_group ~size:insert_batch_size msgs ids with
-  | (group::[]) ->
-    let%lwt stmt = make_stmt group in
-    execute db ~destroy:true stmt
-  | groups ->
-    let%lwt stmts = Lwt_list.map_s make_stmt groups in
-    transaction db ~destroy:true stmts
+  execute db ~destroy:true stmt
 
 let make_args filters =
   Array.mapi filters ~f:(fun i filter ->
@@ -286,11 +280,12 @@ let make_args filters =
 
 let fetch_last_row db ~rowid =
   let (st, sql) as stmt = db.stmts.last_row in
-  let args = [| (1, Data.INT rowid) |] in
+  let args = Collection.singleton (1, Data.INT rowid) in
   let%lwt () = bind st args in
-  match%lwt query db ~destroy:false stmt FBlobInt64 with
-  | [| x |], _ -> return x
-  | dataset, _ -> fail_with (sprintf "Last_row failed (dataset size: %d) for %s" (Array.length dataset) sql)
+  let%lwt result, _ = query db ~destroy:false stmt FBlobInt64 in
+  match Collection.first result with
+  | Some x -> return x
+  | None -> fail_with "Last_row failed (empty dataset)"
 
 let pull db ~search ~fetch_last =
   let open Search in
@@ -301,15 +296,15 @@ let pull db ~search ~fetch_last =
     (* Add tag *)
     let%lwt (st, _) as stmt = prepare db.db (add_tag_sql ~search) in
     let args = make_args (Array.append [| `Tag tag |] search.filters) in
-    let%lwt () = bind st args in
+    let%lwt () = bind st (Collection.of_array args) in
     let%lwt cnt1 = execute db ~destroy:true stmt in
 
     (* Select tag *)
     let%lwt (st, _) as stmt = prepare db.db read_tag_sql in
     let args = make_args [| `Tag tag |] in
-    let%lwt () = bind st args in
+    let%lwt () = bind st (Collection.of_array args) in
     let%lwt (rows, last_rowid) = query db ~destroy:false stmt FBlobRowid in
-    let cnt2 = Array.length rows in
+    let cnt2 = Collection.length rows in
 
     (* Get last row if necessary *)
     let%lwt last_row_data = begin match (fetch_last, last_rowid) with
@@ -322,7 +317,7 @@ let pull db ~search ~fetch_last =
     (* Delete tag *)
     let%lwt (st, _) as stmt = prepare db.db delete_tag_sql in
     let args = make_args [| `Tag tag |] in
-    let%lwt () = bind st args in
+    let%lwt () = bind st (Collection.of_array args) in
     let%lwt cnt3 = execute db ~destroy:false stmt in
 
     if cnt1 <> cnt2 || cnt2 <> cnt3 then
@@ -336,7 +331,7 @@ let pull db ~search ~fetch_last =
     (* Just SELECT *)
     let%lwt (st, _) as stmt = prepare db.db (read_sql ~search) in
     let args = make_args search.filters in
-    let%lwt () = bind st args in
+    let%lwt () = bind st (Collection.of_array args) in
     let%lwt (rows, last_rowid) = query db ~destroy:true stmt FBlobRowid in
 
     (* Get last row if necessary *)
@@ -350,9 +345,10 @@ let pull db ~search ~fetch_last =
 
 let size db =
   let (_, sql) as stmt = db.stmts.count in
-  match%lwt query db ~destroy:false stmt FInt64 with
-  | [| x |], _ -> return x
-  | dataset, _ -> fail_with (sprintf "Count failed (dataset size: %d)" (Array.length dataset))
+  let%lwt result, _ = query db ~destroy:false stmt FInt64 in
+  match Collection.first result with
+  | Some x -> return x
+  | None -> fail_with "Count failed (empty dataset)"
 
 let delete db =
   let (_, sql) as stmt = db.stmts.truncate in
@@ -361,11 +357,8 @@ let delete db =
 
 let health db =
   let (_, sql) as stmt = db.stmts.quick_check in
-  match%lwt query db ~destroy:false stmt FText with
-  | [| "ok" |], _ -> return []
-  | [| str |], _ -> return [sprintf "Local Health failure: %s" str]
-  | dataset, _ -> fail_with (
-      sprintf
-        "Health failed (dataset size: %d) with %s"
-        (Array.length dataset) (String.concat_array ~sep:", " dataset)
-    )
+  let%lwt result, _ = query db ~destroy:false stmt FText in
+  match Collection.first result with
+  | Some "ok" -> return []
+  | Some str -> return [sprintf "Local Health failure: %s" str]
+  | None -> fail_with "Health failed (empty dataset)"

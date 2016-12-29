@@ -7,11 +7,11 @@ val uuid_bytes : unit -> string
 
 val default_separator : string
 
-val array_random : int -> t array
+val coll_random : int -> t Collection.t
 
-val array_of_string_opt :
+val coll_of_string_opt :
   ?sep:string ->
   mode:Mode.Write.t ->
   length_none:int ->
   string option ->
-  (t array, string) Result.t
+  (t Collection.t, string) Result.t

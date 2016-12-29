@@ -2,21 +2,21 @@ open Core.Std
 open Lwt
 
 type ('a, 'b, 'c) t = {
-  lefts: 'a Queue.t;
-  rights: 'b Queue.t;
+  mutable lefts: 'a Queue.t;
+  mutable rights: 'b Queue.t;
   max_time: float; (* milliseconds *)
   max_size: int;
-  handler: 'a array -> 'b array -> 'c Lwt.t;
-  mutable thread: 'c Lwt.t sexp_opaque;
-  mutable wake: 'c Lwt.u sexp_opaque;
+  handler: 'a Collection.t -> 'b Collection.t -> 'c Lwt.t;
+  mutable thread: 'c Lwt.t;
+  mutable wake: 'c Lwt.u;
   mutable last_flush: float;
-} [@@deriving sexp]
+}
 
 let get_data batcher =
-  let lefts = Queue.to_array batcher.lefts in
-  let rights = Queue.to_array batcher.rights in
-  Queue.clear batcher.lefts;
-  Queue.clear batcher.rights;
+  let lefts = Collection.of_queue batcher.lefts in
+  let rights = Collection.of_queue batcher.rights in
+  batcher.lefts <- Queue.create ~capacity:batcher.max_size ();
+  batcher.rights <- Queue.create ~capacity:batcher.max_size ();
   (lefts, rights)
 
 let do_flush batcher =
@@ -68,16 +68,17 @@ let discard thread =
   return_unit
 
 let submit batcher left_arr right_arr =
-  let threads = Array.foldi left_arr ~init:[] ~f:(fun i acc elt ->
-      Queue.enqueue batcher.lefts elt;
-      Queue.enqueue batcher.rights (Array.get right_arr i);
+  let threads = Collection.to_list_concat_mapi_two left_arr right_arr ~f:(fun i left right ->
+      Queue.enqueue batcher.lefts left;
+      Queue.enqueue batcher.rights right;
       if (Int.(=) (length batcher) batcher.max_size)
       then
         let bound = discard batcher.thread in
         ignore (do_flush batcher);
-        (bound::acc)
-      else acc
+        [bound]
+      else []
     )
+                |> snd
   in
   let threads = if List.is_empty threads then [discard batcher.thread] else threads in
   join threads

@@ -18,7 +18,7 @@ val write_shared :
   chan:Channel.t ->
   write:Write_settings.t ->
   msgs:Message.t ->
-  ids:Id.t array ->
+  ids:Id.t Collection.t ->
   (int option, string list) Result.t Lwt.t
 
 val write_http :
@@ -34,8 +34,8 @@ val write_zmq :
   t ->
   listen_name:string ->
   chan_name:string ->
-  ids:string array ->
-  msgs:string array ->
+  ids:string Collection.t ->
+  msgs:string Collection.t ->
   atomic:bool ->
   (int option, string list) Result.t Lwt.t
 

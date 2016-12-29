@@ -187,15 +187,11 @@ The `none` Backend does not have a `backendSettings` object.
 
 __`memory` `backendSettings` Object__
 
-| Property | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `insertBatchSize` | Integer | No | 1000 | Number of messages to write at a time. This is strictly a performance optimization, it has no effect on safety. In general, for smaller messages, set to a high value. |
+The `none` Backend does not have a `backendSettings` object.
 
 __`disk` `backendSettings` Object__
 
-| Property | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `insertBatchSize` | Integer | No | 1000 | Number of messages to write at a time. This is strictly a performance optimization, it has no effect on safety. In general, for smaller messages, set to a high value. |
+The `none` Backend does not have a `backendSettings` object.
 
 __`httpproxy` `backendSettings` Object__
 

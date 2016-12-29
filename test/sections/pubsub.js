@@ -86,6 +86,7 @@ module.exports = function (backend, backendSettings, raw) {
 
             var receivedIds = decoded.write_input.ids.map(x => x.toString('utf8'))
             var receivedMsg = msg.toString('utf8')
+            Fn.assert(receivedIds.length === 1)
             Fn.assert(receivedIds[0] === 'id' + receivedMsg)
             var splitBuf = buf.split('\n')
 
