@@ -393,7 +393,7 @@ let make_stack coll =
           mut := tail;
           v
         | [] ->
-          failwith "Collection: concat_mapi_two impossible case"
+          failwith "Collection: make_stack impossible case"
       end
   | Array arr | Both (arr, _) ->
     fun () ->
@@ -453,8 +453,15 @@ let concat_string ~sep coll =
   match apply_maps coll with
   | List ll -> String.concat ~sep ll
   | Array arr | Both (arr, _) -> String.concat_array ~sep arr
-  (* TODO: Optimize the Queue case *)
-  | Queue q -> String.concat_array ~sep (Queue.to_array q)
+  | Queue q ->
+    let len = Queue.length q in
+    let buffer = Bigbuffer.create (len * (String.length sep) * 2) in
+    for i = 0 to len - 2 do
+      Bigbuffer.add_string buffer (Queue.get q i);
+      Bigbuffer.add_string buffer sep;
+    done;
+    Bigbuffer.add_string buffer (Queue.get q (len - 1));
+    Bigbuffer.contents buffer
 
 let to_list_or_array coll =
   match apply_maps coll with

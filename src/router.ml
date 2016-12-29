@@ -89,7 +89,8 @@ let write_shared router ~listen_name ~chan ~write ~msgs ~ids =
                     ));
                 return_unit
             end
-          ) write.forward in
+          ) write.forward
+        in
         return (Ok (Some count))
       in
       begin match write.ack with
