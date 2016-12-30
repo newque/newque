@@ -85,7 +85,7 @@ let write_shared router ~listen_name ~chan ~write ~msgs ~ids =
               | Error _ -> Logger.warning_lazy (lazy (sprintf "Cannot forward from [%s] to [%s] because [%s] doesn't exist" chan.name forward_chan_name forward_chan_name))
               | Ok forward_chan ->
                 let%lwt forward_count = Channel.push forward_chan msgs ids in
-                if forward_count <> count then async (fun () ->
+                if Int.(<>) forward_count count then async (fun () ->
                     Logger.warning_lazy (lazy (sprintf "Mismatch while forwarding from [%s] (wrote %d) to [%s] (wrote %d). Possible ID collision(s)" chan.name count forward_chan_name forward_count
                     ))
                   );
@@ -97,7 +97,9 @@ let write_shared router ~listen_name ~chan ~write ~msgs ~ids =
       in
       begin match write.ack with
         | Saved -> save_t
-        | Instant -> return (Ok None)
+        | Instant ->
+          async (fun () -> save_t);
+          return (Ok None)
       end
   end
 
