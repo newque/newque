@@ -18,20 +18,22 @@ let submit connector uid outbound =
   fun () ->
     try%lwt
       pick [thread; Lwt_unix.timeout connector.expiration]
-    with
-    | Lwt_unix.Timeout ->
+    with ex ->
       String.Table.remove connector.table uid;
-      let ex = Upstream_error (sprintf "No response from upstream [ZMQ %s] within %F seconds"
+      match ex with
+      | Lwt_unix.Timeout ->
+        let error = Upstream_error (
+            sprintf "No response from upstream [ZMQ %s] within %F seconds"
             outbound connector.expiration
-        )
-      in
-      fail ex
+          )
+        in
+        fail error
 
 let resolve connector uid obj =
   match String.Table.find_and_remove connector.table uid with
   | None ->
-    let ex = Upstream_error (sprintf "Unknown UID received: %s" uid) in
-    fail ex
+    let error = Upstream_error (sprintf "Unknown UID received: %s" uid) in
+    fail error
   | Some wakener ->
     wakeup_later wakener obj;
     return_unit
