@@ -8,7 +8,7 @@
   },
   "writeSettings": {
     "acknowledgement": "none",
-    "forward": ["sink"]
+    "forward": []
   },
   "emptiable": true
 }

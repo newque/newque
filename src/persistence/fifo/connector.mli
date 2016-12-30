@@ -1,5 +1,7 @@
 open Core.Std
 
+exception Upstream_error of string
+
 type 'a t [@@deriving sexp]
 
 val create : float -> 'a t

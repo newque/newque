@@ -4,7 +4,7 @@ var protobuf = require("protocol-buffers")
 var specs = protobuf(fs.readFileSync('../protobuf/zmq_obj.proto'))
 
 var zmq = require('zmq')
-var addrUpstream = 'tcp://127.0.0.1:8007'
+var addrUpstream = 'tcp://127.0.0.1:8008'
 var addrClient = 'tcp://127.0.0.1:8005'
 var upstream = zmq.socket('dealer')
 upstream.connect(addrUpstream)
@@ -77,7 +77,7 @@ for (var i = 0; i < batchesSent; i++) {
   }
 
   var input = specs.Input.encode({
-    channel: 'example_fifo',
+    channel: 'example_bench',
     write_input: {
       atomic: false,
       ids: ids

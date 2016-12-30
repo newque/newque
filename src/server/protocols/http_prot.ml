@@ -3,7 +3,7 @@ open Lwt
 open Cohttp
 open Cohttp_lwt_unix
 
-module Logger = Log.Make (struct let path = Log.outlog let section = "Http" end)
+module Logger = Log.Make (struct let section = "Http" end)
 
 type t = {
   generic: Config_t.config_listener;
@@ -83,7 +83,6 @@ let handle_errors code errors =
 
 let handler http routing ((ch, _) as conn) req body =
   let open Routing in
-  (* async (fun () -> Logger.warning_lazy (lazy (Util.string_of_sexp (Request.sexp_of_t req)))); *)
   let%lwt http = http in
   try%lwt
     begin match%lwt default_filter conn req body with
@@ -227,7 +226,7 @@ let open_sockets = Int.Table.create ~size:5 ()
 
 let make_socket ~backlog host port =
   let open Lwt_unix in
-  let%lwt () = Logger.notice (sprintf "Creating a new TCP socket on %s:%d" host port) in
+  let%lwt () = Logger.info (sprintf "Creating a new TCP socket on %s:%d" host port) in
   let%lwt info = Lwt_unix.getaddrinfo host "0" [AI_PASSIVE; AI_SOCKTYPE SOCK_STREAM] in
   let%lwt (sockaddr, ip) = match List.hd info with
     | Some {ai_addr = (ADDR_UNIX _)} -> fail_with "Cant listen to TCP on a domain socket"

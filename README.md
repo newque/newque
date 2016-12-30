@@ -47,8 +47,8 @@ newque/
 │   ├── channels/
 │   │   └── mychannel.data
 ├── logs/
-│   ├── channels/
-│   └── out.log
+│   ├── out.log
+│   └── err.log
 ├── lib/
 │   ├── libev.so.4
 │   ├── libsqlite3.so.0
@@ -72,6 +72,17 @@ __Raw__
 
 A Channel can enable the option `raw`. Atomics don't exist in this mode. Performance is marginally better for all non-atomic messages. The ElasticSearch backend requires this option to be enabled.
 
+## Logging
+
+Verbosity is configurable using the `logLevel` settings in `newque.json`.
+
+There are six levels, from the most to the least verbose, they are: `debug`, `info`, `notice`, `warning`, `error` and `fatal`.
+
+The recommended level for production usage is `info`.
+
+Levels `debug`, `info` and `notice` are written to STDOUT and `./logs/out.log`.
+
+Levels `warning`, `error` and `fatal` are written to STDERR and `./logs/err.log`.
 
 ## Configuration files
 

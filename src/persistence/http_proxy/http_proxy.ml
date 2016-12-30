@@ -3,7 +3,7 @@ open Lwt
 open Cohttp
 open Cohttp_lwt_unix
 
-module Logger = Log.Make (struct let path = Log.outlog let section = "Httpproxy" end)
+module Logger = Log.Make (struct let section = "Httpproxy" end)
 
 type httpproxy_t = {
   chan_name: string;

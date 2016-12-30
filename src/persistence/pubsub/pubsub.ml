@@ -1,7 +1,7 @@
 open Core.Std
 open Lwt
 
-module Logger = Log.Make (struct let path = Log.outlog let section = "Pubsub" end)
+module Logger = Log.Make (struct let section = "Pubsub" end)
 
 type pubsub_t = {
   chan_name: string;

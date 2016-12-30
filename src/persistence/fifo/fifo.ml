@@ -2,7 +2,7 @@ open Core.Std
 open Lwt
 open Zmq_obj_pb
 
-module Logger = Log.Make (struct let path = Log.outlog let section = "Fifo" end)
+module Logger = Log.Make (struct let section = "Fifo" end)
 
 type fifo_t = {
   chan_name: string;
@@ -87,8 +87,15 @@ let create ~chan_name ~host ~port ~timeout_ms ~health_time_limit_ms =
             | [] -> fail_with "No frames received"
             | uid::frames ->
               Connector.resolve connector uid frames
-          with ex ->
-            Logger.error (sprintf "Error on channel [%s]: %s" chan_name (Exception.full ex))
+          with
+          | (Connector.Upstream_error _) as ex ->
+            Logger.warning_lazy (lazy (sprintf
+                "Upstream error on channel [%s]: %s" chan_name (Exception.human ex)
+            ))
+          | ex ->
+            Logger.error (sprintf
+                "Error on channel [%s]: %s" chan_name (Exception.human ex)
+            )
         in
         loop socket
       in
@@ -155,7 +162,7 @@ module M = struct
     let coll_msgs = Collection.of_list msgs in
     if Int.(<>) read.length (Collection.length coll_msgs)
     then async (fun () ->
-        Logger.warning (sprintf "Lengths don't match: Read [%d] messages, but 'length' is [%d]" read.length (Collection.length coll_msgs))
+        Logger.warning (sprintf "Lengths don't match: Read [%d] messages, but 'Read_Output.length' is [%d]" read.length (Collection.length coll_msgs))
       );
     let meta = begin match read with
       | { last_id = Some l_id; last_timens = Some l_ts; } -> Some (l_id, l_ts)
@@ -204,7 +211,7 @@ module M = struct
     with
     | Lwt_unix.Timeout ->
       let%lwt () = Logger.warning (sprintf
-            "Channel [%s]: No consumer read or answered health check within %f seconds. OK by default."
+            "Channel [%s]: No consumer read or answered health check within %F seconds. OK by default."
             instance.chan_name time_limit
         )
       in

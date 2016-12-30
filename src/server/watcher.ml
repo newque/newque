@@ -1,7 +1,7 @@
 open Core.Std
 open Lwt
 
-module Logger = Log.Make (struct let path = Log.outlog let section = "Watcher" end)
+module Logger = Log.Make (struct let section = "Watcher" end)
 
 type t = {
   router: Router.t;

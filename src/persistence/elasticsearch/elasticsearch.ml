@@ -3,7 +3,7 @@ open Lwt
 open Cohttp
 open Cohttp_lwt_unix
 
-module Logger = Log.Make (struct let path = Log.outlog let section = "Elasticsearch" end)
+module Logger = Log.Make (struct let section = "Elasticsearch" end)
 
 type elasticsearch_t = {
   base_urls: Uri.t array;

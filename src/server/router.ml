@@ -1,7 +1,7 @@
 open Core.Std
 open Lwt
 
-module Logger = Log.Make (struct let path = Log.outlog let section = "Router" end)
+module Logger = Log.Make (struct let section = "Router" end)
 
 type t = {
   table: Channel.t String.Table.t String.Table.t; (* Channels (accessed by name) by listener.id *)
@@ -75,18 +75,21 @@ let write_shared router ~listen_name ~chan ~write ~msgs ~ids =
     | _ ->
       let save_t =
         let%lwt count = Channel.push chan msgs ids in
-        ignore_result (Logger.debug_lazy (lazy (
+        async (fun () ->
+          Logger.debug_lazy (lazy (
             sprintf "Wrote: (length: %d) to [%s] from [%s]" count chan.name listen_name
           ))
         );
         (* Forward to other channels if needed. *)
         let%lwt () = Lwt_list.iter_p (fun forward_chan_name ->
             begin match find_chan router ~listen_name:Listener.(private_listener.id) ~chan_name:forward_chan_name with
-              | Error _ -> Logger.warning_lazy (lazy (sprintf "Cannot forward from [%s] to [%s] because [%s] doesn't exist" chan.name forward_chan_name forward_chan_name))
+              | Error _ -> Logger.error (sprintf "Cannot forward from [%s] to [%s] because [%s] doesn't exist" chan.name forward_chan_name forward_chan_name)
               | Ok forward_chan ->
                 let%lwt forward_count = Channel.push forward_chan msgs ids in
-                if Int.(<>) forward_count count then async (fun () ->
-                    Logger.warning_lazy (lazy (sprintf "Mismatch while forwarding from [%s] (wrote %d) to [%s] (wrote %d). Possible ID collision(s)" chan.name count forward_chan_name forward_count
+                if Int.(<>) forward_count count
+                then async (fun () ->
+                    Logger.notice_lazy (lazy (
+                      sprintf "Mismatch while forwarding from [%s] (wrote %d) to [%s] (wrote %d). Possible ID collision(s)" chan.name count forward_chan_name forward_count
                     ))
                   );
                 return_unit
@@ -181,9 +184,11 @@ let read_slice router ~listen_name ~chan_name ~mode ~limit =
         end
         in
         let%lwt slice = Channel.pull_slice chan ~mode ~limit ~only_once:read.Read_settings.only_once in
-        ignore_result (Logger.debug_lazy (lazy (
+        async (fun () ->
+          Logger.debug_lazy (lazy (
             sprintf "Read: (size: %d) [%s] from [%s]" (Collection.length slice.Persistence.payloads) chan_name listen_name
-          )));
+          ))
+        );
         return (Ok (slice, chan))
     end
 
@@ -195,9 +200,11 @@ let read_stream router ~listen_name ~chan_name ~mode =
       | None -> return (Error [sprintf "Channel [%s] doesn't support Reading from it" chan_name])
       | Some read ->
         let%lwt stream = Channel.pull_stream chan ~mode ~only_once:read.Read_settings.only_once in
-        ignore_result (Logger.debug_lazy (lazy (
+        async (fun () ->
+          Logger.debug_lazy (lazy (
             sprintf "Reading: [%s] (stream) from [%s]" chan_name listen_name
-          )));
+          ))
+        );
         return (Ok (stream, chan))
     end
 
@@ -210,9 +217,11 @@ let count router ~listen_name ~chan_name ~mode =
   | (Error _) as err -> return err
   | Ok chan ->
     let%lwt count = Channel.size chan in
-    ignore_result (Logger.debug_lazy (lazy (
+    async (fun () ->
+      Logger.debug_lazy (lazy (
         sprintf "Counted: (size: %Ld) [%s] from [%s]" count chan_name listen_name
-      )));
+      ))
+    );
     return (Ok count)
 
 (******************
@@ -227,9 +236,11 @@ let delete router ~listen_name ~chan_name ~mode =
       | false -> return (Error [sprintf "Channel [%s] doesn't support Deleting from it" chan_name])
       | true ->
         let%lwt () = Channel.delete chan in
-        ignore_result (Logger.debug_lazy (lazy (
+        async (fun () ->
+          Logger.debug_lazy (lazy (
             sprintf "Deleted: [%s] from [%s]" chan_name listen_name
-          )));
+          ))
+        );
         return Result.ok_unit
     end
 
@@ -262,13 +273,15 @@ let rec health router ~listen_name ~chan_name ~mode =
       | Error errors -> return errors
       | Ok chan ->
         let%lwt result = Channel.health chan in
-        ignore_result (Logger.debug_lazy (lazy (
+        async (fun () ->
+          Logger.debug_lazy (lazy (
             let str = match result with
               | [] -> "OK"
               | errors -> sprintf "Errors: %s" (String.concat ~sep:", " errors)
             in
             let printable_listen_name = if String.is_empty listen_name then "<global>" else listen_name in
             sprintf "Health: [%s] from [%s]. Status: %s" chan_name printable_listen_name str
-          )));
+          ))
+        );
         return result
     end

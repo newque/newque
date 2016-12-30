@@ -1,7 +1,7 @@
 open Core.Std
 open Lwt
 
-module Logger = Log.Make (struct let path = Log.outlog let section = "Zmq" end)
+module Logger = Log.Make (struct let section = "Zmq" end)
 
 type worker = {
   accept: unit Lwt.t;
@@ -36,7 +36,6 @@ let invalid_read_output = Zmq_obj_pb.({ length = 0; last_id = None; last_timens 
 
 let handler zmq routing socket frames =
   let open Routing in
-  (* let%lwt () = Logger.debug (String.concat ~sep:"--" frames) in *)
   let%lwt zmq = zmq in
   match frames with
   | header::id::meta::msgs ->
@@ -126,7 +125,7 @@ let handler zmq routing socket frames =
 
   | strs ->
     let printable = Yojson.Basic.to_string (`List (List.map ~f:(fun s -> `String s) strs)) in
-    let%lwt () = Logger.warning (sprintf "Received invalid msg parts on %s: %s" zmq.inbound printable) in
+    let%lwt () = Logger.notice (sprintf "Received invalid msg parts on %s: %s" zmq.inbound printable) in
     let error =
       let open Zmq_obj_pb in
       let errors = [sprintf "Received invalid msg parts on %s. Expected [id], [input], [msgs...]." zmq.inbound] in

@@ -77,8 +77,7 @@ let submit batcher left_arr right_arr =
         ignore (do_flush batcher);
         [bound]
       else []
-    )
-                |> snd
+    ) |> snd
   in
   let threads = if List.is_empty threads then [discard batcher.thread] else threads in
   join threads

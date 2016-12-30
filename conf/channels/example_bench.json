@@ -3,18 +3,14 @@
   "backend": "fifo",
   "backendSettings": {
     "host": "0.0.0.0",
-    "port": 8007,
+    "port": 8008,
     "timeout": 20000,
     "healthTimeLimit": 3000
   },
   "acknowledgement": "saved",
   "readSettings": {},
   "writeSettings": {
-    "forward": [],
-    "batching": {
-      "maxSize": 2,
-      "maxTime": 1000
-    }
+    "forward": []
   },
   "raw": true,
   "emptiable": false

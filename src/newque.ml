@@ -13,7 +13,7 @@ let () = Lwt.async_exception_hook := fun ex ->
 
 let () = Lwt_preemptive.init 4 25 (fun str ->
     async (fun () ->
-      print_endline (sprintf "*** THREAD POOL ** %s" str);
+      print_endline (sprintf "*** THREAD POOL *** %s" str);
       return_unit
     )
   )
@@ -22,27 +22,28 @@ let () = Lwt_preemptive.init 4 25 (fun str ->
 let () = Lwt_log.add_rule "*" Lwt_log.Debug
 
 let start config_path =
-  let%lwt () = Log.stdout Lwt_log.Info "Starting Newque" in
+  let%lwt () = Log.write_stdout Lwt_log.Info "Starting Newque" in
   (* Make directories for logs and channels *)
   let check_directory path =
     let dir = Fs.is_directory ~create:true path in
     if%lwt dir then return_unit else
-      Log.stderr Lwt_log.Error (sprintf "%s is not a directory or can't be created as one" path)
+      Log.write_stderr Lwt_log.Error (sprintf "%s is not a directory or can't be created as one" path)
   in
   let%lwt () = Lwt_list.iter_s check_directory [
       Fs.log_dir;
-      Fs.log_chan_dir;
       Fs.conf_dir;
       Fs.conf_chan_dir;
       Fs.data_dir;
       Fs.data_chan_dir;
-    ] in
+    ]
+  in
 
   (* Make logger *)
-  let module Logger = Log.Make (struct let path = Log.outlog let section = "Main" end) in
+  Log.init ();
+  let module Logger = Log.Make (struct let section = "Main" end) in
 
   (* Load main config *)
-  let%lwt () = Logger.info (sprintf "Loading %s" config_path) in
+  let%lwt () = Logger.info (sprintf "Loading [%s]" config_path) in
   let%lwt config = Configtools.parse_main config_path in
   let log_level_str =
     let open Config_t in
@@ -50,7 +51,7 @@ let start config_path =
     |> Log.log_level_of_variant
     |> Lwt_log.string_of_level
   in
-  let%lwt () = Logger.info (sprintf "Active Log Level: %s" log_level_str) in
+  let%lwt () = Logger.info (sprintf "Active Log Level: [%s]" log_level_str) in
   let watcher = Watcher.create () in
   let%lwt () = Configtools.apply_main config watcher in
 
@@ -74,7 +75,7 @@ let start config_path =
         Logger.error (String.concat ~sep:"\n" errors)
       | [] ->
         let%lwt () = Logger.info "Global health check succeeded" in
-        let%lwt () = Logger.info "*** SERVER STARTED **" in
+        let%lwt () = Logger.info "*** SERVER STARTED ***" in
         let listeners_json = Watcher.listeners_to_json watcher None in
         print_endline (Yojson.Basic.pretty_to_string listeners_json);
         (* Run forever *)
@@ -88,4 +89,11 @@ let start config_path =
 
 
 let _ =
-  Lwt_unix.run (start (sprintf "%s%s" Fs.conf_dir "newque.json"))
+  try
+    Lwt_unix.run (start (sprintf "%s%s" Fs.conf_dir "newque.json"))
+  with
+  | ex ->
+    print_endline (sprintf
+        "\n\nCritical failure during startup process.\n%s"
+        (Exception.full ex)
+    )

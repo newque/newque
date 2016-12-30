@@ -1,7 +1,7 @@
 open Core.Std
 open Lwt
 
-module Logger = Log.Make (struct let path = Log.outlog let section = "Local" end)
+module Logger = Log.Make (struct let section = "Local" end)
 
 type local_t = {
   mutable db: Sqlite.t;

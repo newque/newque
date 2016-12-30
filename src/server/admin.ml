@@ -4,7 +4,7 @@ open Cohttp
 open Cohttp_lwt_unix
 open Routing
 
-module Logger = Log.Make (struct let path = Log.outlog let section = "Admin" end)
+module Logger = Log.Make (struct let section = "Admin" end)
 
 (* let handler routing ((ch, _) as conn) req body = *)
 let handler routing _ req _ =

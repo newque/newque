@@ -3,7 +3,6 @@ open Lwt
 
 let default_perm = 0o755 (* rwxr-xr-x *)
 let log_dir = "./logs/"
-let log_chan_dir = "./logs/channels/"
 let conf_dir = "./conf/"
 let conf_chan_dir = "./conf/channels/"
 let data_dir = "./data/"

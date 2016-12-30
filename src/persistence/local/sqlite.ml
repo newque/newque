@@ -5,7 +5,7 @@ module S3 = Sqlite3
 module Rc = Sqlite3.Rc
 module Data = Sqlite3.Data
 
-module Logger = Log.Make (struct let path = Log.outlog let section = "Sqlite" end)
+module Logger = Log.Make (struct let section = "Sqlite" end)
 
 type statements = {
   last_row: Sqlite3.stmt * string;
@@ -22,6 +22,7 @@ type t = {
   avg_read: int;
   stmts: statements sexp_opaque;
 } [@@deriving sexp]
+
 (* Ridiculously high number of retries by default,
    because it is only retried when the db is locked.
    We only want it to fail in catastrophic cases. *)
@@ -47,7 +48,7 @@ let clean_sync ~destroy stmt =
     end
 
 let exec_sync db ?(retry=default_retries) ~destroy (stmt, sql) =
-  async (fun () -> Logger.debug (sprintf "Executing %s" sql));
+  async (fun () -> Logger.debug_lazy (lazy (sprintf "Executing %s" sql)));
   let rec run count =
     match S3.step stmt with
     | Rc.DONE -> S3.changes db
@@ -82,7 +83,7 @@ type _ repr =
 let query : type a. t -> ?retry:int -> destroy:bool -> S3.stmt * string -> a repr -> (a Collection.t * int64 option) Lwt.t =
   fun db ?(retry=default_retries) ~destroy (stmt, sql) repr ->
     Lwt_preemptive.detach (fun () ->
-      async (fun () -> Logger.debug (sprintf "Querying %s" sql));
+      async (fun () -> Logger.debug_lazy (lazy (sprintf "Querying %s" sql)));
       let queue : a Queue.t = Queue.create ~capacity:db.avg_read () in
       let rec run count last_rowid =
         match S3.step stmt with

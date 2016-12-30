@@ -10,7 +10,7 @@ let parse_main path =
   | ex ->
     let failure, stack = Exception.human_bt ex in
     let str = sprintf "[%s] %s" path failure in
-    let%lwt () = Log.stdout Lwt_log.Fatal (sprintf "%s\n%s" str stack) in
+    let%lwt () = Log.write_stdout Lwt_log.Fatal (sprintf "%s\n%s" str stack) in
     fail_with str
 
 let apply_main config watcher =
@@ -43,7 +43,7 @@ let parse_channels config path =
     | ex ->
       let failure, stack = Exception.human_bt ex in
       let str = sprintf "[%s] %s" filepath failure in
-      let%lwt () = Log.stdout Lwt_log.Fatal (sprintf "%s\n%s" str stack) in
+      let%lwt () = Log.write_stdout Lwt_log.Fatal (sprintf "%s\n%s" str stack) in
       fail_with str
   ) files
 

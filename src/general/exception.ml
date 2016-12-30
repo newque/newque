@@ -12,12 +12,14 @@ let human ex = match ex with
   | Multiple_exn errors ->
     sprintf "Multiple Errors: %s" (String.concat ~sep:", " errors)
 
-  | Ag_oj_run.Error str
-  | Yojson.Json_error str ->
-    sprintf "JSON Parsing Error: %s" (Str.global_replace json_error_regexp " " str)
+  | Connector.Upstream_error str -> str
 
   | Protobuf.Decoder.Failure err ->
     sprintf "Protobuf Decoder Error: %s" (Protobuf.Decoder.error_to_string err)
+
+  | Ag_oj_run.Error str
+  | Yojson.Json_error str ->
+    sprintf "JSON Parsing Error: %s" (Str.global_replace json_error_regexp " " str)
 
   | Unix.Unix_error (c, n, p) ->
     sprintf "System Error %s {call: %s(%s)}" (String.uppercase (Unix.error_message c)) n p

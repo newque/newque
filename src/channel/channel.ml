@@ -108,14 +108,21 @@ let create name conf_channel =
       (module Persistence.Make (Arg) : Persistence.S)
 
     | `Fifo fifo ->
+      let timeout_ms = fifo.f_timeout in
+      let health_time_limit_ms = fifo.f_health_time_limit in
+      if Float.(<) timeout_ms health_time_limit_ms then failwith (sprintf
+            "Channel [%s] has backend type [fifo], setting 'timeout' (%.f) must not be smaller than 'healthTimeLimit' (%.f)"
+            name timeout_ms health_time_limit_ms
+        )
+      else
       let module Arg = struct
         module IO = Fifo.M
         let create () = Fifo.create
             ~chan_name:name
             ~host:fifo.f_host
             ~port:fifo.f_port
-            ~timeout_ms:fifo.f_timeout
-            ~health_time_limit_ms:fifo.f_health_time_limit
+            ~timeout_ms
+            ~health_time_limit_ms
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
         let batching = batching
