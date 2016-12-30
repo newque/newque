@@ -37,7 +37,8 @@ var pubsubSettings = {
 var fifoSettings = {
   host: '0.0.0.0',
   port: 8500,
-  timeout: 1000
+  timeout: 1000,
+  healthTimeLimit: 1000
 }
 
 Proc.pathExists(Proc.newquePath)

@@ -24,10 +24,11 @@ let submit connector uid outbound =
       | Lwt_unix.Timeout ->
         let error = Upstream_error (
             sprintf "No response from upstream [ZMQ %s] within %F seconds"
-            outbound connector.expiration
+              outbound connector.expiration
           )
         in
         fail error
+      | _ -> fail ex
 
 let resolve connector uid obj =
   match String.Table.find_and_remove connector.table uid with

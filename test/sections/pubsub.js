@@ -32,6 +32,7 @@ module.exports = function (backend, backendSettings, raw) {
     })
 
     it('Push to multiple subscribers', function () {
+      this.timeout(4000)
       var originalIds = ['id1', 'id2', 'id3', 'id4']
       var originalIdsStr = originalIds.join(',')
       var buf = `{"a":"abc"}\n{"a":"def"}\n{"a":"ghi"}\n{"a":"jkl"}`
@@ -69,7 +70,7 @@ module.exports = function (backend, backendSettings, raw) {
     })
 
     it('Should split into single flushes', function () {
-      this.timeout(3000)
+      this.timeout(4000)
       var originalIds = ['id1', 'id2', 'id4', 'id8']
       var originalIdsStr = originalIds.join(',')
       var buf = `1\n2\n4\n8`

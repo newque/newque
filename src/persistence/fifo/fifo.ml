@@ -89,7 +89,7 @@ let create ~chan_name ~host ~port ~timeout_ms ~health_time_limit_ms =
               Connector.resolve connector uid frames
           with
           | (Connector.Upstream_error _) as ex ->
-            Logger.warning_lazy (lazy (sprintf
+            Logger.notice_lazy (lazy (sprintf
                 "Upstream error on channel [%s]: %s" chan_name (Exception.human ex)
             ))
           | ex ->
@@ -210,7 +210,7 @@ module M = struct
       pick [thread; Lwt_unix.timeout time_limit]
     with
     | Lwt_unix.Timeout ->
-      let%lwt () = Logger.warning (sprintf
+      let%lwt () = Logger.notice (sprintf
             "Channel [%s]: No consumer read or answered health check within %F seconds. OK by default."
             instance.chan_name time_limit
         )
