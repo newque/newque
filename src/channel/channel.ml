@@ -29,6 +29,9 @@ let create name conf_channel =
   let write = Option.map conf_channel.write_settings ~f:Write_settings.create in
   let batching = Option.bind write (fun w -> w.Write_settings.batching) in
 
+  if String.is_empty conf_channel.separator
+  then failwith (sprintf "Channel [%s] has invalid separator (empty string)" name) else
+
   let splitter = Util.make_splitter ~sep:conf_channel.separator in
 
   let module Persist = (val (match conf_channel.backend_settings with

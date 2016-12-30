@@ -118,7 +118,6 @@ type config_channel_read = {
   ~only_once <json name="onlyOnce"><ocaml default="false">: bool;
 } <ocaml field_prefix="c_">
 
-(* TODO: Validate that the separators are non-empty *)
 type config_channel = {
   endpoint_names <json name="listeners">: string list;
   backend_settings <json name="backendSettings" tag_field="backend">: config_backend;

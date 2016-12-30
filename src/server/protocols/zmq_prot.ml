@@ -153,7 +153,7 @@ let start generic specific routing =
   ZMQ.Socket.bind backend inproc;
 
   let proxy = Lwt_preemptive.detach (fun () ->
-      ZMQ.Proxy.create frontend backend;
+      ZMQ.Proxy.create frontend backend
     ) ()
   in
   async (fun () -> pick [stop_t; proxy]);

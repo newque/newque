@@ -69,6 +69,7 @@ module.exports = function (backend, backendSettings, raw) {
     })
 
     it('Should split into single flushes', function () {
+      this.timeout(3000)
       var originalIds = ['id1', 'id2', 'id4', 'id8']
       var originalIdsStr = originalIds.join(',')
       var buf = `1\n2\n4\n8`
