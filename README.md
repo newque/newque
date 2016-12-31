@@ -148,15 +148,27 @@ __HTTP Settings object__
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
-| `backlog` | Integer | No | `20` | The `backlog` argument for the `listen(2)` syscall. |
+| `backlog` | Integer | No | `100` | The `backlog` argument for the `listen(2)` syscall. |
 
 __ZMQ Settings object__
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `concurrency` | Integer | No | `20` | Number of requests that can be processed concurrently. |
-| `receiveHighWaterMark` | Integer | No | `5000` | Number of inbound messages ZMQ will keep in buffer until they can be processed. |
-| `sendHighWaterMark` | Integer | No | `5000` | Number of outbound messages ZMQ will keep in buffer for slow or disconnected clients. |
+| `socketSettings` | Object | No | | Low level, advanced ZMQ socket options. See `Socket Settings object`. |
+
+__Socket Settings object__
+
+**IMPORTANT:** Read [the docs](http://api.zeromq.org/4-0:zmq-setsockopt) before changing any defaults!
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `ZMQ_MAXMSGSIZE` | Integer | No | `-1` | Max message size in bytes, `-1` means unlimited.  |
+| `ZMQ_LINGER` | Integer | No | `60000` | How long to keep unaccepted messages after disconnection in milliseconds. |
+| `ZMQ_RECONNECT_IVL` | Integer | No | `100` | Reconnection interval in milliseconds. |
+| `ZMQ_RECONNECT_IVL_MAX` | Integer | No | `60000` | Max exponential backoff reconnection interval in milliseconds. |
+| `ZMQ_BACKLOG` | Integer | No | `100` | The `backlog` argument for the `listen(2)` syscall. |
+| `ZMQ_SNDHWM` | Integer | No | `5000` | Hard limit on the number outbound outstanding messages per connection. |
+| `ZMQ_RCVHWM` | Integer | No | `5000` | Hard limit on the number inbound outstanding messages per connection. |
 
 ### Channel configuration files
 
@@ -238,6 +250,7 @@ __`pubsub` `backendSettings` Object__
 |----------|------|----------|---------|-------------|
 | `host` | String | Yes | | Address on which the messages will be broadcasted |
 | `port` | Integer | Yes | | Port on which the messages will be broadcasted |
+| `socketSettings` | Object | No | | Low level, advanced ZMQ socket options. See `Socket Settings object`. |
 
 __`fifo` `backendSettings` Object__
 
@@ -247,6 +260,7 @@ __`fifo` `backendSettings` Object__
 | `port` | Integer | Yes | | Port on which the messages will queued up for clients to accept |
 | `timeout` | Number | Yes | | Number of milliseconds before requests are cancelled with an error. |
 | `healthTimeLimit` | Number | No | `5000` | Number of milliseconds before unanswered health calls are resolved as successful. This is useful when no consumers are currently listening. |
+| `socketSettings` | Object | No | | Low level, advanced ZMQ socket options. See `Socket Settings object`. |
 
 __Read Settings Object__
 

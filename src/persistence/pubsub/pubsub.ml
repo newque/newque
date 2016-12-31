@@ -12,11 +12,14 @@ type pubsub_t = {
   socket: [`Pub] Lwt_zmq.Socket.t sexp_opaque;
 } [@@deriving sexp]
 
-let create ~chan_name host port =
+let create ~chan_name ~host ~port ~socket_settings =
   let outbound = sprintf "tcp://%s:%d" host port in
   let%lwt () = Logger.info (sprintf "Creating a new TCP socket on %s:%d" host port) in
+
   let pub = ZMQ.Socket.create Zmq_tools.ctx ZMQ.Socket.pub in
-  (* TODO: ZMQ Options *)
+  Zmq_tools.apply_default_settings pub;
+  Option.iter socket_settings ~f:(Zmq_tools.apply_settings pub);
+
   ZMQ.Socket.bind pub outbound;
   let socket = Lwt_zmq.Socket.of_socket pub in
 

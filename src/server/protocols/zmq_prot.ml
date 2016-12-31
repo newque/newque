@@ -146,8 +146,10 @@ let start generic specific routing =
 
   let%lwt () = Logger.info (sprintf "Creating a new TCP socket on %s:%d" generic.host generic.port) in
   let frontend = ZMQ.Socket.create Zmq_tools.ctx ZMQ.Socket.router in
-  Zmq_tools.set_hwm frontend specific.receive_hwm specific.send_hwm;
+  Zmq_tools.apply_default_settings frontend;
+  Option.iter specific.socket_settings ~f:(Zmq_tools.apply_settings frontend);
   ZMQ.Socket.bind frontend inbound;
+
   let backend = ZMQ.Socket.create Zmq_tools.ctx ZMQ.Socket.dealer in
   ZMQ.Socket.bind backend inproc;
 
@@ -156,8 +158,6 @@ let start generic specific routing =
     ) ()
   in
   async (fun () -> pick [stop_t; proxy]);
-
-  (* TODO: Configurable timeout for disconnected clients *)
 
   let%lwt callback = match routing with
     | Admin _ -> fail_with "ZMQ listeners don't support Admin routing"

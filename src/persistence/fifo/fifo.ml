@@ -70,12 +70,15 @@ let handler instance input messages =
   | [] -> return pair
   | errors -> fail (Exception.Multiple_exn errors)
 
-let create ~chan_name ~host ~port ~timeout_ms ~health_time_limit_ms =
+let create ~chan_name ~host ~port ~socket_settings ~timeout_ms ~health_time_limit_ms =
   let outbound = sprintf "tcp://%s:%d" host port in
   let%lwt () = Logger.info (sprintf "Creating a new TCP socket on %s:%d" host port) in
   let timeout = Float.(/) timeout_ms 1000. in
+
   let router = ZMQ.Socket.create Zmq_tools.ctx ZMQ.Socket.dealer in
-  (* TODO: ZMQ Options *)
+  Zmq_tools.apply_default_settings router;
+  Option.iter socket_settings ~f:(Zmq_tools.apply_settings router);
+
   ZMQ.Socket.bind router outbound;
   let socket = Lwt_zmq.Socket.of_socket router in
   let connector = Connector.create timeout in
@@ -192,7 +195,7 @@ module M = struct
     unwrap_action output.action Delete_action "Delete_Output"
 
   let health instance =
-    (* The connector has its own timeout and fails with Failure.
+    (* The connector has its own timeout and fails with Upstream_error.
        If no consumer reads or answers within time_limit, we consider
        the health check as passed. *)
     let time_limit = instance.health_time_limit in

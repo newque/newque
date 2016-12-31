@@ -99,8 +99,9 @@ let create name conf_channel =
         module IO = Pubsub.M
         let create () = Pubsub.create
             ~chan_name:name
-            pubsub.p_host
-            pubsub.p_port
+            ~host:pubsub.p_host
+            ~port:pubsub.p_port
+            ~socket_settings:pubsub.p_socket_settings
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
         let batching = batching
@@ -121,6 +122,7 @@ let create name conf_channel =
             ~chan_name:name
             ~host:fifo.f_host
             ~port:fifo.f_port
+            ~socket_settings:fifo.f_socket_settings
             ~timeout_ms
             ~health_time_limit_ms
         let stream_slice_size = stream_slice_size
