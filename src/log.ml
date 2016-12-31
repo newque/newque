@@ -22,7 +22,9 @@ let int_of_level level =
 let outfile = sprintf "%s%s" Fs.log_dir "out.log"
 let errfile = sprintf "%s%s" Fs.log_dir "err.log"
 
-let template = "$(date) [$(level)] [$(section)]: $(message)"
+let template = match Sys.getenv "NEWQUE_ENV" with
+  | None -> "$(date) [$(level)] [$(section)]: $(message)"
+  | Some env -> sprintf "$(date) [$(level)] [%s] [$(section)]: $(message)" env
 
 let lazy_level = ref (int_of_level Lwt_log.Debug)
 let init_thread, init_wakener = wait ()

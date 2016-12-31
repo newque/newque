@@ -84,6 +84,8 @@ Levels `debug`, `info` and `notice` are written to STDOUT and `./logs/out.log`.
 
 Levels `warning`, `error` and `fatal` are written to STDERR and `./logs/err.log`.
 
+**Note:** If the `NEWQUE_ENV` environment variable is set, it'll be used in the log format.
+
 ## Configuration files
 
 ### Main configuration file (`newque.json`)
