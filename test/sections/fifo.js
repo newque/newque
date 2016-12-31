@@ -21,12 +21,11 @@ module.exports = function (backend, backendSettings, raw) {
 
     it('Timeouts', function () {
       var ctr = 0
-
       var addr = 'tcp://127.0.0.1:' + env.fifoPorts.example
       socket.connect(addr)
       socket.on('message', function (uid, input) {
         var decoded = specs.Input.decode(input)
-        // console.log(decoded)
+        // console.log(decoded.channel.toString('utf8'), decoded)
         Fn.assert(decoded.channel.toString('utf8') === 'example')
         ctr++
       })
@@ -36,10 +35,9 @@ module.exports = function (backend, backendSettings, raw) {
         Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'one']]).then(Fn.shouldFail(500)),
         Fn.call('POST', 8000, '/v1/example', 'somestring', [[C.modeHeader, 'single']]).then(Fn.shouldFail(500)),
         Fn.call('DELETE', 8000, '/v1/example').then(Fn.shouldFail(500)),
-        Fn.call('GET', 8000, '/v1/example/health').then(Fn.shouldFail(500))
       ])
       .then(function () {
-        Fn.assert(ctr === 6)
+        Fn.assert(ctr === 5)
         socket.removeAllListeners('message')
         socket.disconnect(addr)
       })

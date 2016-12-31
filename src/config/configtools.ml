@@ -10,7 +10,7 @@ let parse_main path =
   | ex ->
     let failure, stack = Exception.human_bt ex in
     let str = sprintf "[%s] %s" path failure in
-    let%lwt () = Log.stdout Lwt_log.Fatal (sprintf "%s\n%s" str stack) in
+    let%lwt () = Log.write_stdout Lwt_log.Fatal (sprintf "%s\n%s" str stack) in
     fail_with str
 
 let apply_main config watcher =
@@ -43,7 +43,7 @@ let parse_channels config path =
     | ex ->
       let failure, stack = Exception.human_bt ex in
       let str = sprintf "[%s] %s" filepath failure in
-      let%lwt () = Log.stdout Lwt_log.Fatal (sprintf "%s\n%s" str stack) in
+      let%lwt () = Log.write_stdout Lwt_log.Fatal (sprintf "%s\n%s" str stack) in
       fail_with str
   ) files
 
@@ -52,26 +52,3 @@ let apply_channels w channels =
   Router.register_listeners (Watcher.router w) (Watcher.listeners w)
   >>= fun () ->
   Router.register_channels (Watcher.router w) channels
-
-let create_admin_server watcher config =
-  let admin_spec_conf = {
-    backlog = 5;
-  } in
-  let admin_conf = {
-    name = "newque_admin";
-    host = config.admin.a_host;
-    port = config.admin.a_port;
-    protocol_settings = Config_http_prot admin_spec_conf;
-  } in
-  let%lwt admin_server =
-    let open Routing in
-    let table = (Watcher.router watcher).Router.table in
-    let admin = Admin { table } in
-    Http_prot.start admin_conf admin_spec_conf admin
-  in
-  let (_, wakener) = wait () in
-  let open Listener in
-  async (fun () -> Watcher.monitor watcher {id = admin_conf.name; server = HTTP (admin_server, wakener);});
-
-  let success_str = sprintf "Started Admin server on HTTP %s:%d" admin_conf.host admin_conf.port in
-  return (admin_server, success_str)

@@ -32,6 +32,7 @@ module.exports = function (backend, backendSettings, raw) {
     })
 
     it('Push to multiple subscribers', function () {
+      this.timeout(4000)
       var originalIds = ['id1', 'id2', 'id3', 'id4']
       var originalIdsStr = originalIds.join(',')
       var buf = `{"a":"abc"}\n{"a":"def"}\n{"a":"ghi"}\n{"a":"jkl"}`
@@ -69,6 +70,7 @@ module.exports = function (backend, backendSettings, raw) {
     })
 
     it('Should split into single flushes', function () {
+      this.timeout(4000)
       var originalIds = ['id1', 'id2', 'id4', 'id8']
       var originalIdsStr = originalIds.join(',')
       var buf = `1\n2\n4\n8`
@@ -86,6 +88,7 @@ module.exports = function (backend, backendSettings, raw) {
 
             var receivedIds = decoded.write_input.ids.map(x => x.toString('utf8'))
             var receivedMsg = msg.toString('utf8')
+            Fn.assert(receivedIds.length === 1)
             Fn.assert(receivedIds[0] === 'id' + receivedMsg)
             var splitBuf = buf.split('\n')
 

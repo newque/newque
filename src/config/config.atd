@@ -26,12 +26,22 @@ type config_log_level = [
 
 (* NETWORK *)
 type config_http_settings = {
-  ~backlog <ocaml default="20">: int;
+  ~backlog <ocaml default="100">: int;
 }
+
+type zmq_socket_settings = {
+  ?zmq_maxmsgsize <json name="ZMQ_MAXMSGSIZE">: int option;
+  ?zmq_linger <json name="ZMQ_LINGER">: int option;
+  ?zmq_reconnect_ivl <json name="ZMQ_RECONNECT_IVL">: int option;
+  ?zmq_reconnect_ivl_max <json name="ZMQ_RECONNECT_IVL_MAX">: int option;
+  ?zmq_backlog <json name="ZMQ_BACKLOG">: int option;
+  ?zmq_sndhwm <json name="ZMQ_SNDHWM">: int option;
+  ?zmq_rcvhwm <json name="ZMQ_RCVHWM">: int option;
+}
+
 type config_zmq_settings = {
   ~concurrency <ocaml default="20">: int;
-  ~receive_hwm <json name="receiveHighWaterMark"><ocaml default="5000">: int;
-  ~send_hwm <json name="sendHighWaterMark"><ocaml default="5000">: int;
+  ?socket_settings <json name="socketSettings">: zmq_socket_settings option;
 }
 
 type config_proto = [
@@ -66,12 +76,15 @@ type config_httpproxy = {
 type config_pubsub = {
   host: string;
   port: int;
+  ?socket_settings <json name="socketSettings">: zmq_socket_settings option;
 } <ocaml field_prefix="p_">
 
 type config_fifo = {
   host: string;
   port: int;
+  ?socket_settings <json name="socketSettings">: zmq_socket_settings option;
   timeout: int <ocaml repr="float">;
+  ~health_time_limit <json name="healthTimeLimit"><ocaml default="5000.0">: int <ocaml repr="float">;
 } <ocaml field_prefix="f_">
 
 type config_elasticsearch = {
@@ -117,7 +130,6 @@ type config_channel_read = {
   ~only_once <json name="onlyOnce"><ocaml default="false">: bool;
 } <ocaml field_prefix="c_">
 
-(* TODO: Validate that the separators are non-empty *)
 type config_channel = {
   endpoint_names <json name="listeners">: string list;
   backend_settings <json name="backendSettings" tag_field="backend">: config_backend;

@@ -1,6 +1,7 @@
 {
   "listeners": ["http8000"],
   "backend": "disk",
+  "backendSettings": {},
   "readSettings": {
     "httpFormat":"json",
     "onlyOnce": false
