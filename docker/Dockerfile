@@ -1,12 +1,12 @@
 FROM debian:wheezy
 
-ENV NEWQUE_VERSION 0.0.2
+ENV NEWQUE_VERSION 0.0.3
 
 RUN apt-get -y update && apt-get install -y curl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-RUN curl -SLO "https://github.com/SGrondin/newque/releases/download/v0.0.2/newque.$NEWQUE_VERSION.tar.gz" \
+RUN curl -SLO "https://github.com/SGrondin/newque/releases/download/v0.0.3/newque.$NEWQUE_VERSION.tar.gz" \
     && tar xvf newque.$NEWQUE_VERSION.tar.gz \
     && rm newque.$NEWQUE_VERSION.tar.gz
 
