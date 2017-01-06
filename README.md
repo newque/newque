@@ -201,9 +201,9 @@ __Example__
 | `raw` | Boolean | Yes | | Whether the messages should be wrapped when writing to the Backend. |
 | `readSettings` | Object or Null | Yes | | Settings related to Reading from this Channel, or `null` to disable all Reading. |
 | `writeSettings` | Object or Null | Yes | | Settings related to Writing to this Channel, or `null` to disable all Writing. |
-| `separator` | String | No | `\n` | String that acts as a separator between messages for `httpFormat`: `plaintext`. |
-| `averageSize` | Integer | No | `256` | Average size (in bytes) of incoming (Write) HTTP bodies when `httpFormat`: `plaintext`. |
-| `maxRead` | Integer | No | `1000` | How messages can be returned in a single Read operation. Includes Streaming.  |
+| `separator` | String | No | `\n` | String that acts as a separator between messages when `httpFormat` is set to `plaintext`. |
+| `averageSize` | Integer | No | `256` | Performance optimization. Average size (in bytes) of incoming (Write) HTTP bodies when `httpFormat` is set to `plaintext`. |
+| `maxRead` | Integer | No | `1000` | How many messages can be returned in a single Read operation. Also affects Streaming.  |
 | `averageRead` | Integer | No | `32` | Average number of messages returned per Read operation. Includes Streaming. |
 
 __`none` `backendSettings` Object__
@@ -288,256 +288,19 @@ __Batching Object__
 
 ## HTTP
 
-Interacting with Newque over HTTP is the most flexible way. Its performance is adequate as long as calls are infrequent enough. If you find yourself in a position where you need to make many small HTTP calls at a high rate, consider using ZMQ.
+Interacting with Newque over HTTP is the most flexible way. It offers good performance, but HTTP comes with a heavy overhead per request. If you find yourself making many small HTTP calls at a high rate, consider using ZMQ instead. However, HTTP is a lot easier to load balance and is usable directly on the command line with tools such as `curl`.
 
-### Writing
+An important concept to grasp is that of the `httpFormat`. Each channel has its own `httpFormat`, one for Writing (`POST`) and one for Reading (`GET`). Valid formats are `json` (default) and `plaintext`.
 
-The Writing `httpFormat` is `json` by default.
-
-#### Request when the `httpFormat` is `json`
-
-Endpoint: `http://hostname:port/v1/mychannel`
-
-Method: `POST`
-
-Headers: N/A
-
-Body: Example:
-```json
-{
-  "atomic": false,
-  "messages": ["message1", "message2", "message3"],
-  "ids": ["id1", "id2", "id3"]
-}
-```
-
-| Property | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `atomic` | Boolean | No | `false` | Must the messages be treated as one? |
-| `messages` | Array of strings | Yes | | The actual messages. |
-| `ids` | Array of strings | No | | The IDs of the messages. Lengths must match. |
-
-#### Request when the `httpFormat` is `plaintext`
-
-Endpoint: `http://hostname:port/v1/mychannel`
-
-Method: `POST`
-
-Headers:
-- (required) `newque-mode`. One of:
-  - `single`: The entire body is a single message.
-  - `multiple`: The body is multiple messages, separated by `separator`. Therefore a message cannot contain the string `separator`.
-  - `atomic`: Same as `multiple`, but all the messages will be treated as one. They'll have a combined size of `1`, and all be written and/or read at once.
-- (optional) `newque-msg-id`. A list of comma-separated unique IDs for the messages. The number of IDs must match the number of messages. If this header is missing, Newque will generate new unique IDs.
-
-Body: See the `newque-mode` header. Unless the Mode is `single`, the body will consist in a list of messages separated by `separator`. Example: `message1__message2__message3` will result in 3 messages if the Mode is `multiple` and the Channel's `separator` is `__`.
-
-#### Response for both `json` and `plaintext`
-
-Status:
-- `201`: Messages were saved successfully.
-- `202`: The request was received, but `acknowledgement` is set to `instant`, therefore we don't know if the operation succeeded.
-- `4xx`: Client error
-- `5xx`: Server error
-
-Headers:
-- `content-type: application/json`
-
-Body:
-
-A JSON object. Example:
-```json
-{
-  "code": 201,
-  "errors": [],
-  "saved": 3
-}
-```
-
-| Property | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `code` | Integer | Yes | | The HTTP status code. |
-| `errors` | Array of strings | Yes | | A list of errors. |
-| `saved` | Array of strings | No | | How many messages were saved successfully. |
-
-### Read
-
-The Reading `httpFormat` is `json` by default. Everything is identical between both formats, except for the response body.
-
-#### Request
-
-Endpoint: `http://hostname:port/v1/mychannel`
-
-Method: `GET`
-
-Headers:
-- (required) `newque-mode`. One of:
-  - `one`. Returns a single message.
-  - `many X` where `X` is an integer. Returns up to `X` messages.
-  - `after_id X` where `X` is a string. Returns as many messages as possible that were received after that ID.
-  - `after_ts X` where `X` is a timestamp in nanoseconds. Returns as many messages as possible that were received after that timestamp.
-- (optional) `newque-read-max`. An integer to set an upper bound to the number of returned messages. Note: Channels also have a `maxRead` setting.
-
-Body: N/A
-
-#### Response
-
-Status:
-- `200`: Messages have been retrieved successfully.
-- `4xx`: Client error
-- `5xx`: Server error
-
-Headers:
-- `content-type: X` where `X` is `application/json` (when format is `json`) or `application/octet-stream` (when format is `plaintext`).
-- `newque-response-length: X` where `X` is the number of messages returned.
-- (if backend supports it) `newque-response-last-id: X` where `X` is the ID of the last message returned.
-- (if backend supports it) `newque-response-last-ts: X` where `X` is the timestamp (in nanoseconds) of the last message returned.
-
-**Body (`json` format)**:
-
-A JSON object. Example:
-```json
-{
-  "code": 200,
-  "errors": [],
-  "messages": ["message1", "message2", "message3"]
-}
-```
-
-| Property | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `code` | Integer | Yes | | The HTTP status code. |
-| `errors` | Array of strings | Yes | | A list of errors. |
-| `messages` | Array of strings | Yes | | A list of messages. |
-
-**Body (`plaintext` format)**: All the messages concatenated by the `separator` string.
-
-### Read (Streaming)
-
-This is a special case. Adding the `Transfer-Encoding: Chunked` header to a Read call will make Newque stream messages back as fast as possible in `plaintext` format (no matter the format configured on the Channel). This can be useful when reading a very large number of messages at once because they do not have to be buffered up in memory before being returned.
-
-### Count
-
-#### Request
-
-Endpoint: `http://hostname:port/v1/mychannel/count`
-
-Method: `GET`
-
-Headers: N/A
-
-Body: N/A
-
-#### Response
-
-Status:
-- `200`: Success
-- `4xx`: Client error
-- `5xx`: Server error
-
-Headers:
-- `content-type: application/json`
-
-Body:
-
-A JSON object. Example:
-```json
-{
-  "code": 200,
-  "errors": [],
-  "count": 3
-}
-```
-
-| Property | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `code` | Integer | Yes | | The HTTP status code. |
-| `errors` | Array of strings | Yes | | A list of errors. |
-| `count` | Integer | No | | How many messages are present in the backend. |
-
-### Delete
-
-#### Request
-
-Endpoint: `http://hostname:port/v1/mychannel`
-
-Method: `DELETE`
-
-Headers: N/A
-
-Body: N/A
-
-#### Response
-
-Status:
-- `200`: Success
-- `4xx`: Client error
-- `5xx`: Server error
-
-Headers:
-- `content-type: application/json`
-
-Body:
-
-A JSON object. Example:
-```json
-{
-  "code": 200,
-  "errors": []
-}
-```
-
-| Property | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `code` | Integer | Yes | | The HTTP status code. |
-| `errors` | Array of strings | Yes | | A list of errors. |
-
-### Health
-
-It's possible to check the health for a single channel or the entire system.
-
-#### Request
-
-Endpoint: `http://hostname:port/v1/mychannel/health` **or** `http://hostname:port/v1/health`
-
-Method: `GET`
-
-Headers: N/A
-
-Body: N/A
-
-#### Response
-
-Status:
-- `200`: Success
-- `4xx`: Client error
-- `5xx`: Server error
-
-Headers:
-- `content-type: application/json`
-
-Body:
-
-A JSON object. Example:
-```json
-{
-  "code": 200,
-  "errors": []
-}
-```
-
-| Property | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `code` | Integer | Yes | | The HTTP status code. |
-| `errors` | Array of strings | Yes | | A list of errors. |
+The formats, as well as every possible operation are defined in the [HTTP API Spec](https://github.com/SGrondin/newque/blob/master/specs/http_api.yml).
 
 ## ZMQ
 
-ZMQ is (much) faster and easier to use, once the boilerplate is in place.
+ZMQ is much faster and does suffer from the same overhead as HTTP, but being a long-lived TCP socket, it can be much harder to load balance than HTTP.
 
-**All the formats are already defined in [this file](https://github.com/SGrondin/newque/blob/master/protobuf/zmq_obj.proto)**
+**All the formats are already defined in [this file](https://github.com/SGrondin/newque/blob/master/specs/zmq_api.proto)**
 
-So go ahead and use your language's code generator for `.proto` files. Send `Input` Protobuf objects as defined in [the spec](https://github.com/SGrondin/newque/blob/master/protobuf/zmq_obj.proto) and Newque will return `Output` objects.
+So go ahead and use your language's code generator for `.proto` files. Send `Input` Protobuf objects as defined in [the spec](https://github.com/SGrondin/newque/blob/master/specs/zmq_api.proto) and Newque will return `Output` objects.
 
 Then open a ZMQ socket in `dealer` mode and `connect` to a Newque ZMQ Listener using the address `tcp://ListenerHost:ListenerPort`.
 
@@ -549,11 +312,11 @@ A complete Node.js example is available [here](https://github.com/SGrondin/newqu
 
 Send [`UID`, `Input`, message1, message2, etc] on the ZMQ socket.
 
-`UID` must be a unique string. `Input` is a [Protobuf object](https://github.com/SGrondin/newque/blob/master/protobuf/zmq_obj.proto) with the `action` field set to `Write_Input`.
+`UID` must be a unique string. `Input` is a [Protobuf object](https://github.com/SGrondin/newque/blob/master/specs/zmq_api.proto) with the `action` field set to `Write_Input`.
 
 Newque will return [`UID`, `Output`].
 
-`UID` will be the exact same string that was sent with the request. This is so that you can associate responses with their requests. `Output` is a [Protobuf object](https://github.com/SGrondin/newque/blob/master/protobuf/zmq_obj.proto) with the `action` field set to `Write_Output` or `Error_Output`.
+`UID` will be the exact same string that was sent with the request. This is so that you can associate responses with their requests. `Output` is a [Protobuf object](https://github.com/SGrondin/newque/blob/master/specs/zmq_api.proto) with the `action` field set to `Write_Output` or `Error_Output`.
 
 #### Read
 
@@ -581,9 +344,11 @@ Newque will return [`UID`, `Output`].
 
 ### Backend integrations
 
+This section describes how to accept requests from Newque and serve as a backend for a channel.
+
 #### Pubsub
 
-To receive messages from a `pubsub` backend, open a ZMQ socket in `sub` mode and `connect` to the Channel using the address `tcp://PubsubChannelHost:PubsubChannelPort` and finally subscribe to all messages.
+To receive messages on a `pubsub` backend, open a ZMQ socket in `sub` mode and `connect` to the Channel using the ZMQ address `tcp://PubsubChannelHost:PubsubChannelPort` and finally `subscribe` to all messages.
 
 Newque will be sending data in the following format: [`Input`, message1, message2, etc].
 
@@ -591,10 +356,10 @@ A full example is available [here](https://github.com/SGrondin/newque/blob/dd217
 
 #### FIFO
 
-To receive messages from a `fifo` backend, open a ZMQ socket in `dealer` mode and `connect` to the Channel using the address `tcp://FifoChannelHost:FifoChannelPort`.
+To receive messages on a `fifo` backend, open a ZMQ socket in `dealer` mode and `connect` to the Channel using the ZMQ address `tcp://FifoChannelHost:FifoChannelPort`.
 
 Newque will be sending data in the following format: [`UID`, `Input`].
 
-`fifo` requires an Acknowledgement or else the client making a request to Newque will receive a timeout error. Using the same socket, send [`UID`, `Output`] back to Newque.
+`fifo` requires an Acknowledgement or else the client making a request to Newque will receive a timeout error. Using the same socket, send [`UID`, `Output`] back to Newque, where `UID` is the exact same string/buffer that was sent by Newque.
 
 A full example is available [here](https://github.com/SGrondin/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/fifo.js).

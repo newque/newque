@@ -5,7 +5,7 @@ var request = require('superagent')
 
 var zmq = require('zmq')
 var protobuf = require("protocol-buffers")
-var specs = protobuf(fs.readFileSync('../protobuf/zmq_obj.proto'))
+var specs = protobuf(fs.readFileSync('../specs/zmq_api.proto'))
 
 var newquePath = exports.newquePath = __dirname + '/../newque.native'
 var confDir = __dirname + '/conf'

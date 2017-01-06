@@ -1,7 +1,7 @@
 var zmq = require('zmq')
 var fs = require('fs')
 var protobuf = require("protocol-buffers")
-var specs = protobuf(fs.readFileSync('../protobuf/zmq_obj.proto'))
+var specs = protobuf(fs.readFileSync('../specs/zmq_api.proto'))
 
 /****** Main ZMQ Socket ******/
 var socket = zmq.socket('dealer')

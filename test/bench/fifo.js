@@ -1,7 +1,7 @@
 var assert = require('assert')
 var fs = require('fs')
 var protobuf = require("protocol-buffers")
-var specs = protobuf(fs.readFileSync('../protobuf/zmq_obj.proto'))
+var specs = protobuf(fs.readFileSync('../specs/zmq_api.proto'))
 
 var zmq = require('zmq')
 var addrUpstream = 'tcp://127.0.0.1:8008'

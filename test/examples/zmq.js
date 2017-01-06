@@ -15,7 +15,7 @@ socket.connect('tcp://127.0.0.1:8005')
 
 /****** SETUP ******/
 // Load the proto file
-var specs = protobuf(fs.readFileSync('../protobuf/zmq_obj.proto'))
+var specs = protobuf(fs.readFileSync('../specs/zmq_api.proto'))
 
 var str = s => s ? s.toString('utf8') : s
 var router = {}
