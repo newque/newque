@@ -8,8 +8,8 @@ type local_t = {
   file: string;
   chan_name: string;
   avg_read: int;
-  mutex: Lwt_mutex.t sexp_opaque;
-} [@@deriving sexp]
+  mutex: Lwt_mutex.t;
+}
 
 let create ~file ~chan_name ~avg_read =
   let mutex = Lwt_mutex.create () in
@@ -36,7 +36,7 @@ let create ~file ~chan_name ~avg_read =
 
 module M = struct
 
-  type t = local_t [@@deriving sexp]
+  type t = local_t
 
   let close_nolock instance =
     try%lwt

@@ -29,7 +29,7 @@ let parse_channels config path =
       String.split ~on:'.' filename
       |> List.filter ~f:(fun str -> String.is_empty str |> not)
     in
-    let%lwt () = if (List.length fragments < 2) || (List.last_exn fragments <> "json")
+    let%lwt () = if (List.length fragments < 2) || (String.(<>) (List.last_exn fragments) "json")
       then fail_with (sprintf "Channel file %s must end in .json" filename)
       else return_unit
     in

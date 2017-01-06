@@ -11,11 +11,11 @@ type fifo_t = {
   timeout: float; (* in seconds *)
   health_time_limit: float; (* in seconds *)
   outbound: string;
-  router: [`Dealer] ZMQ.Socket.t sexp_opaque;
-  socket: [`Dealer] Lwt_zmq.Socket.t sexp_opaque;
+  router: [`Dealer] ZMQ.Socket.t;
+  socket: [`Dealer] Lwt_zmq.Socket.t;
   connector: string list Connector.t;
-  workers: unit Lwt.t array sexp_opaque;
-} [@@deriving sexp]
+  workers: unit Lwt.t array;
+}
 
 type _ action =
   | Write_action : output_write_output action
@@ -128,7 +128,7 @@ let create ~chan_name ~host ~port ~socket_settings ~timeout_ms ~health_time_limi
 
 module M = struct
 
-  type t = fifo_t [@@deriving sexp]
+  type t = fifo_t
 
   let close instance =
     (* TODO: Close workers *)

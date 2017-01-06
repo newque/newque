@@ -8,9 +8,9 @@ type pubsub_t = {
   host: string;
   port: int;
   outbound: string;
-  pub: [`Pub] ZMQ.Socket.t sexp_opaque;
-  socket: [`Pub] Lwt_zmq.Socket.t sexp_opaque;
-} [@@deriving sexp]
+  pub: [`Pub] ZMQ.Socket.t;
+  socket: [`Pub] Lwt_zmq.Socket.t;
+}
 
 let create ~chan_name ~host ~port ~socket_settings =
   let outbound = sprintf "tcp://%s:%d" host port in
@@ -36,7 +36,7 @@ let create ~chan_name ~host ~port ~socket_settings =
 
 module M = struct
 
-  type t = pubsub_t [@@deriving sexp]
+  type t = pubsub_t
 
   let close instance =
     wrap (fun () ->

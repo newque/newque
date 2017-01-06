@@ -19,18 +19,6 @@ type t = {
   proxy: unit Lwt.t;
   stop_w: unit Lwt.u;
 }
-let sexp_of_t zmq =
-  let open Config_t in
-  Sexp.List [
-    Sexp.List [
-      Sexp.Atom zmq.generic.name;
-      Sexp.Atom zmq.generic.host;
-      Sexp.Atom (Int.to_string zmq.generic.port);
-    ];
-    Sexp.List [
-      Sexp.Atom (Int.to_string zmq.specific.concurrency);
-    ];
-  ]
 
 let invalid_read_output = Zmq_obj_pb.({ length = 0; last_id = None; last_timens = None })
 

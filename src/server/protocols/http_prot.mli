@@ -10,7 +10,7 @@ type t = {
   stop_w : unit Lwt.u;
   ctx : Cohttp_lwt_unix_net.ctx;
   thread : unit Lwt.t;
-} [@@deriving sexp_of]
+}
 
 val start :
   Config_t.config_listener ->

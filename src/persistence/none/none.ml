@@ -1,13 +1,13 @@
 open Core.Std
 open Lwt
 
-type none_t = unit [@@deriving sexp]
+type none_t = unit
 
 let create () = return_unit
 
 module M = struct
 
-  type t = none_t [@@deriving sexp]
+  type t = none_t
 
   let close instance = return_unit
 

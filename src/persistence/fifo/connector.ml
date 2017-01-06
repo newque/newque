@@ -4,9 +4,9 @@ open Lwt
 exception Upstream_error of string
 
 type 'a t = {
-  table: 'a Lwt.u String.Table.t sexp_opaque;
+  table: 'a Lwt.u String.Table.t;
   expiration: float; (* in seconds *)
-} [@@deriving sexp]
+}
 
 let create expiration =
   let table = String.Table.create () in

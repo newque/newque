@@ -13,18 +13,6 @@ type t = {
   ctx: Cohttp_lwt_unix_net.ctx;
   thread: unit Lwt.t;
 }
-let sexp_of_t http =
-  let open Config_t in
-  Sexp.List [
-    Sexp.List [
-      Sexp.Atom http.generic.name;
-      Sexp.Atom http.generic.host;
-      Sexp.Atom (Int.to_string http.generic.port);
-    ];
-    Sexp.List [
-      Sexp.Atom (Int.to_string http.specific.backlog);
-    ];
-  ]
 
 let missing_header = "<no header>"
 

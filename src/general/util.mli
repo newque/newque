@@ -1,7 +1,7 @@
 open Core.Std
 open Cohttp
 
-type splitter = (string -> string list) [@@deriving sexp]
+type splitter = (string -> string list)
 val make_splitter : sep:string -> splitter
 
 val parse_int64 : string -> int64 option

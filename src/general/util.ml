@@ -2,7 +2,7 @@ open Core.Std
 open Lwt
 open Cohttp
 
-type splitter = (string -> string list) [@@deriving sexp]
+type splitter = (string -> string list)
 let make_splitter ~sep =
   let delim = Str.regexp_string sep in
   Str.split_delim delim

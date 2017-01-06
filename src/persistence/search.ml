@@ -4,7 +4,7 @@ type t = {
   limit: int64;
   filters: [ `After_id of string | `After_ts of int64 | `After_rowid of int64 | `Tag of string ] array;
   only_once: bool;
-} [@@deriving sexp]
+}
 
 let create max_read ~mode ~only_once =
   match mode with

@@ -16,7 +16,7 @@ type t = {
   workers: worker array;
   proxy: unit Lwt.t;
   stop_w: unit Lwt.u;
-} [@@deriving sexp_of]
+}
 
 val start :
   Config_t.config_listener ->
