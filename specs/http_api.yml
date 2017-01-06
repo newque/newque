@@ -5,12 +5,17 @@ info:
   version: '0.0.3'
 schemes:
   - http
+tags:
+  - name: Write
+  - name: Read
+  - name: Count
+  - name: Delete
+  - name: Health
 paths:
   /v1/{channelName} (when httpFormat = json):
     post:
       tags:
         - Write
-        - httpFormat = json
       summary: Write messages to a channel.
       description: |
         Documents how to write to a channel when `writeSettings.httpFormat` is set to `json` (default).
@@ -40,7 +45,6 @@ paths:
     get:
       tags:
         - Read
-        - httpFormat = json
       summary: Read messages from a channel.
       description: |
         Documents how to retrieve messages from a channel when `readSettings.httpFormat` is set to `json` (default).
@@ -70,7 +74,6 @@ paths:
     post:
       tags:
         - Write
-        - httpFormat = plaintext
       summary: Write messages to a channel.
       description: |
         Documents how to write to a channel when `writeSettings.httpFormat` is set to `plaintext`.
@@ -112,7 +115,6 @@ paths:
     get:
       tags:
         - Read
-        - httpFormat = plaintext
       summary: Read messages from a channel.
       description: |
         Documents how to retrieve messages from a channel when `readSettings.httpFormat` is set to `plaintext`.
@@ -152,8 +154,6 @@ paths:
     get:
       tags:
         - Read
-        - httpFormat = plaintext
-        - Streaming
       summary: Read messages from a channel (Streamed).
       description: |
         This is a special use case.
