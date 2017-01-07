@@ -298,11 +298,11 @@ The formats, as well as every possible operation are defined in the HTTP API Spe
 
 ## ZMQ
 
-ZMQ is much faster and does suffer from the same overhead as HTTP, but being a long-lived TCP socket, it can be much harder to load balance than HTTP.
+ZMQ is much faster and does not suffer from the same overhead as HTTP, but being a long-lived TCP socket, it can be much harder to load balance than HTTP.
 
 **All the formats are already defined in [this file](https://github.com/newque/newque/blob/master/specs/zmq_api.proto)**
 
-So go ahead and use your language's code generator for `.proto` files. Send `Input` Protobuf objects as defined in [the spec](https://github.com/newque/newque/blob/master/specs/zmq_api.proto) and Newque will return `Output` objects.
+Use your language's code generator for `.proto` files. Send `Input` Protobuf objects as defined in [the spec](https://github.com/newque/newque/blob/master/specs/zmq_api.proto) and Newque will return `Output` objects.
 
 Then open a ZMQ socket in `dealer` mode and `connect` to a Newque ZMQ Listener using the address `tcp://ListenerHost:ListenerPort`.
 
