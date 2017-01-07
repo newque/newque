@@ -292,19 +292,21 @@ Interacting with Newque over HTTP is the most flexible way. It offers good perfo
 
 An important concept to grasp is that of the `httpFormat`. Each channel has its own `httpFormat`, one for Writing (`POST`) and one for Reading (`GET`). Valid formats are `json` (default) and `plaintext`.
 
-The formats, as well as every possible operation are defined in the [HTTP API Spec](https://github.com/SGrondin/newque/blob/master/specs/http_api.yml).
+The formats, as well as every possible operation are defined in the HTTP API Spec.
+
+[View the HTTP API Spec in your browser](https://newque.github.io) or go to the [Swagger Editor](http://editor.swagger.io/#/) and select `File` -> `Import URL` (`https://github.com/newque/newque/blob/master/specs/http_api.yml`).
 
 ## ZMQ
 
 ZMQ is much faster and does suffer from the same overhead as HTTP, but being a long-lived TCP socket, it can be much harder to load balance than HTTP.
 
-**All the formats are already defined in [this file](https://github.com/SGrondin/newque/blob/master/specs/zmq_api.proto)**
+**All the formats are already defined in [this file](https://github.com/newque/newque/blob/master/specs/zmq_api.proto)**
 
-So go ahead and use your language's code generator for `.proto` files. Send `Input` Protobuf objects as defined in [the spec](https://github.com/SGrondin/newque/blob/master/specs/zmq_api.proto) and Newque will return `Output` objects.
+So go ahead and use your language's code generator for `.proto` files. Send `Input` Protobuf objects as defined in [the spec](https://github.com/newque/newque/blob/master/specs/zmq_api.proto) and Newque will return `Output` objects.
 
 Then open a ZMQ socket in `dealer` mode and `connect` to a Newque ZMQ Listener using the address `tcp://ListenerHost:ListenerPort`.
 
-A complete Node.js example is available [here](https://github.com/SGrondin/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/zmq.js).
+A complete Node.js example is available [here](https://github.com/newque/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/zmq.js).
 
 ### Basic operations
 
@@ -312,11 +314,11 @@ A complete Node.js example is available [here](https://github.com/SGrondin/newqu
 
 Send [`UID`, `Input`, message1, message2, etc] on the ZMQ socket.
 
-`UID` must be a unique string. `Input` is a [Protobuf object](https://github.com/SGrondin/newque/blob/master/specs/zmq_api.proto) with the `action` field set to `Write_Input`.
+`UID` must be a unique string. `Input` is a [Protobuf object](https://github.com/newque/newque/blob/master/specs/zmq_api.proto) with the `action` field set to `Write_Input`.
 
 Newque will return [`UID`, `Output`].
 
-`UID` will be the exact same string that was sent with the request. This is so that you can associate responses with their requests. `Output` is a [Protobuf object](https://github.com/SGrondin/newque/blob/master/specs/zmq_api.proto) with the `action` field set to `Write_Output` or `Error_Output`.
+`UID` will be the exact same string that was sent with the request. This is so that you can associate responses with their requests. `Output` is a [Protobuf object](https://github.com/newque/newque/blob/master/specs/zmq_api.proto) with the `action` field set to `Write_Output` or `Error_Output`.
 
 #### Read
 
@@ -352,7 +354,7 @@ To receive messages on a `pubsub` backend, open a ZMQ socket in `sub` mode and `
 
 Newque will be sending data in the following format: [`Input`, message1, message2, etc].
 
-A full example is available [here](https://github.com/SGrondin/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/pubsub.js).
+A full example is available [here](https://github.com/newque/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/pubsub.js).
 
 #### FIFO
 
@@ -362,4 +364,4 @@ Newque will be sending data in the following format: [`UID`, `Input`].
 
 `fifo` requires an Acknowledgement or else the client making a request to Newque will receive a timeout error. Using the same socket, send [`UID`, `Output`] back to Newque, where `UID` is the exact same string/buffer that was sent by Newque.
 
-A full example is available [here](https://github.com/SGrondin/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/fifo.js).
+A full example is available [here](https://github.com/newque/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/fifo.js).
