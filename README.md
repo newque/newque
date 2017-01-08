@@ -4,36 +4,49 @@
 
 Newque - pronounced `nuke` - is a fast, declarative message broker.
 
-It can be used for log aggregation, message passing, request batching, pubsub, proxying, routing, optimizing ElasticSearch ingestion rates, and more.
+It can be used for log aggregation, message passing, request batching, pubsub, proxying, routing, logging into ElasticSearch, and a whole lot more.
 
-It is entirely configured through JSON files that are loaded on startup. The format of those JSON files is documented below.
+1. Design your architecture
+2. Define it into simple config files
+3. Let Newque handle it all
+4. Develop and iterate faster instead of reinventing the wheel
 
-Newque is built around the concept of Listeners and Channels. Each channel is registered on a number of Listeners. Each channel has a Backend where messages are stored before they can be read. Messages are treated as binary blobs, they don't have to (but can) be UTF-8.
+Newque is configured with simple JSON files that are loaded on startup. The format of those JSON files is documented [below](https://github.com/newque/newque#configuration-files).
 
-Each message has a unique ID, Newque will generate IDs when they are not provided. If a message with the same ID already exists it won't be added, therefore it is safe to retry messages after a network error, for example.
+Newque is built around the concept of Listeners and Channels (also known as "topics"). Each Channel can be accessed from zero or more Listeners. Listeners expose a protocol ([HTTP](https://github.com/newque/newque#http) or [ZMQ](https://github.com/newque/newque#http)) over a port. Both protocols have pros and cons. Each Channel has a Backend where messages are sent before they can be read. Messages are binary blobs, it is possible to send anything from UTF-8 text to images, JSON, compressed video, etc.
 
-The current Backend options are:
+#### A simple use case example
 
-- None
-- Memory
-- Disk
-- Proxy to a remote HTTP or Newque server
-- ElasticSearch
-- Publish to pubsub (1-to-many, no ack)
-- Publish to a FIFO queue (1-to-1, with ack)
-- ...more coming soon (Redis)
+A typical use case for Newque might involve clients (producers) recording events in an application. In this scenario, events happen continuously and the producers stream those single messages to Newque on a Channel (let's call it "Main") using the local disk as its Backend. This log allows the user to replay events later.
+
+The user also configured Newque to Forward messages received on the Main Channel to a another Channel using ElasticSearch as its Backend (let's call that Channel "Indexer"). The user, aware of the high cost of HTTP requests to ElasticSearch, configured the Indexer Channel to use Batching (for example, with: size = 1000, time = 2 seconds). Therefore Newque will only make a request to ES once at least 1000 messages have been received or once 2 seconds have elapsed since the last flush.
+
+In this imaginary scenario, the user also needs to Forward the messages to a pool of clients (consumers) that will process them. There are multiple Backend choices available to accomplish this task: `httpproxy`, `pubsub` or `fifo`.
+
+The user then uses the Newque high level library (driver) for the language of their choice. By not having to write all that logic themselves, the user can focus on what really matters: the business logic. By relying on a battle-tested platform such as Newque, they avoid reinventing the wheel with all the debugging and performance optimizations it involves.
+
+---
 
 The main operations are:
 
-- Writing to a Channel
-- Reading from Channel
-- Streaming from Channel
+- Writing to a Channel's Backend
+- Reading from a Channel's Backend
+- Streaming from a Channel's Backend
 - Counting the number of messages in a Channel's Backend
 - Deleting all data from a Channel's Backend
-- Checking the Health of a Channel
-- Checking the Health of all Channels
+- Checking the Health of a Channel's Backend
+- Checking the Health of the whole system
 
-Every Backend, its possible use cases and the main operations are documented below.
+The current Backend options are:
+
+- `memory`: Use the local RAM to store messages.
+- `disk`: Use the local disk to store messages.
+- `httpproxy`: Proxy messages to a remote HTTP or another Newque server.
+- `elasticsearch`: Write to ES. Messages must be valid JSON, for obvious reasons.
+- `pubsub`: Broadcast to a ZMQ pubsub address. Publisher-Subscriber. (1-to-many, no ack)
+- `fifo`: Send to a FIFO queue. Producer-Consumer. (1-to-1, with ack)
+- `none`: Does nothing besides Forwarding to other Channels, if applicable
+- ...more coming soon (Redis)
 
 ## Directory structure
 
@@ -63,6 +76,10 @@ __Directories__
 - `lib/` contains the libraries needed to run Newque, it must be located in the same folder as the `newque` executable
 
 ## Concepts
+
+__IDs__
+
+Each message has a unique ID and Newque will generate IDs when they are not provided by the client. If a message with the same ID already exists in the Backend it won't be written, therefore it is possible to retry messages when network errors occur. Obviously in the case of the `httpproxy`, `pubsub` and `fifo` Backends, it is up to the upstream server to implement this behavior if they wish to.
 
 __Atomics__
 
