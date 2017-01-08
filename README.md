@@ -292,15 +292,13 @@ Interacting with Newque over HTTP is the most flexible way. It offers good perfo
 
 An important concept to grasp is that of the `httpFormat`. Each channel has its own `httpFormat`, one for Writing (`POST`) and one for Reading (`GET`). Valid formats are `json` (default) and `plaintext`.
 
-The formats, as well as every possible operation are defined in the HTTP API Spec.
-
-[View the HTTP API Spec in your browser](https://newque.github.io) or go to the [Swagger Editor](http://editor.swagger.io/#/) and select `File` -> `Import URL` (`https://github.com/newque/newque/blob/master/specs/http_api.yml`).
+The formats, as well as every possible operation are defined in the [HTTP API Spec](https://newque.github.io/).
 
 ## ZMQ
 
 ZMQ is much faster and does not suffer from the same overhead as HTTP, but being a long-lived TCP socket, it can be much harder to load balance than HTTP.
 
-**All the formats are already defined in [this file](https://github.com/newque/newque/blob/master/specs/zmq_api.proto)**
+**All the formats are already defined in [the ZMQ API Spec](https://github.com/newque/newque/blob/master/specs/zmq_api.proto)**
 
 Use your language's code generator for `.proto` files. Send `Input` Protobuf objects as defined in [the spec](https://github.com/newque/newque/blob/master/specs/zmq_api.proto) and Newque will return `Output` objects.
 
