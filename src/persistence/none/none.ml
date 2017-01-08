@@ -11,7 +11,7 @@ module M = struct
 
   let close instance = return_unit
 
-  let push instance ~msgs ~ids = return Int.zero
+  let push instance ~msgs ~ids = return (Collection.length msgs)
 
   let pull instance ~search ~fetch_last = return (Collection.empty, None, None)
 
