@@ -17,9 +17,9 @@ Newque is built around the concept of Listeners and Channels (also known as "top
 
 #### A simple use case example
 
-A typical use case for Newque might involve clients (producers) recording events in an application. In this scenario, events happen continuously and the producers stream those single messages to Newque on a Channel (let's call it "Main") using the local disk as its Backend. This log allows the user to replay events later.
+Imagine clients (producers) recording events in an application. In this scenario, events happen continuously and the producers stream those single messages to Newque on a Channel (let's call it "Main") using the local disk as its Backend. This log allows the user to replay events later.
 
-The user also configured Newque to Forward messages received on the Main Channel to a another Channel using ElasticSearch as its Backend (let's call that Channel "Indexer"). The user, aware of the high cost of HTTP requests to ElasticSearch, configured the Indexer Channel to use Batching (for example, with: size = 1000, time = 2 seconds). Therefore Newque will only make a request to ES once at least 1000 messages have been received or once 2 seconds have elapsed since the last flush.
+The user also configured Newque to Forward messages received on the Main Channel to a another Channel using ElasticSearch as its Backend (let's call that Channel "Indexer"). Indexer is not directly exposed on a Listener. The user, aware of the high cost of HTTP requests to ElasticSearch, configured the Indexer Channel to use Batching (for example, with: size = 1000, time = 2 seconds). Therefore Newque will only make a request to ES once at least 1000 messages have been received or once 2 seconds have elapsed since the last flush.
 
 In this imaginary scenario, the user also needs to Forward the messages to a pool of clients (consumers) that will process them. There are multiple Backend choices available to accomplish this task: `httpproxy`, `pubsub` or `fifo`.
 
@@ -44,7 +44,7 @@ The current Backend options are:
 - `httpproxy`: Proxy messages to a remote HTTP or another Newque server.
 - `elasticsearch`: Write to ES. Messages must be valid JSON, for obvious reasons.
 - `pubsub`: Broadcast to a ZMQ pubsub address. Publisher-Subscriber. (1-to-many, no ack)
-- `fifo`: Send to a FIFO queue. Producer-Consumer. (1-to-1, with ack)
+- `fifo`: Send to a ZMQ FIFO address. Producer-Consumer. (1-to-1, with ack)
 - `none`: Does nothing besides Forwarding to other Channels, if applicable
 - ...more coming soon (Redis)
 
