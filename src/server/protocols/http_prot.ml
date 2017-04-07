@@ -224,7 +224,7 @@ let make_socket ~backlog host port =
   let sock = Lwt_unix.socket (Unix.domain_of_sockaddr sockaddr)
       Unix.SOCK_STREAM 0 in
   Lwt_unix.setsockopt sock SO_REUSEADDR true;
-  Lwt_unix.bind sock sockaddr;
+  let%lwt () = Lwt_unix.Versioned.bind_2 sock sockaddr in
   Lwt_unix.listen sock backlog;
   Lwt_unix.set_close_on_exec sock;
   return sock

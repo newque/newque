@@ -5,6 +5,7 @@ let default_perm = 0o755 (* rwxr-xr-x *)
 let log_dir = "./logs/"
 let conf_dir = "./conf/"
 let conf_chan_dir = "./conf/channels/"
+let conf_scripts_dir = "./conf/scripts/"
 let data_dir = "./data/"
 let data_chan_dir = "./data/channels/"
 

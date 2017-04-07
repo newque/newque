@@ -21,6 +21,9 @@ Executable "newque"
   Path: tmp
   MainIs: newque.ml
   CompiledObject: best
+  CSources: lua_newque_bindings.c
+  CCOpt: -O3 -Wall -I/usr/include/lua5.1
+  CCLib: -llua5.1
   BuildDepends:
     atd,
     atdgen,
@@ -32,6 +35,7 @@ Executable "newque"
     lwt.preemptive,
     lwt.unix,
     lwt-zmq,
+    lua,
     ocaml-protoc,
     ppx_sexp_conv,
     ppx_deriving_protobuf,

@@ -34,6 +34,7 @@ module type Argument = sig
   val create : unit -> IO.t Lwt.t
   val stream_slice_size : int64
   val raw : bool
+  val scripting : Write_settings.scripting option
   val batching : Write_settings.batching option
 end
 
@@ -60,9 +61,9 @@ module Make (Argument: Argument) : S = struct
 
   let instance = Argument.create ()
 
-  let ready () =
-    let%lwt _ = instance in
-    return_unit
+  let lua_opt_t = Option.map Argument.scripting ~f:(fun scripting ->
+      Lua_scripting.create ~mappers:(scripting.Write_settings.mappers)
+    )
 
   (******************
      PUSH
@@ -72,17 +73,19 @@ module Make (Argument: Argument) : S = struct
     | true -> Message.serialize_raw
     | false -> Message.serialize_full
 
-  let fast_push =
+  let fast_push_batching =
     let open Write_settings in
     match Argument.batching with
     | None ->
       fun msgs ids ->
+        (* Runtime *)
         let%lwt instance = instance in
         Argument.IO.push instance ~msgs ~ids
 
     | Some { max_time; max_size = 1; _ } ->
       (* Special case optimization *)
       fun msgs ids ->
+        (* Runtime *)
         let%lwt instance = instance in
         let threads =
           Collection.to_list_mapi_two msgs ids ~f:(fun i msg id ->
@@ -103,12 +106,25 @@ module Make (Argument: Argument) : S = struct
         )
       in
       fun msgs ids ->
+        (* Runtime *)
         let%lwt () = Batcher.submit batcher msgs ids in
         return (Collection.length msgs)
 
+  let fast_push_scripting =
+    let open Write_settings in
+    match (Argument.scripting, lua_opt_t) with
+    | None, None -> fast_push_batching
+    | (Some { mappers }), (Some lua_t) ->
+      fun msgs ids ->
+        (* Runtime *)
+        let%lwt lua = lua_t in
+        let%lwt (mapped_msgs, mapped_ids) = Lua_scripting.run_mappers lua mappers ~msgs ~ids in
+        fast_push_batching mapped_msgs mapped_ids
+    | _ -> fast_push_batching (* Impossible case *)
+
   let push msgs ids =
     let msgs = fast_serialize msgs in
-    fast_push msgs ids
+    fast_push_scripting msgs ids
 
   (******************
      PULL
@@ -197,5 +213,18 @@ module Make (Argument: Argument) : S = struct
   let health () =
     let%lwt instance = instance in
     Argument.IO.health instance
+
+  (******************
+     SETUP
+   ********************)
+  let ready () =
+    let%lwt _ = instance in
+    let%lwt () = match lua_opt_t with
+      | None -> return_unit
+      | Some lua_t ->
+        let%lwt _ = lua_t in
+        return_unit
+    in
+    return_unit
 
 end

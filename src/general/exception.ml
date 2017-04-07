@@ -7,6 +7,8 @@ let json_error_regexp = Str.regexp "[ \\\n]"
 let human ex = match ex with
   | Failure str -> str
 
+  | Lua_scripting.Lua_exn (str, _) -> str
+
   | Multiple_exn [] -> "Multiple Unknown Errors"
   | Multiple_exn [str] -> str
   | Multiple_exn errors ->

@@ -2,6 +2,8 @@
 
 # Compilation folder
 rm -rf tmp
+mkdir tmp
+cp libnewque_stubs.clib tmp/
 
 # Folders created by running Newque
 rm -rf logs

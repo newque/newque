@@ -13,6 +13,8 @@ setup.data
 setup.log
 setup.ml
 
+libnewque_stubs.clib
+
 test/node_modules
 test/running
 test/newque

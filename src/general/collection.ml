@@ -349,12 +349,6 @@ let to_coll_concat_map ~f coll =
 
 
 (* HIGH LEVEL *)
-let iter coll ~f =
-  match towards_array coll with
-  | List ll -> List.iter ~f ll
-  | Array arr | Both (arr, _) -> Array.iter ~f arr
-  | Queue q -> Queue.iter ~f q
-
 let fold coll ~init ~f =
   match apply_maps coll with
   | List ll -> List.fold ~init ~f ll
@@ -369,6 +363,20 @@ let foldi coll ~init ~f =
     i := !i + 1;
     acc
   )
+
+let iter coll ~f =
+  match towards_array coll with
+  | List ll -> List.iter ~f ll
+  | Array arr | Both (arr, _) -> Array.iter ~f arr
+  | Queue q -> Queue.iter ~f q
+
+let iteri coll ~f =
+  let _ = fold coll ~init:0 ~f:(fun i x ->
+      let () = f i x in
+      (i + 1)
+    )
+  in
+  ()
 
 let add_to_queue coll queue =
   match towards_list coll with

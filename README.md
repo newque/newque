@@ -42,6 +42,8 @@ newque/
 ├── conf/
 │   ├── channels/
 │   │   └── mychannel.json
+│   ├── scripts/
+│   │   └── myscript.lua
 │   └── newque.json
 ├── data/
 │   ├── channels/
@@ -57,7 +59,7 @@ newque/
 ```
 
 __Directories__
-- `conf/` contains the `newque.json` file and a folder with the settings for every channel.
+- `conf/` contains the `newque.json` file and folders for the channel settings and scripts.
 - `data/` is created when starting Newque and contains data generated during operation. Do not modify.
 - `logs/` is created when starting Newque and contains the output and error logs.
 - `lib/` contains the libraries needed to run Newque, it must be located in the same folder as the `newque` executable

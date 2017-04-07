@@ -3,7 +3,7 @@
 Don't run as `root`. Instructions for Debian/Ubuntu.
 ```bash
 sudo apt-get update
-sudo apt-get install libev4 libev-dev build-essential libsqlite3-dev patchelf upx aspcud opam libtool pkg-config autoconf automake uuid-dev
+sudo apt-get install libev4 libev-dev build-essential libsqlite3-dev liblua5.1-0 liblua5.1-0-dev patchelf upx aspcud opam libtool pkg-config autoconf automake uuid-dev
 
 # Then install ZeroMQ 4.0.x using the "To build on UNIX-like systems" instructions at
 # http://zeromq.org/intro:get-the-software
@@ -12,7 +12,7 @@ opam init
 # Pay attention and run "eval `opam config env`" whenever OPAM asks for it.
 opam update
 opam switch 4.02.3
-opam install atdgen cohttp conf-libev core cppo lwt-zmq oasis ocaml-protoc ocp-indent ppx_deriving_protobuf sqlite3 utop uuidm
+opam install atdgen cohttp conf-libev core cppo lwt-zmq oasis ocaml-lua ocaml-protoc ocp-indent ppx_deriving_protobuf sqlite3 utop uuidm
 
 git clone git@github.com:SGrondin/newque.git
 # Then, cd into the cloned newque repo and run:

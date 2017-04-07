@@ -6,7 +6,7 @@ open Core.Std
 open Lwt
 open Http_prot
 
-let () = Lwt_engine.set ~transfer:true ~destroy:true (new Lwt_engine.libev)
+let () = Lwt_engine.set ~transfer:true ~destroy:true (new Lwt_engine.Versioned.libev_2 ())
 
 let () = Lwt.async_exception_hook := fun ex ->
     print_endline (sprintf "UNCAUGHT EXCEPTION: %s" (Exception.full ex))
@@ -90,7 +90,7 @@ let start config_path =
 
 let _ =
   try
-    Lwt_unix.run (start (sprintf "%s%s" Fs.conf_dir "newque.json"))
+    Lwt_main.run (start (sprintf "%s%s" Fs.conf_dir "newque.json"))
   with
   | ex ->
     print_endline (sprintf
