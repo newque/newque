@@ -377,7 +377,7 @@ A full example is available [here](https://github.com/newque/newque/blob/dd21741
 
 To receive messages on a `fifo` backend, open a ZMQ socket in `dealer` mode and `connect` to the Channel using the ZMQ address `tcp://FifoChannelHost:FifoChannelPort`.
 
-Newque will be sending data in the following format: [`UID`, `Input`].
+Newque will be sending data in the following format: [`UID`, `Input`, message1, message2, etc].
 
 `fifo` requires an Acknowledgement or else the client making a request to Newque will receive a timeout error. Using the same socket, send [`UID`, `Output`] back to Newque, where `UID` is the exact same string/buffer that was sent by Newque.
 
