@@ -177,6 +177,7 @@ __ZMQ Settings object__
 __Socket Settings object__
 
 **IMPORTANT:** Read [the docs](http://api.zeromq.org/4-0:zmq-setsockopt) before changing any defaults!
+
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `ZMQ_MAXMSGSIZE` | Integer | No | `-1` | Max message size in bytes, `-1` means unlimited.  |
@@ -247,6 +248,7 @@ __`httpproxy` `backendSettings` Object__
 | `remoteOutputFormat` | String | No | `json` | Format that the remote server uses to send read results. One of `plaintext` or `json`. |
 
 Header object:
+
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `key` | String | Yes | | Header name |
