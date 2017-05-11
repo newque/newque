@@ -4,17 +4,19 @@
 
 ## Table of Contents
 
-- [Introduction](#introduction)  
-  - [Newque Overview](#newque-overview)  
-  - [Key Benefits](#key-benefits)  
-- [Getting Started](#getting-started)  
-- [Integrations](#integrations)  
-- [Security](#security)  
-- [Examples](#examples)  
-  - [Common Use Case](#common-use-case)  
-- [JSON Configuration](#json-configuration)  
-- [Roadmap](#roadmap)  
-- [Contributing](#contributing)  
+- [Introduction](#introduction)
+  - [Newque Overview](#newque-overview)
+  - [Key Benefits](#key-benefits)
+- [Getting Started](#getting-started)
+- [Integrations](#integrations)
+- [Examples](#examples)
+  - [Common Use Case](#common-use-case)
+- [Directory Structure](#directory-structure)
+- [Concepts](#concepts)
+- [Logging](#logging)
+- [JSON Configuration](#json-configuration)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
 
 ## Introduction
 
@@ -44,12 +46,12 @@ Newque is built around the concept of Listeners and Channels (also known as "top
 
 ### Key Benefits
 
-Todo: Using Newque can afford you:
+Using Newque can afford you:
 
-- Peace of mind: over what?
-- Saves you time: queue management over failed instances, pending queues, etc require hours of development and testing, and thousands of lines of code.
-- Improves application performance: data retrieval is fast. Todo how fast?
-- Todo: benchmarks
+- **Peace of mind**: you no longer have to ask yourself worrisome questions such as: 'Will my data collector run if one of my agents accidentally disconnects?'
+- **Fast architecture prototyping**: it takes seconds to change the entire flow of data in your system to try different architectures. Avoid having to reinvent the wheel, or writing complicated and error-prone code to move data around.
+- **Time**: queue management over failed instances, pending queues, etc require hours of development and testing, and thousands of lines of code. Newque handles it all.
+- **Fast application performance**
 
 ## Getting Started
 
@@ -58,6 +60,13 @@ To install Newque, run
 ```bash
 $ some command
 ```
+
+## Integrations
+
+- Disk
+- ElasticSearch
+- Redis (coming soon)
+- PostgreSQL (coming soon)
 
 ## Examples
 
@@ -91,15 +100,6 @@ The current Backend options are:
 - `fifo`: Send to a ZMQ FIFO address. Producer-Consumer. (1-to-1, with ack)
 - `none`: Does nothing besides Forwarding to other Channels, if applicable
 - ...more coming soon (Redis)
-
----
-
-## Integrations
-
-- Disk
-- ElasticSearch
-- Redis (coming soon)
-- PostgreSQL (coming soon)
 
 ## Directory structure
 
@@ -156,7 +156,7 @@ Levels `warning`, `error` and `fatal` are written to STDERR and `./logs/err.log`
 
 **Note:** If the `NEWQUE_ENV` environment variable is set, it'll be used in the log format.
 
-## Configuration files
+## JSON Configuration
 
 ### Main configuration file (`newque.json`)
 
