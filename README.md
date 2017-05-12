@@ -5,12 +5,15 @@
 ## Table of Contents
 
 - [Introduction](#introduction)
+  - [Basics](#basics)
   - [Newque Overview](#newque-overview)
   - [Key Benefits](#key-benefits)
+  - [Common Use Case](#common-use-case)
 - [Getting Started](#getting-started)
 - [Integrations](#integrations)
 - [Examples](#examples)
-  - [Common Use Case](#common-use-case)
+  - [Pubsub](#pubsub)
+  - [FIFO](#fifo)
 - [Directory Structure](#directory-structure)
 - [Concepts](#concepts)
 - [Logging](#logging)
@@ -19,6 +22,8 @@
 - [Contributing](#contributing)
 
 ## Introduction
+
+### Basics
 
 A message broker acts as a service in between a datastore and application. It can accept client application's requests to return aggregate data from a datastore such as Redis, or itself acting as a collector. Message brokers offset developer workload and application complexity by handling several things, including:
 
@@ -53,23 +58,6 @@ Using Newque can afford you:
 - **Time**: queue management over failed instances, pending queues, etc require hours of development and testing, and thousands of lines of code. Newque handles it all.
 - **Fast application performance**
 
-## Getting Started
-
-To install Newque, run
-
-```bash
-$ some command
-```
-
-## Integrations
-
-- Disk
-- ElasticSearch
-- Redis (coming soon)
-- PostgreSQL (coming soon)
-
-## Examples
-
 ### Common Use Case
 
 Imagine clients (producers) recording events in an application. In this scenario, events happen continuously and the producers stream those single messages to Newque on a Channel (let's call it "Main") using the local disk as its Backend. This log allows the user to replay events later.
@@ -100,6 +88,41 @@ The current Backend options are:
 - `fifo`: Send to a ZMQ FIFO address. Producer-Consumer. (1-to-1, with ack)
 - `none`: Does nothing besides Forwarding to other Channels, if applicable
 - ...more coming soon (Redis)
+
+## Getting Started
+
+To install Newque, run
+
+```bash
+$ some command
+```
+
+## Integrations
+
+- Disk
+- ElasticSearch
+- Redis (coming soon)
+- PostgreSQL (coming soon)
+
+## Examples
+
+### Pubsub
+
+To receive messages on a `pubsub` backend, open a ZMQ socket in `sub` mode and `connect` to the Channel using the ZMQ address `tcp://PubsubChannelHost:PubsubChannelPort` and finally `subscribe` to all messages.
+
+Newque will be sending data in the following format: [`Input`, message1, message2, etc].
+
+A full example is available [here](https://github.com/newque/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/pubsub.js).
+
+### FIFO
+
+To receive messages on a `fifo` backend, open a ZMQ socket in `dealer` mode and `connect` to the Channel using the ZMQ address `tcp://FifoChannelHost:FifoChannelPort`.
+
+Newque will be sending data in the following format: [`UID`, `Input`, message1, message2, etc].
+
+`fifo` requires an Acknowledgement or else the client making a request to Newque will receive a timeout error. Using the same socket, send [`UID`, `Output`] back to Newque, where `UID` is the exact same string/buffer that was sent by Newque.
+
+A full example is available [here](https://github.com/newque/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/fifo.js).
 
 ## Directory structure
 
@@ -418,30 +441,11 @@ Newque will return [`UID`, `Output`].
 
 This section describes how to accept requests from Newque and serve as a backend for a channel.
 
-#### Pubsub
-
-To receive messages on a `pubsub` backend, open a ZMQ socket in `sub` mode and `connect` to the Channel using the ZMQ address `tcp://PubsubChannelHost:PubsubChannelPort` and finally `subscribe` to all messages.
-
-Newque will be sending data in the following format: [`Input`, message1, message2, etc].
-
-A full example is available [here](https://github.com/newque/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/pubsub.js).
-
-#### FIFO
-
-To receive messages on a `fifo` backend, open a ZMQ socket in `dealer` mode and `connect` to the Channel using the ZMQ address `tcp://FifoChannelHost:FifoChannelPort`.
-
-Newque will be sending data in the following format: [`UID`, `Input`, message1, message2, etc].
-
-`fifo` requires an Acknowledgement or else the client making a request to Newque will receive a timeout error. Using the same socket, send [`UID`, `Output`] back to Newque, where `UID` is the exact same string/buffer that was sent by Newque.
-
-A full example is available [here](https://github.com/newque/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/fifo.js).
-
 ## Roadmap
 
-v0.1.0
+Planned features:
 
-- This
-- That
+- Redis integration
 
 ## Contributing
 
