@@ -1,6 +1,6 @@
 # Newque
 
-> Fast, modular message broker
+> Fast, configurable message broker that saves you time and rids datastore headaches.
 
 ## Table of Contents
 
@@ -91,11 +91,11 @@ The current Backend options are:
 
 ## Getting Started
 
-To install Newque, run
+To set up and run Newque:
 
-```bash
-$ some command
-```
+1. Download the latest release from https://github.com/newque/newque/releases/latest and unzip it to a `path/`
+1. Edit the configuration files in `path/conf/` to your needs (see [JSON Configuration](#json-configuration))
+1. Run `path/newque`
 
 ## Integrations
 
