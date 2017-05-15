@@ -25,7 +25,7 @@
 
 ### Basics
 
-A message broker acts as a service in between networked applications, devices, datastores, etc. It can accept client application's requests to return aggregate data from your backend servers, or itself acting as a collector. Message brokers offset developer workload and application complexity by handling several things, including:
+A message broker acts as a service in between networked applications, devices, datastores, etc. It can accept client applications' requests to return aggregate data from your backend servers, or itself acting as a collector. Message brokers offset developer workload and application complexity by handling several things, including:
 
 - Collecting data
 - Log aggregation
