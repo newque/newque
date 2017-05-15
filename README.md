@@ -25,48 +25,49 @@
 
 ### Basics
 
-A message broker acts as a service in between a datastore and application. It can accept client application's requests to return aggregate data from a datastore such as Redis, or itself acting as a collector. Message brokers offset developer workload and application complexity by handling several things, including:
+A message broker acts as a service in between networked applications, devices, datastores, etc. It can accept client applications' requests to return aggregate data from your backend servers, or itself acting as a collector. Message brokers offset developer workload and application complexity by handling several things, including:
 
 - Collecting data
 - Log aggregation
 - Message parsing
+- Message validation
 - Request batching
-- pubsub
+- One-to-many routing (pubsub)
+- Producer-consumer routing
 - Proxying
-- Routing
 - Logging
 
 ### Newque Overview
 
 Newque - pronounced `nuke` - is a fast, declarative message broker. It can be used for common operations listed above and more. With Newque, you can:
 
-1. Design your architecture using short terms
+1. Design your architecture using common patterns
 2. Define it into JSON config files
 3. Let Newque handle all your message needs
 4. Develop and iterate faster instead of reinventing the wheel
 
 Newque is configured with JSON files that are loaded on startup. The format of those JSON files is documented [below](https://github.com/newque/newque#configuration-files).
 
-Newque is built around the concept of Listeners and Channels (also known as "topics"). Each Channel can be accessed from zero or more Listeners. Listeners expose a protocol ([HTTP](https://github.com/newque/newque#http) or [ZMQ](https://github.com/newque/newque#http)) over a port. Both protocols have pros and cons. Each Channel has a Backend where messages are sent before they can be read. Messages are binary blobs; it is possible to send anything from UTF-8 text to images, JSON, compressed video, etc.
+Newque is built around the concept of Listeners and Channels (sometimes known as "topics"). Each Channel can be accessed from zero or more Listeners. Listeners expose a protocol ([HTTP](https://github.com/newque/newque#http) or [ZMQ](https://github.com/newque/newque#zmq)) over a port. Both protocols have pros and cons. Each Channel has a Backend where messages are sent before they can be read. Messages are binary blobs; it is possible to send anything from UTF-8 text to images, JSON, compressed video, etc.
 
 ### Key Benefits
 
 Using Newque can afford you:
 
-- **Peace of mind**: you no longer have to ask yourself worrisome questions such as: 'Will my data collector run if one of my agents accidentally disconnects?'
+- **Peace of mind**: you no longer have to ask yourself worrisome questions such as: 'What happens if one of my data processing servers goes down?'
 - **Fast architecture prototyping**: it takes seconds to change the entire flow of data in your system to try different architectures. Avoid having to reinvent the wheel, or writing complicated and error-prone code to move data around.
-- **Time**: queue management over failed instances, pending queues, etc require hours of development and testing, and thousands of lines of code. Newque handles it all.
+- **Time**: queue management over failed instances, pending queues, etc require hours of development and testing. Newque handles it all.
 - **Fast application performance**
 
 ### Common Use Case
 
-Imagine clients (producers) recording events in an application. In this scenario, events happen continuously and the producers stream those single messages to Newque on a Channel (let's call it "Main") using the local disk as its Backend. This log allows the user to replay events later.
+Imagine clients (producers) recording events in an application. In this scenario, events happen continuously and the producers stream those single messages to Newque on a Channel (let's call it "Main") using the local disk as its Backend. This log allows the user to replay events later by Reading messages from that Backend.
 
-The user also configured Newque to Forward messages received on the Main Channel to another Channel using ElasticSearch as its Backend (let's call that Channel "Indexer"). Indexer is not directly exposed on a Listener. The user, aware of the high cost of HTTP requests to ElasticSearch, configured the Indexer Channel to use Batching (for example, with: size = 1000, time = 2 seconds). Therefore Newque will only make a request to ES once at least 1000 messages have been received or once 2 seconds have elapsed since the last flush.
+The user also configured Newque to Forward messages received on the Main Channel to another Channel using ElasticSearch as its Backend (let's call that Channel "Indexer"). Indexer is not directly exposed on a Listener. The user, aware of the high overhead of HTTP requests to ElasticSearch, configured the Indexer Channel to use Batching (for example, with: size = 1000, time = 2 seconds). Therefore Newque will only make a request to ES once at least 1000 messages have been received or once 2 seconds have elapsed since the last request was made.
 
 In this imaginary scenario, the user also needs to Forward the messages to a pool of clients (consumers) that will process them. There are multiple Backend choices available to accomplish this task: `httpproxy`, `pubsub` or `fifo`.
 
-The user then uses the Newque high level library (driver) for the language of their choice. By not having to write all that logic themselves, the user can focus on what really matters: the business logic. By relying on a battle-tested platform such as Newque, they avoid reinventing the wheel with all the debugging and performance optimizations it involves.
+The user then uses the Newque high level library (driver) for the language of their choice. By not having to write all the code to route data to all these services themselves, the user can focus on what really matters: the business logic. By relying on a battle-tested platform such as Newque, they avoid reinventing the wheel with all the debugging and performance optimizations it involves.
 
 The main operations are:
 
@@ -87,7 +88,7 @@ The current Backend options are:
 - `pubsub`: Broadcast to a ZMQ pubsub address. Publisher-Subscriber. (1-to-many, no ack)
 - `fifo`: Send to a ZMQ FIFO address. Producer-Consumer. (1-to-1, with ack)
 - `none`: Does nothing besides Forwarding to other Channels, if applicable
-- ...more coming soon (Redis)
+- ...more coming soon (Redis and PostgreSQL)
 
 ## Getting Started
 
@@ -101,6 +102,7 @@ To set up and run Newque:
 
 - Disk
 - ElasticSearch
+- ZMQ
 - Redis (coming soon)
 - PostgreSQL (coming soon)
 
@@ -149,7 +151,7 @@ __Directories__
 - `conf/` contains the `newque.json` file and a folder with the settings for every channel.
 - `data/` is created when starting Newque and contains data generated during operation. Do not modify.
 - `logs/` is created when starting Newque and contains the output and error logs.
-- `lib/` contains the libraries needed to run Newque, it must be located in the same folder as the `newque` executable
+- `lib/` contains the libraries needed to run Newque, it must be located in the same folder as the `newque` executable. Do not modify.
 
 ## Concepts
 
@@ -159,11 +161,11 @@ Each message has a unique ID and Newque will generate IDs when they are not prov
 
 __Atomics__
 
-When Writing a batch of messages, they can be flagged as `atomic`. They will be treated as one. They'll have a combined size of `1`, and all be written and/or read at once.
+When Writing a batch of messages, they can be flagged as `atomic`. They will be treated as one. They'll have a combined size of `1`, and all be written and read at once.
 
 __Raw__
 
-A Channel can enable the option `raw`. Atomics don't exist in this mode. Performance is marginally better for all non-atomic messages. The ElasticSearch backend requires this option to be enabled.
+A Channel can enable the option `raw`. Atomics don't exist in this mode. Performance is marginally better for all non-atomic messages. Messages are passed as-is to the Backend, which can be useful if your `fifo`, `pubsub` or `httpproxy` remote servers need to be able to make sense of those messages. The ElasticSearch backend requires this option to be enabled.
 
 ## Logging
 
@@ -446,6 +448,7 @@ This section describes how to accept requests from Newque and serve as a backend
 Planned features:
 
 - Redis integration
+- PostgreSQL integration
 
 ## Contributing
 
