@@ -1,9 +1,10 @@
-open Core.Std
+open Core
 open Lua_api
 
 type t
 
 exception Lua_exn of string * Lua.thread_status
+exception Lua_user_exn of string
 
 type _ lua_type =
   | Lua_integer : int lua_type

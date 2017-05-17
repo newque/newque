@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Lwt
 
 type t =
@@ -84,3 +84,10 @@ let length ~raw msg =
   | Multiple m -> Collection.length m
   | Atomic m when raw -> Collection.length m
   | Atomic _ -> 1
+
+let swap_contents msg new_contents =
+  let atomic = match msg with
+    | Multiple _ -> false
+    | Atomic _ -> true
+  in
+  of_string_coll ~atomic new_contents

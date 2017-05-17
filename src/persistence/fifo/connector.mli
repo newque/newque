@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 
 exception Upstream_error of string
 

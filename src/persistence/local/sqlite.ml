@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Lwt
 (* Not opening Sqlite3, to make it more explicit and to wrap all calls to it *)
 module S3 = Sqlite3

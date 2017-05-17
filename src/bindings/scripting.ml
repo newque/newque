@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Lwt
 open Lua_api
 
@@ -10,6 +10,13 @@ type t = {
 }
 
 exception Lua_exn of string * Lua.thread_status
+exception Lua_user_exn of string
+
+external lua_parallel_multi_pcall__wrapper : Lua.state -> int -> int -> int = "lua_parallel_multi_pcall"
+
+let parallel_multi_pcall ls nargsresults nmappers =
+  lua_parallel_multi_pcall__wrapper ls nargsresults nmappers
+  |> Lua.thread_status_of_int
 
 let registry_mapper_key chan_name = sprintf "NEWQUE_%s_MAPPER" chan_name
 
@@ -20,6 +27,7 @@ let create_lua_state () =
   wrap (fun () ->
     let ls = LuaL.newstate ?max_memory_size:(None) () in
     LuaL.openlibs ls;
+
     (* Edit package.path *)
     Lua.getglobal ls "package";
     Lua.getfield ls (-1) "path";
@@ -32,6 +40,16 @@ let create_lua_state () =
     Lua.pushstring ls new_path;
     Lua.setfield ls (-2) "path";
     Lua.setglobal ls "package";
+
+    (* Prepare a safe Lua exception catcher *)
+    let _ = Lua.atpanic ls (fun ls ->
+        let msg = Option.value ~default:"No message found on the stack" (Lua.tostring ls (-1)) in
+        let str = sprintf "A Lua VM panic occured: [%s]" msg in
+        async (fun () -> Logger.error str);
+        (* This exception allows us to escape Lua's call to exit(0) *)
+        failwith str
+      )
+    in
     ls
   )
 
@@ -45,26 +63,37 @@ let thread_status_to_string ts =
   | Lua.LUA_ERRERR -> "LUA_ERRERR"
   | Lua.LUA_ERRFILE -> "LUA_ERRFILE"
 
-let get_lua_exn ls ts =
-  let err_msg = sprintf "%s %s"
-      (thread_status_to_string ts)
-      (Option.value ~default:"" (Lua.tostring ls (-1)))
+let raise_lua_exn ~during ls ts =
+  let type_ = Lua.type_ ls (-1) in
+  let ex = match type_ with
+    | Lua.LUA_TSTRING | Lua.LUA_TNUMBER ->
+      let err_str = Option.value ~default:"" (Lua.tostring ls (-1)) in
+      let err_msg = sprintf "Unexpected error [%s] [%s] during %s"
+          (thread_status_to_string ts) err_str during
+      in
+      Lua_exn (err_msg, ts)
+
+    | Lua.LUA_TTABLE ->
+      Lua.getfield ls (-1) "location";
+      let location = Option.value ~default:"" (Lua.tostring ls (-1)) in
+      Lua.getfield ls (-2) "message";
+      let message = Option.value ~default:"" (Lua.tostring ls (-1)) in
+      Lua_user_exn (sprintf "Error [%s] occured in [%s]" message location)
+
+    | Lua.LUA_TNONE
+    | Lua.LUA_TNIL
+    | Lua.LUA_TBOOLEAN
+    | Lua.LUA_TLIGHTUSERDATA
+    | Lua.LUA_TFUNCTION
+    | Lua.LUA_TUSERDATA
+    | Lua.LUA_TTHREAD ->
+      let err_msg = sprintf "Error [%s]: invalid value of type [%s] was thrown during %s"
+          (thread_status_to_string ts) (Lua.typename ls type_) during
+      in
+      Lua_exn (err_msg, ts)
   in
   empty_stack ls;
-  Lua_exn (err_msg, ts)
-
-
-external lua_parallel_pcall__wrapper : Lua.state -> int -> int -> int -> int = "lua_parallel_pcall__stub"
-external lua_parallel_multi_pcall__wrapper : Lua.state -> int -> int -> int = "lua_parallel_multi_pcall__stub"
-
-let parallel_pcall ls nargs nresults errfunc =
-  lua_parallel_pcall__wrapper ls nargs nresults errfunc
-  |> Lua.thread_status_of_int
-
-let parallel_multi_pcall ls nargsresults nmappers =
-  lua_parallel_multi_pcall__wrapper ls nargsresults nmappers
-  |> Lua.thread_status_of_int
-
+  raise ex
 
 type _ lua_type =
   | Lua_integer : int lua_type
@@ -73,6 +102,7 @@ type _ lua_type =
   | Lua_string_table : string Collection.t lua_type
   | Lua_string_table_pair : (string Collection.t * string Collection.t) lua_type
 
+(* Will eventually need to be rewritten in C *)
 let extract_string_table ls =
   Array.init (Lua.objlen ls (-1)) ~f:(fun i ->
     Lua.rawgeti ls (-1) (i+1);
@@ -135,13 +165,13 @@ let load_script ls script =
   (* Compile *)
   let%lwt () = match LuaL.loadstring ls contents with
     | Lua.LUA_OK -> return_unit
-    | lua_err -> fail (get_lua_exn ls lua_err)
+    | lua_err -> raise_lua_exn ls lua_err ~during:(sprintf "initial compilation of [%s]" path)
   in
 
   (* Run *)
   let%lwt () = match Lua.pcall ls 0 1 0 with
     | Lua.LUA_OK -> return_unit
-    | lua_err -> fail (get_lua_exn ls lua_err)
+    | lua_err -> raise_lua_exn ls lua_err ~during:(sprintf "initial execution of [%s]" path)
   in
 
   (* Validate function *)
@@ -167,19 +197,6 @@ let create ~mappers =
   let instance = { ls; mutex; } in
   return instance
 
-let run_lua_fn : type a. t -> string -> a lua_type -> (Lua.state -> int) -> a Lwt.t =
-  fun {ls; mutex;} script_name return_type push_args ->
-    Lwt_mutex.with_lock mutex (fun () ->
-      Lwt_preemptive.detach (fun () ->
-        Lua.getfield ls Lua.registryindex (registry_mapper_key script_name);
-        let args_count = push_args ls in
-        match parallel_pcall ls args_count 1 0 with
-        | Lua.LUA_OK ->
-          extract_lua_result_sync ls return_type
-        | lua_err -> raise (get_lua_exn ls lua_err)
-      ) ()
-    )
-
 let run_lua_fn_chain : type a. t -> string array -> a lua_type -> (Lua.state -> int) -> a Lwt.t =
   fun {ls; mutex;} script_names return_type push_args ->
     Lwt_mutex.with_lock mutex (fun () ->
@@ -191,13 +208,20 @@ let run_lua_fn_chain : type a. t -> string array -> a lua_type -> (Lua.state -> 
         match parallel_multi_pcall ls args_count (Array.length script_names) with
         | Lua.LUA_OK ->
           extract_lua_result_sync ls return_type
-        | lua_err -> raise (get_lua_exn ls lua_err)
+        | lua_err ->
+          raise_lua_exn ls lua_err ~during:(sprintf "execution of [%s]" (String.concat_array ~sep:"," script_names))
       ) ()
     )
 
 let run_mappers instance mappers ~msgs ~ids =
-  run_lua_fn_chain instance mappers Lua_string_table_pair (fun ls ->
-    push_coll_to_stack_sync ls ids;
-    push_coll_to_stack_sync ls msgs;
-    2
-  )
+  let lua_result = run_lua_fn_chain instance mappers Lua_string_table_pair (fun ls ->
+      push_coll_to_stack_sync ls ids;
+      push_coll_to_stack_sync ls msgs;
+      2
+    )
+  in
+  (* If not a user error, print it into the logs *)
+  try%lwt lua_result with
+  | Lua_exn (err, _) ->
+    let%lwt () = Logger.error err in
+    fail (Lua_user_exn "Unexpected error during script execution")

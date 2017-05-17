@@ -11,21 +11,24 @@ sudo apt-get install libev4 libev-dev build-essential libsqlite3-dev liblua5.1-0
 opam init
 # Pay attention and run "eval `opam config env`" whenever OPAM asks for it.
 opam update
-opam switch 4.02.3
-opam install atdgen cohttp conf-libev core cppo lwt-zmq oasis ocaml-lua ocaml-protoc ocp-indent ppx_deriving_protobuf sqlite3 utop uuidm
+opam switch 4.03.0
 
 git clone git@github.com:SGrondin/newque.git
-# Then, cd into the cloned newque repo and run:
-git clone git@github.com:SGrondin/ocaml-conduit.git conduit.0.12.0
+cd newque
 
-# This next command will reinstall conduit and cohttp:
-opam pin add conduit conduit.0.12.0
+git clone git@github.com:SGrondin/ocaml-lua.git newque-lua
+opam pin add ocaml-lua newque-lua -y
 
-oasis setup
-./configure
+git clone git@github.com:SGrondin/ocaml-conduit.git newque-conduit
+opam pin add conduit newque-conduit -y
+
+opam install atdgen cohttp conf-libev core cppo lwt-zmq oasis ocaml-protoc ocp-indent ppx_deriving_protobuf sqlite3 utop uuidm
+
+# Downloads some dependencies and runs 'configure' scripts
+./scripts/setup.sh
 
 # To remove some invalid warnings, run (replace USERNAME in the path):
-echo 'export OCAMLFIND_IGNORE_DUPS_IN=/home/USERNAME/.opam/4.02.3/lib/ocaml/compiler-libs/' >> ~/.bashrc
+echo 'export OCAMLFIND_IGNORE_DUPS_IN=/home/USERNAME/.opam/4.03.0/lib/ocaml/compiler-libs/' >> ~/.bashrc
 source ~/.bashrc
 
 make

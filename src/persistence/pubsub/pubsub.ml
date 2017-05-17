@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Lwt
 
 module Logger = Log.Make (struct let section = "Pubsub" end)
@@ -45,6 +45,7 @@ module M = struct
     )
 
   let push instance ~msgs ~ids =
+    let open Zmq_obj_types in
     let open Zmq_obj_pb in
     let input = { channel = instance.chan_name; action = Write_input { atomic = None; ids = (Collection.to_list ids |> snd); } } in
     let encoder = Pbrt.Encoder.create () in

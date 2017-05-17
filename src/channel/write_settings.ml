@@ -1,8 +1,13 @@
-open Core.Std
+open Core
 
 type ack =
   | Instant
   | Saved
+
+type json_validation = {
+  schema_name: string;
+  parallelism_threshold: int;
+}
 
 type scripting = {
   mappers: string array;
@@ -17,6 +22,7 @@ type t = {
   http_format: Http_format.t;
   ack: ack;
   forward: string list;
+  json_validation: json_validation option;
   scripting: scripting option;
   batching: batching option;
 }
@@ -40,4 +46,10 @@ let create config_channel_write =
         max_size = conf_batching.c_max_size;
       }
     ) in
-  { http_format; ack; forward; scripting; batching; }
+  let json_validation = Option.map config_channel_write.c_json_validation ~f:(fun conf_json_validation ->
+      {
+        schema_name = conf_json_validation.c_schema_name;
+        parallelism_threshold = conf_json_validation.c_parallelism_threshold;
+      }
+    ) in
+  { http_format; ack; forward; json_validation; scripting; batching; }

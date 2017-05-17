@@ -1,0 +1,15 @@
+{
+  "listeners": ["http8000", "zmq8005"],
+  "backend": "disk",
+  "acknowledgement": "saved",
+  "readSettings": {},
+  "writeSettings": {
+    "httpFormat": "plaintext",
+    "forward": [],
+    "scripting": {
+      "mappers": ["throws.lua"]
+    }
+  },
+  "raw": true,
+  "emptiable": false
+}

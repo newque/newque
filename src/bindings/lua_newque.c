@@ -14,42 +14,14 @@
 #include <caml/callback.h>
 #include <caml/signals.h>
 
+
 /* macro from ocaml-lua/stub.h */
 #ifndef lua_State_val
 #define lua_State_val(L) (*((lua_State **) Data_custom_val(L)))
 #endif
 
-// Fully parallel version of lua_pcall()
-CAMLprim
-value lua_parallel_pcall__stub(value v_L, value v_nargs, value v_nresults, value v_errfunc)
-{
-  // Register heap values
-  CAMLparam4(v_L, v_nargs, v_nresults, v_errfunc);
-  CAMLlocal1(v_status);
-
-  // Import values so the lock can be released
-  lua_State* L = lua_State_val(v_L);
-  int nargs = Int_val(v_nargs);
-  int nresults = Int_val(v_nresults);
-  int errfunc = Int_val(v_errfunc);
-
-  // Release runtime
-  caml_enter_blocking_section();
-
-  // Execute
-  int status = lua_pcall(L, nargs, nresults, errfunc);
-
-  // Acquire runtime
-  caml_leave_blocking_section();
-
-  // Wrap
-  v_status = Val_int(status);
-
-  CAMLreturn(v_status);
-}
-
-CAMLprim
-value lua_parallel_multi_pcall__stub(value v_L, value v_nargsresults, value v_nmappers)
+extern "C"
+value lua_parallel_multi_pcall(value v_L, value v_nargsresults, value v_nmappers)
 {
   // Register heap values
   CAMLparam3(v_L, v_nargsresults, v_nmappers);

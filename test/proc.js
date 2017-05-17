@@ -225,8 +225,12 @@ exports.setupEnvironment = function (backend, backendSettings, raw) {
   return rm(remoteRunningDir)
   .then(() => rm(runningDir))
   .then(() => rm(remoteConfDir + '/channels'))
+  .then(() => rm(remoteConfDir + '/scripts'))
+  .then(() => rm(remoteConfDir + '/jsonschemas'))
   .then(() => createDir(remoteRunningDir))
   .then(() => copyDir(confDir + '/channels', remoteConfDir + '/channels'))
+  .then(() => copyDir(confDir + '/scripts', remoteConfDir + '/scripts'))
+  .then(() => copyDir(confDir + '/jsonschemas', remoteConfDir + '/jsonschemas'))
   .then(() => copyDir(remoteConfDir, remoteRunningDir + '/conf'))
   .then(() => readDirectory(confDir + '/channels'))
   .then(function (channels) {
@@ -242,6 +246,8 @@ exports.setupEnvironment = function (backend, backendSettings, raw) {
         if (parsed.writeSettings) {
           parsed.writeSettings.httpFormat = remoteType
           delete parsed.writeSettings.batching
+          delete parsed.writeSettings.scripting
+          delete parsed.writeSettings.jsonValidation
         }
         return writeFile(remoteRunningDir + '/conf/channels/' + channel, JSON.stringify(parsed, null, 2))
       })
@@ -314,7 +320,8 @@ exports.setupEnvironment = function (backend, backendSettings, raw) {
       processes.push(spawnExecutable(newquePath, remoteRunningDir))
     }
     var delay = processes.length > 0 ? C.spawnDelay : 0
-    return Promise.delay(delay)
+    return Promise.all(processes)
+    .delay(delay)
     .then(() => Promise.resolve(processes))
   })
   .then(function (processes) {
@@ -336,20 +343,20 @@ var spawnExecutable = exports.spawnExecutable = function (execLocation, dirLocat
     detached: false
   })
   p.stderr.on('data', function (data) {
-    console.log(data.toString('utf8'))
+    console.log(dirLocation, data.toString('utf8'))
     throw new Error('STDERR output detected')
   })
   p.stderr.on('err', function (err) {
-    console.log(err)
+    console.log(dirLocation, err)
     throw new Error('STDERR disconnected')
   })
   p.stdout.on('err', function (err) {
-    console.log(err)
+    console.log(dirLocation, err)
     throw new Error('STDOUT disconnected')
   })
   if (debug) {
     p.stdout.on('data', function (data) {
-      console.log(data.toString('utf8'))
+      console.log(dirLocation, data.toString('utf8'))
     })
   }
   return p

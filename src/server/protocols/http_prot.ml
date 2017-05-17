@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Lwt
 open Cohttp
 open Cohttp_lwt_unix
@@ -224,10 +224,13 @@ let make_socket ~backlog host port =
   let sock = Lwt_unix.socket (Unix.domain_of_sockaddr sockaddr)
       Unix.SOCK_STREAM 0 in
   Lwt_unix.setsockopt sock SO_REUSEADDR true;
-  let%lwt () = Lwt_unix.Versioned.bind_2 sock sockaddr in
+  let%lwt () = Lwt_unix.bind sock sockaddr in
   Lwt_unix.listen sock backlog;
   Lwt_unix.set_close_on_exec sock;
   return sock
+
+let conn_closed name conn =
+  async (fun () -> Logger.debug_lazy (lazy (sprintf "Connection closed on [%s]" name)))
 
 let start generic specific routing =
   let open Config_t in
@@ -246,8 +249,10 @@ let start generic specific routing =
   let mode = `TCP (`Socket sock) in
   let (instance_t, instance_w) = wait () in
   let conf = match routing with
-    | Standard routing -> Server.make ~callback:(handler instance_t routing) ()
-    | Admin routing -> Server.make ~callback:(Admin.handler routing) ()
+    | Standard routing ->
+      Server.make ~callback:(handler instance_t routing) ()
+    | Admin routing ->
+      Server.make ~callback:(Admin.handler routing) ()
   in
   let (stop_t, stop_w) = wait () in
   let thread = Server.create ~stop:stop_t ~ctx ~mode conf in

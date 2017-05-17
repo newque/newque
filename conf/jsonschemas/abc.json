@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "required": ["abc"],
+  "properties": {
+    "abc": {
+      "type": "object",
+      "required": ["def"],
+      "properties": {
+        "def": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

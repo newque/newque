@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 
 type t
 
@@ -28,3 +28,5 @@ val serialize_raw : t -> string Collection.t
 val parse_full_exn : string -> string list
 
 val length : raw:bool -> t -> int
+
+val swap_contents : t -> string Collection.t -> t

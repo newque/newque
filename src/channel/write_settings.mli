@@ -2,6 +2,11 @@ type ack =
   | Instant
   | Saved
 
+type json_validation = {
+  schema_name: string;
+  parallelism_threshold: int;
+}
+
 type scripting = {
   mappers: string array;
 }
@@ -15,6 +20,7 @@ type t = {
   http_format: Http_format.t;
   ack: ack;
   forward: string list;
+  json_validation: json_validation option;
   scripting: scripting option;
   batching: batching option;
 }

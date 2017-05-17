@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Lwt
 
 module Logger = Log.Make (struct let section = "Local" end)

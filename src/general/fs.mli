@@ -3,6 +3,7 @@ val default_perm : int
 val log_dir : string
 val conf_dir : string
 val conf_chan_dir : string
+val conf_json_schemas_dir : string
 val conf_scripts_dir : string
 val data_dir : string
 val data_chan_dir : string

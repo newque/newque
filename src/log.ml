@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Lwt
 
 let log_level_of_variant variant =

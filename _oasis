@@ -20,10 +20,10 @@ PreCleanCommand: ./scripts/preclean.sh
 Executable "newque"
   Path: tmp
   MainIs: newque.ml
-  CompiledObject: best
-  CSources: lua_newque_bindings.c
-  CCOpt: -O3 -Wall -I/usr/include/lua5.1
-  CCLib: -llua5.1
+  CompiledObject: native
+  CSources: conversions.c, lua_newque.c, rapidjson_schema.c, rapidjson_newque.c
+  CCOpt: "-x c++" -std=c++11 -O3 -Wall -I/usr/include/lua5.1 -I../src/bindings -I..
+  CCLib: -llua5.1 -lstdc++
   BuildDepends:
     atd,
     atdgen,

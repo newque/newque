@@ -148,7 +148,7 @@ module.exports = function (backend, backendSettings, raw) {
         return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'one']])
         .then(Fn.shouldHaveRead(['M abc'], '\n'))
         .then(function (result) {
-          lastTs = parseInt(result.res.headers[C.lastTsHeader], 10)
+          lastTs = result.res.headers[C.lastTsHeader]
           // All added in the same batch, so it should return nothing
           return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'After_ts ' + lastTs]])
         })
@@ -156,7 +156,8 @@ module.exports = function (backend, backendSettings, raw) {
         .then(function () {
           // Removing a 1 nanosecond will return all of them, but JS numbers don't have enough precision
           // at that scale, so we remove more
-          return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'After_ts ' + (lastTs - 1000)]])
+          var parsedLastTs = parseInt(lastTs, 10)
+          return Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'After_ts ' + (parsedLastTs - 1000)]])
         })
         .then(Fn.shouldHaveRead(['M abc', 'M def', 'M ghi', 'M jkl'], '\n'))
       })

@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 
 type 'a structure =
   | List : 'a list -> 'a structure

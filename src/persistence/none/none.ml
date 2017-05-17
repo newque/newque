@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Lwt
 
 type none_t = unit

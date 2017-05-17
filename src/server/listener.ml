@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 
 type server =
   | HTTP of Http_prot.t * unit Lwt.u

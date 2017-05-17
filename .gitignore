@@ -22,7 +22,11 @@ test/logs
 test/remoteRunning
 test/remoteConf/channels
 
-conduit.0.12.0
+rapidjson
+src/bindings/rapidjson_v1.1.0.tar.gz
+
+newque-conduit
+newque-lua
 
 data
 logs

@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 
 (* http://api.zeromq.org/4-0:zmq-ctx-set *)
 let ctx =

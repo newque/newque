@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Lwt
 
 exception Upstream_error of string

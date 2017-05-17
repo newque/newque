@@ -1,5 +1,6 @@
-open Core.Std
+open Core
 open Lwt
+open Zmq_obj_types
 open Zmq_obj_pb
 
 module Logger = Log.Make (struct let section = "Fifo" end)
