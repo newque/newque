@@ -107,8 +107,8 @@ Proc.pathExists(Proc.newquePath)
 
   require('./sections/none')('none', {}, false)
   require('./sections/pubsub')('pubsub', pubsubSettings, true)
-  require('./sections/fifo')('fifo no-consumer', fifoSettings, true)
   require('./sections/httpproxy')('httpproxy no-consumer', httpJsonSettings, true)
+  require('./sections/fifo')('fifo no-consumer', fifoSettings, true)
   require('./sections/elasticsearch')('elasticsearch', esSettings, true)
 
   run()

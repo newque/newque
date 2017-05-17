@@ -8,10 +8,6 @@ mkdir tmp
 oasis setup
 ./configure
 
-# Remove the '-std=gnu99' from the build options to avoid warnings
-# _oasis overrides it with '-x c++' and '-std=c++11'
-# sed -i -e 's/ -std=gnu99//g' setup.data
-
 # Keep a copy of the stubs
 cp tmp/libnewque_stubs.clib .
 

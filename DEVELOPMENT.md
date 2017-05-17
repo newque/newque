@@ -11,7 +11,7 @@ sudo apt-get install libev4 libev-dev build-essential libsqlite3-dev liblua5.1-0
 opam init
 # Pay attention and run "eval `opam config env`" whenever OPAM asks for it.
 opam update
-opam switch 4.03.0
+opam switch 4.04.1+flambda
 
 git clone git@github.com:SGrondin/newque.git
 cd newque
@@ -24,11 +24,14 @@ opam pin add conduit newque-conduit -y
 
 opam install atdgen cohttp conf-libev core cppo lwt-zmq oasis ocaml-protoc ocp-indent ppx_deriving_protobuf sqlite3 utop uuidm
 
+rm -rf newque-lua
+rm -rf newque-conduit
+
 # Downloads some dependencies and runs 'configure' scripts
 ./scripts/setup.sh
 
 # To remove some invalid warnings, run (replace USERNAME in the path):
-echo 'export OCAMLFIND_IGNORE_DUPS_IN=/home/USERNAME/.opam/4.03.0/lib/ocaml/compiler-libs/' >> ~/.bashrc
+echo 'export OCAMLFIND_IGNORE_DUPS_IN=/home/USERNAME/.opam/4.04.1+flambda/lib/ocaml/compiler-libs/' >> ~/.bashrc
 source ~/.bashrc
 
 make
