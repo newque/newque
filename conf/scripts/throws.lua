@@ -1,5 +1,3 @@
-local m = require("someotherfile")
-
 return function (ids, messages)
   messages[1] = string.upper(messages[1])
 

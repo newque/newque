@@ -7,7 +7,7 @@
     "httpFormat": "plaintext",
     "forward": [],
     "scripting": {
-      "mappers": ["myscript.lua", "myscript2.lua"]
+      "mappers": ["to_uppercase.lua", "add_counter.lua"]
     }
   },
   "raw": true,
