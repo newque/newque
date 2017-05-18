@@ -1,0 +1,521 @@
+swagger: '2.0'
+info:
+  title: Newque HTTP API
+  description: Fast modular message broker. https://github.com/newque/newque
+  version: '0.0.3'
+schemes:
+  - http
+tags:
+  - name: Write
+  - name: Read
+  - name: Count
+  - name: Delete
+  - name: Health
+paths:
+  /v1/{channelName} (when httpFormat = json):
+    post:
+      tags:
+        - Write
+      summary: Write messages to a channel.
+      description: |
+        Documents how to write to a channel when `writeSettings.httpFormat` is set to `json` (default).
+      parameters:
+        - $ref: '#/parameters/ChannelName'
+        - name: body
+          in: body
+          description: Payload containing the message(s).
+          required: true
+          schema:
+            $ref: '#/definitions/WriteJsonInputBody'
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      responses:
+        201:
+          $ref: '#/responses/Write201'
+        202:
+          $ref: '#/responses/Write202'
+        400:
+          $ref: '#/responses/Error400'
+        500:
+          $ref: '#/responses/Error500'
+        default:
+          $ref: '#/responses/DefaultResponse'
+    get:
+      tags:
+        - Read
+      summary: Read messages from a channel.
+      description: |
+        Documents how to retrieve messages from a channel when `readSettings.httpFormat` is set to `json` (default).
+      parameters:
+        - $ref: '#/parameters/ChannelName'
+        - $ref: '#/parameters/NewqueModeRead'
+        - name: newque-read-max
+          in: header
+          type: integer
+          description: |
+            An integer to set an upper bound to the number of returned messages.
+            Note: Channels also have a `maxRead` setting.
+          required: false
+      produces:
+        - application/json
+      responses:
+        200:
+          $ref: '#/responses/ReadJson'
+        400:
+          $ref: '#/responses/Error400'
+        500:
+          $ref: '#/responses/Error500'
+        default:
+          $ref: '#/responses/DefaultResponse'
+
+  /v1/{channelName} (when httpFormat = plaintext):
+    post:
+      tags:
+        - Write
+      summary: Write messages to a channel.
+      description: |
+        Documents how to write to a channel when `writeSettings.httpFormat` is set to `plaintext`.
+
+        To transform an array of messages into the `plaintext` format, simply `join()` it
+        into a string using the channel's `separator` (`\n` by default).
+
+        The `newque-mode` header controls how the body should be interpreted.
+
+        Example: `msg1__msg2__msg3` will result in 3 messages if the Mode is `multiple` and the channel's separator is `__`.
+
+        The `plaintext` format can be streamed,
+        unlike `json` which needs to be fully read before it can be parsed or serialized.
+      parameters:
+        - $ref: '#/parameters/ChannelName'
+        - $ref: '#/parameters/NewqueModeWrite'
+        - name: newque-msg-id
+          in: header
+          type: string
+          description: |
+            A list of comma-separated IDs for the messages.
+            The number of IDs must match the number of messages.
+            If this header is missing, Newque will generate new unique IDs.
+          required: false
+        - $ref: '#/parameters/PlaintextBody'
+      produces:
+        - application/json
+      responses:
+        201:
+          $ref: '#/responses/Write201'
+        202:
+          $ref: '#/responses/Write202'
+        400:
+          $ref: '#/responses/Error400'
+        500:
+          $ref: '#/responses/Error500'
+        default:
+          $ref: '#/responses/DefaultResponse'
+    get:
+      tags:
+        - Read
+      summary: Read messages from a channel.
+      description: |
+        Documents how to retrieve messages from a channel when `readSettings.httpFormat` is set to `plaintext`.
+
+        To transform the `plaintext` output into an array of messages, simply `split()` on
+        the channel's `separator` string (`\n` by default).
+
+        Example: `msg1__msg2__msg3` consists of 3 messages if the channel's separator is `__`.
+
+        The `plaintext` format can be streamed,
+        unlike `json` which needs to be fully read before it can be parsed or serialized.
+
+        Refer to the `Streaming` section.
+      parameters:
+        - $ref: '#/parameters/ChannelName'
+        - $ref: '#/parameters/NewqueModeRead'
+        - name: newque-read-max
+          in: header
+          type: integer
+          description: |
+            An integer to set an upper bound to the number of returned messages.
+            Note: Channels also have a `maxRead` setting.
+          required: false
+      produces:
+        - application/octet-stream
+      responses:
+        200:
+          $ref: '#/responses/ReadPlaintext'
+        400:
+          $ref: '#/responses/Error400'
+        500:
+          $ref: '#/responses/Error500'
+        default:
+          $ref: '#/responses/DefaultResponse'
+
+  /v1/{channelName} (Streaming):
+    get:
+      tags:
+        - Read
+      summary: Read messages from a channel (Streamed).
+      description: |
+        This is a special use case.
+
+        Adding the `Transfer-Encoding: Chunked` header to a Read call will make Newque
+        stream messages back in `plaintext` format (no matter the format configured on the channel)
+        over an HTTP Stream.
+
+        This is useful when reading a very large number of messages at once because they do
+        not have to be buffered up in Newque's (nor your client's) memory before being returned.
+      parameters:
+        - name: Transfer-Encoding
+          in: header
+          type: string
+          description: Must be set to `Chunked` to enable streaming.
+          required: true
+          enum:
+            - Chunked
+        - $ref: '#/parameters/ChannelName'
+        - $ref: '#/parameters/NewqueModeRead'
+        - name: newque-read-max
+          in: header
+          type: integer
+          description: |
+            An integer to set an upper bound to the number of returned messages.
+            Note: Channels also have a `maxRead` setting.
+          required: false
+      produces:
+        - application/octet-stream
+      responses:
+        200:
+          $ref: '#/responses/StreamPlaintext'
+        400:
+          $ref: '#/responses/Error400'
+        500:
+          $ref: '#/responses/Error500'
+        default:
+          $ref: '#/responses/DefaultResponse'
+
+  /v1/{channelName}/count:
+    get:
+      tags:
+        - Count
+      summary: Returns the number of messages in the channel.
+      description: Returns the number of messages in the channel.
+      parameters:
+        - $ref: '#/parameters/ChannelName'
+      produces:
+        - application/json
+      responses:
+        200:
+          $ref: '#/responses/Count'
+        400:
+          $ref: '#/responses/Error400'
+        500:
+          $ref: '#/responses/Error500'
+        default:
+          $ref: '#/responses/DefaultResponse'
+
+  /v1/{channelName}:
+    delete:
+      tags:
+        - Delete
+      summary: Deletes all messages from the channel.
+      description: Deletes all messages from the channel.
+      parameters:
+        - $ref: '#/parameters/ChannelName'
+      produces:
+        - application/json
+      responses:
+        200:
+          $ref: '#/responses/DefaultResponse'
+        400:
+          $ref: '#/responses/Error400'
+        500:
+          $ref: '#/responses/Error500'
+        default:
+          $ref: '#/responses/DefaultResponse'
+
+  /v1/{channelName}/health:
+    get:
+      tags:
+        - Health
+      summary: Checks the health of a single channel.
+      description: |
+        Checks the health of a single channel.
+
+        Returns `200` when the channel is healthy.
+      parameters:
+        - $ref: '#/parameters/ChannelName'
+      produces:
+        - application/json
+      responses:
+        200:
+          $ref: '#/responses/DefaultResponse'
+        400:
+          $ref: '#/responses/Error400'
+        500:
+          $ref: '#/responses/Error500'
+        default:
+          $ref: '#/responses/DefaultResponse'
+
+  /v1/health:
+    get:
+      tags:
+        - Health
+      summary: Checks the health of the whole system.
+      description: |
+        Checks the health of the whole system. All the channels will be checked.
+
+        Returns `200` when the system is healthy.
+      produces:
+        - application/json
+      responses:
+        200:
+          $ref: '#/responses/DefaultResponse'
+        400:
+          $ref: '#/responses/Error400'
+        500:
+          $ref: '#/responses/Error500'
+        default:
+          $ref: '#/responses/DefaultResponse'
+
+parameters:
+  ChannelName:
+    name: channelName
+    in: path
+    type: string
+    description: Name of the channel.
+    required: true
+  PlaintextBody:
+    name: body
+    in: body
+    description: Payload containing the message(s).
+    required: true
+    schema:
+      $ref: '#/definitions/PlaintextBody'
+  NewqueModeWrite:
+    name: newque-mode
+    in: header
+    type: string
+    description: |
+      _One of_:
+
+      **single**: The entire body is a single message.
+
+      **multiple**: The body is multiple messages, separated by a separator string. Therefore a message cannot contain the separator itself.
+
+      **atomic**: Same as multiple, but all the messages will be treated as one. They'll have a combined size of 1, and all be written and/or read at once.
+    required: true
+    enum:
+      - single
+      - multiple
+      - atomic
+  NewqueModeRead:
+    name: newque-mode
+    in: header
+    type: string
+    description: |
+      _One of_:
+
+      **one**: Returns a single message.
+
+      **many X**: where `X` is an integer. Returns up to `X` messages.
+
+      **after_id X**: where `X` is a string. Returns as many messages as possible that were received after that ID.
+
+      **after_ts X**: where `X` is a UNIX timestamp in nanoseconds.
+      Returns as many messages as possible that were received after that timestamp.
+    required: true
+
+responses:
+  Write201:
+    description: Messages were saved successfully.
+    headers:
+      content-type:
+        type: string
+        description: MIME Type
+        enum:
+          - application/json
+    schema:
+      $ref: '#/definitions/WriteOutputBody'
+  Write202:
+    description: |
+      Data was received, but `acknowledgement` is set to `instant`,
+      therefore we don't know if the operation succeeded.
+    headers:
+      content-type:
+        type: string
+        description: MIME Type
+        enum:
+          - application/json
+    schema:
+      $ref: '#/definitions/WriteOutputBody'
+  ReadJson:
+    description: Messages have been retrieved successfully.
+    headers:
+      content-type:
+        type: string
+        description: MIME Type
+        enum:
+          - application/json
+      newque-response-length:
+        type: integer
+        description: Number of messages returned.
+      newque-response-last-id:
+        type: string
+        description: (Optional) ID of the last message returned.
+      newque-response-last-ts:
+        type: integer
+        format: long
+        description: (Optional) Timestamp (in nanoseconds) of the last message returned.
+    schema:
+      $ref: '#/definitions/ReadJsonOutputBody'
+  ReadPlaintext:
+    description: Messages have been retrieved successfully.
+    headers:
+      newque-response-length:
+        type: integer
+        description: Number of messages returned.
+      newque-response-last-id:
+        type: string
+        description: (Optional) ID of the last message returned.
+      newque-response-last-ts:
+        type: integer
+        format: long
+        description: (Optional) Timestamp (in nanoseconds) of the last message returned.
+    schema:
+      $ref: '#/definitions/PlaintextBody'
+  StreamPlaintext:
+    description: Messages are being streamed.
+    schema:
+      $ref: '#/definitions/PlaintextBody'
+  Count:
+    description: Messages have been counted successfully.
+    headers:
+      content-type:
+        type: string
+        description: MIME Type
+        enum:
+          - application/json
+    schema:
+      $ref: '#/definitions/CountOutputBody'
+  Error400:
+    description: A client error occured.
+    headers:
+      content-type:
+        type: string
+        description: MIME Type
+        enum:
+          - application/json
+    schema:
+      $ref: '#/definitions/DefaultOutputBody'
+  Error500:
+    description: A server error occured.
+    headers:
+      content-type:
+        type: string
+        description: MIME Type
+        enum:
+          - application/json
+    schema:
+      $ref: '#/definitions/DefaultOutputBody'
+  DefaultResponse:
+    description: ''
+    headers:
+      content-type:
+        type: string
+        description: MIME Type
+        enum:
+          - application/json
+    schema:
+      $ref: '#/definitions/DefaultOutputBody'
+
+definitions:
+  PlaintextBody:
+    type: string
+    format: binary
+    description: Payload containing the message(s).
+  WriteJsonInputBody:
+    type: object
+    required:
+      - messages
+    properties:
+      atomic:
+        type: boolean
+        description: 'Must the messages be treated as one?'
+      messages:
+        type: array
+        description: The actual messages.
+        items:
+          type: string
+      ids:
+        type: array
+        description: The IDs of the messages. `ids` array length must match `messages` array length.
+        items:
+          type: string
+  WriteOutputBody:
+    type: object
+    required:
+      - code
+      - errors
+    properties:
+      code:
+        type: integer
+        description: HTTP Status code.
+      errors:
+        type: array
+        description: Errors that occured.
+        items:
+          type: string
+      saved:
+        type: integer
+        description: Number of messages that were successfully written.
+  ReadJsonOutputBody:
+    type: object
+    required:
+      - code
+      - errors
+      - messages
+    properties:
+      code:
+        type: integer
+        description: HTTP Status code.
+      errors:
+        type: array
+        description: Errors that occured.
+        items:
+          type: string
+      messages:
+        type: array
+        description: Messages that were retrieved.
+        items:
+          type: string
+  CountOutputBody:
+    type: object
+    required:
+      - code
+      - errors
+    properties:
+      code:
+        type: integer
+        description: HTTP Status code.
+      errors:
+        type: array
+        description: Errors that occured.
+        items:
+          type: string
+      count:
+        type: integer
+        description: How many messages are present in the backend.
+  DefaultOutputBody:
+    type: object
+    required:
+      - code
+      - errors
+    properties:
+      code:
+        type: integer
+        description: HTTP Status code.
+      errors:
+        type: array
+        description: Errors that occured.
+        items:
+          type: string

@@ -1,3 +1,17 @@
+// This specification file can be used to automatically generate
+// parsers and serializers to interface with Newque ZMQ Listeners.
+
+// Use your programming language's protobuf library and simply
+// point it at this file. It will then expose functions to convert
+// native objects into compiled binary strings/buffers that Newque
+// can understand, and vice versa.
+
+// REQUEST OBJECTS (Input) are serialized objects that Newque receives from clients.
+// RESPONSE OBJECTS (Output) are serialized objects that Newque emits back to clients.
+// See README.md for more information.
+
+// ------------------------------------
+
 // REQUEST OBJECTS
 message Input {
 
@@ -29,6 +43,8 @@ message Input {
   }
 
 }
+
+// ------------------------------------
 
 // RESPONSE OBJECTS
 message Output {

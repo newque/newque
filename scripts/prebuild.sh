@@ -18,7 +18,7 @@ atdgen -t ./src/serialization/json_obj.atd
 atdgen -j -j-std ./src/serialization/json_obj.atd
 
 # Copy the protobuf specs to the top level protobuf/ directory
-find src -type f -name "*.proto" -print0 | xargs -0 -I % sh -c 'cp % protobuf/'
+cp src/serialization/zmq_obj.proto specs/zmq_api.proto
 
 # Generate protobuf parsers
 ocaml-protoc -ml_out src/serialization src/serialization/zmq_obj.proto

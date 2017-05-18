@@ -1,39 +1,130 @@
 # Newque
 
-## Overview
+> Fast, configurable message broker that saves you time and rids datastore headaches.
 
-Newque - pronounced `nuke` - is a fast, declarative message broker.
+## Table of Contents
 
-It can be used for log aggregation, message passing, request batching, pubsub, proxying, routing, optimizing ElasticSearch ingestion rates, and more.
+- [Introduction](#introduction)
+  - [Basics](#basics)
+  - [Newque Overview](#newque-overview)
+  - [Key Benefits](#key-benefits)
+  - [Common Use Case](#common-use-case)
+- [Getting Started](#getting-started)
+- [Integrations](#integrations)
+- [Examples](#examples)
+  - [Pubsub](#pubsub)
+  - [FIFO](#fifo)
+- [Directory Structure](#directory-structure)
+- [Concepts](#concepts)
+- [Logging](#logging)
+- [JSON Configuration](#json-configuration)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
 
-It is entirely configured through JSON files that are loaded on startup. The format of those JSON files is documented below.
+## Introduction
 
-Newque is built around the concept of Listeners and Channels. Each channel is registered on a number of Listeners. Each channel has a Backend where messages are stored before they can be read. Messages are treated as binary blobs, they don't have to (but can) be UTF-8.
+### Basics
 
-Each message has a unique ID, Newque will generate IDs when they are not provided. If a message with the same ID already exists it won't be added, therefore it is safe to retry messages after a network error, for example.
+A message broker acts as a service in between networked applications, devices, datastores, etc. It can accept client applications' requests to return aggregate data from your backend servers, or itself acting as a collector. Message brokers offset developer workload and application complexity by handling several things, including:
 
-The current Backend options are:
+- Collecting data
+- Log aggregation
+- Message parsing
+- Message validation
+- Request batching
+- One-to-many routing (pubsub)
+- Producer-consumer routing
+- Proxying
+- Logging
 
-- None
-- Memory
-- Disk
-- Proxy to a remote HTTP or Newque server
-- ElasticSearch
-- Publish to pubsub (1-to-many, no ack)
-- Publish to a FIFO queue (1-to-1, with ack)
-- ...more coming soon (Redis)
+### Newque Overview
+
+Newque - pronounced `nuke` - is a fast, declarative message broker. It can be used for common operations listed above and more. With Newque, you can:
+
+1. Design your architecture using common patterns
+2. Define it into JSON config files
+3. Let Newque handle all your message needs
+4. Develop and iterate faster instead of reinventing the wheel
+
+Newque is configured with JSON files that are loaded on startup. The format of those JSON files is documented [below](https://github.com/newque/newque#configuration-files).
+
+Newque is built around the concept of Listeners and Channels (sometimes known as "topics"). Each Channel can be accessed from zero or more Listeners. Listeners expose a protocol ([HTTP](https://github.com/newque/newque#http) or [ZMQ](https://github.com/newque/newque#zmq)) over a port. Both protocols have pros and cons. Each Channel has a Backend where messages are sent before they can be read. Messages are binary blobs; it is possible to send anything from UTF-8 text to images, JSON, compressed video, etc.
+
+### Key Benefits
+
+Using Newque can afford you:
+
+- **Peace of mind**: you no longer have to ask yourself worrisome questions such as: 'What happens if one of my data processing servers goes down?'
+- **Fast architecture prototyping**: it takes seconds to change the entire flow of data in your system to try different architectures. Avoid having to reinvent the wheel, or writing complicated and error-prone code to move data around.
+- **Time**: queue management over failed instances, pending queues, etc require hours of development and testing. Newque handles it all.
+- **Fast application performance**
+
+### Common Use Case
+
+Imagine clients (producers) recording events in an application. In this scenario, events happen continuously and the producers stream those single messages to Newque on a Channel (let's call it "Main") using the local disk as its Backend. This log allows the user to replay events later by Reading messages from that Backend.
+
+The user also configured Newque to Forward messages received on the Main Channel to another Channel using ElasticSearch as its Backend (let's call that Channel "Indexer"). Indexer is not directly exposed on a Listener. The user, aware of the high overhead of HTTP requests to ElasticSearch, configured the Indexer Channel to use Batching (for example, with: size = 1000, time = 2 seconds). Therefore Newque will only make a request to ES once at least 1000 messages have been received or once 2 seconds have elapsed since the last request was made.
+
+In this imaginary scenario, the user also needs to Forward the messages to a pool of clients (consumers) that will process them. There are multiple Backend choices available to accomplish this task: `httpproxy`, `pubsub` or `fifo`.
+
+The user then uses the Newque high level library (driver) for the language of their choice. By not having to write all the code to route data to all these services themselves, the user can focus on what really matters: the business logic. By relying on a battle-tested platform such as Newque, they avoid reinventing the wheel with all the debugging and performance optimizations it involves.
 
 The main operations are:
 
-- Writing to a Channel
-- Reading from Channel
-- Streaming from Channel
+- Writing to a Channel's Backend
+- Reading from a Channel's Backend
+- Streaming from a Channel's Backend
 - Counting the number of messages in a Channel's Backend
 - Deleting all data from a Channel's Backend
-- Checking the Health of a Channel
-- Checking the Health of all Channels
+- Checking the Health of a Channel's Backend
+- Checking the Health of the whole system
 
-Every Backend, its possible use cases and the main operations are documented below.
+The current Backend options are:
+
+- `memory`: Use the local RAM to store messages.
+- `disk`: Use the local disk to store messages.
+- `httpproxy`: Proxy messages to a remote HTTP or another Newque server.
+- `elasticsearch`: Write to ES. Messages must be valid JSON, for obvious reasons.
+- `pubsub`: Broadcast to a ZMQ pubsub address. Publisher-Subscriber. (1-to-many, no ack)
+- `fifo`: Send to a ZMQ FIFO address. Producer-Consumer. (1-to-1, with ack)
+- `none`: Does nothing besides Forwarding to other Channels, if applicable
+- ...more coming soon (Redis and PostgreSQL)
+
+## Getting Started
+
+To set up and run Newque:
+
+1. Download the latest release from https://github.com/newque/newque/releases/latest and unzip it to a `path/`
+1. Edit the configuration files in `path/conf/` to your needs (see [JSON Configuration](#json-configuration))
+1. Run `path/newque`
+
+## Integrations
+
+- Disk
+- ElasticSearch
+- ZMQ
+- Redis (coming soon)
+- PostgreSQL (coming soon)
+
+## Examples
+
+### Pubsub
+
+To receive messages on a `pubsub` backend, open a ZMQ socket in `sub` mode and `connect` to the Channel using the ZMQ address `tcp://PubsubChannelHost:PubsubChannelPort` and finally `subscribe` to all messages.
+
+Newque will be sending data in the following format: [`Input`, message1, message2, etc].
+
+A full example is available [here](https://github.com/newque/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/pubsub.js).
+
+### FIFO
+
+To receive messages on a `fifo` backend, open a ZMQ socket in `dealer` mode and `connect` to the Channel using the ZMQ address `tcp://FifoChannelHost:FifoChannelPort`.
+
+Newque will be sending data in the following format: [`UID`, `Input`, message1, message2, etc].
+
+`fifo` requires an Acknowledgement or else the client making a request to Newque will receive a timeout error. Using the same socket, send [`UID`, `Output`] back to Newque, where `UID` is the exact same string/buffer that was sent by Newque.
+
+A full example is available [here](https://github.com/newque/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/fifo.js).
 
 ## Directory structure
 
@@ -64,17 +155,21 @@ __Directories__
 - `conf/` contains the `newque.json` file and folders for the channel settings and scripts.
 - `data/` is created when starting Newque and contains data generated during operation. Do not modify.
 - `logs/` is created when starting Newque and contains the output and error logs.
-- `lib/` contains the libraries needed to run Newque, it must be located in the same folder as the `newque` executable
+- `lib/` contains the libraries needed to run Newque, it must be located in the same folder as the `newque` executable. Do not modify.
 
 ## Concepts
 
+__IDs__
+
+Each message has a unique ID and Newque will generate IDs when they are not provided by the client. If a message with the same ID already exists in the Backend it won't be written, therefore it is possible to retry messages when network errors occur. Obviously in the case of the `httpproxy`, `pubsub` and `fifo` Backends, it is up to the upstream server to implement this behavior if they wish to.
+
 __Atomics__
 
-When Writing a batch of messages, they can be flagged as `atomic`. They will be treated as one. They'll have a combined size of `1`, and all be written and/or read at once.
+When Writing a batch of messages, they can be flagged as `atomic`. They will be treated as one. They'll have a combined size of `1`, and all be written and read at once.
 
 __Raw__
 
-A Channel can enable the option `raw`. Atomics don't exist in this mode. Performance is marginally better for all non-atomic messages. The ElasticSearch backend requires this option to be enabled.
+A Channel can enable the option `raw`. Atomics don't exist in this mode. Performance is marginally better for all non-atomic messages. Messages are passed as-is to the Backend, which can be useful if your `fifo`, `pubsub` or `httpproxy` remote servers need to be able to make sense of those messages. The ElasticSearch backend requires this option to be enabled.
 
 __JSON Schema Validation__
 
@@ -126,7 +221,7 @@ Levels `warning`, `error` and `fatal` are written to STDERR and `./logs/err.log`
 
 **Note:** If the `NEWQUE_ENV` environment variable is set, it'll be used in the log format.
 
-## Configuration files
+## JSON Configuration
 
 ### Main configuration file (`newque.json`)
 
@@ -200,6 +295,7 @@ __ZMQ Settings object__
 __Socket Settings object__
 
 **IMPORTANT:** Read [the docs](http://api.zeromq.org/4-0:zmq-setsockopt) before changing any defaults!
+
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `ZMQ_MAXMSGSIZE` | Integer | No | `-1` | Max message size in bytes, `-1` means unlimited.  |
@@ -241,9 +337,9 @@ __Example__
 | `raw` | Boolean | Yes | | Whether the messages should be wrapped when writing to the Backend. |
 | `readSettings` | Object or Null | Yes | | Settings related to Reading from this Channel, or `null` to disable all Reading. |
 | `writeSettings` | Object or Null | Yes | | Settings related to Writing to this Channel, or `null` to disable all Writing. |
-| `separator` | String | No | `\n` | String that acts as a separator between messages for `httpFormat`: `plaintext`. |
-| `averageSize` | Integer | No | `256` | Average size (in bytes) of incoming (Write) HTTP bodies when `httpFormat`: `plaintext`. |
-| `maxRead` | Integer | No | `1000` | How messages can be returned in a single Read operation. Includes Streaming.  |
+| `separator` | String | No | `\n` | String that acts as a separator between messages when `httpFormat` is set to `plaintext`. |
+| `averageSize` | Integer | No | `256` | Performance optimization. Average size (in bytes) of incoming (Write) HTTP bodies when `httpFormat` is set to `plaintext`. |
+| `maxRead` | Integer | No | `1000` | How many messages can be returned in a single Read operation. Also affects Streaming.  |
 | `averageRead` | Integer | No | `32` | Average number of messages returned per Read operation. Includes Streaming. |
 
 __`none` `backendSettings` Object__
@@ -270,6 +366,7 @@ __`httpproxy` `backendSettings` Object__
 | `remoteOutputFormat` | String | No | `json` | Format that the remote server uses to send read results. One of `plaintext` or `json`. |
 
 Header object:
+
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `key` | String | Yes | | Header name |
@@ -343,260 +440,23 @@ __Lua Scripting Object__
 
 ## HTTP
 
-Interacting with Newque over HTTP is the most flexible way. Its performance is adequate as long as calls are infrequent enough. If you find yourself in a position where you need to make many small HTTP calls at a high rate, consider using ZMQ.
+Interacting with Newque over HTTP is the most flexible way. It offers good performance, but HTTP comes with a heavy overhead per request. If you find yourself making many small HTTP calls at a high rate, consider using ZMQ instead. However, HTTP is a lot easier to load balance and is usable directly on the command line with tools such as `curl`.
 
-### Writing
+An important concept to grasp is that of the `httpFormat`. Each channel has its own `httpFormat`, one for Writing (`POST`) and one for Reading (`GET`). Valid formats are `json` (default) and `plaintext`.
 
-The Writing `httpFormat` is `json` by default.
-
-#### Request when the `httpFormat` is `json`
-
-Endpoint: `http://hostname:port/v1/mychannel`
-
-Method: `POST`
-
-Headers: N/A
-
-Body: Example:
-```json
-{
-  "atomic": false,
-  "messages": ["message1", "message2", "message3"],
-  "ids": ["id1", "id2", "id3"]
-}
-```
-
-| Property | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `atomic` | Boolean | No | `false` | Must the messages be treated as one? |
-| `messages` | Array of strings | Yes | | The actual messages. |
-| `ids` | Array of strings | No | | The IDs of the messages. Lengths must match. |
-
-#### Request when the `httpFormat` is `plaintext`
-
-Endpoint: `http://hostname:port/v1/mychannel`
-
-Method: `POST`
-
-Headers:
-- (required) `newque-mode`. One of:
-  - `single`: The entire body is a single message.
-  - `multiple`: The body is multiple messages, separated by `separator`. Therefore a message cannot contain the string `separator`.
-  - `atomic`: Same as `multiple`, but all the messages will be treated as one. They'll have a combined size of `1`, and all be written and/or read at once.
-- (optional) `newque-msg-id`. A list of comma-separated unique IDs for the messages. The number of IDs must match the number of messages. If this header is missing, Newque will generate new unique IDs.
-
-Body: See the `newque-mode` header. Unless the Mode is `single`, the body will consist in a list of messages separated by `separator`. Example: `message1__message2__message3` will result in 3 messages if the Mode is `multiple` and the Channel's `separator` is `__`.
-
-#### Response for both `json` and `plaintext`
-
-Status:
-- `201`: Messages were saved successfully.
-- `202`: The request was received, but `acknowledgement` is set to `instant`, therefore we don't know if the operation succeeded.
-- `4xx`: Client error
-- `5xx`: Server error
-
-Headers:
-- `content-type: application/json`
-
-Body:
-
-A JSON object. Example:
-```json
-{
-  "code": 201,
-  "errors": [],
-  "saved": 3
-}
-```
-
-| Property | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `code` | Integer | Yes | | The HTTP status code. |
-| `errors` | Array of strings | Yes | | A list of errors. |
-| `saved` | Array of strings | No | | How many messages were saved successfully. |
-
-### Read
-
-The Reading `httpFormat` is `json` by default. Everything is identical between both formats, except for the response body.
-
-#### Request
-
-Endpoint: `http://hostname:port/v1/mychannel`
-
-Method: `GET`
-
-Headers:
-- (required) `newque-mode`. One of:
-  - `one`. Returns a single message.
-  - `many X` where `X` is an integer. Returns up to `X` messages.
-  - `after_id X` where `X` is a string. Returns as many messages as possible that were received after that ID.
-  - `after_ts X` where `X` is a timestamp in nanoseconds. Returns as many messages as possible that were received after that timestamp.
-- (optional) `newque-read-max`. An integer to set an upper bound to the number of returned messages. Note: Channels also have a `maxRead` setting.
-
-Body: N/A
-
-#### Response
-
-Status:
-- `200`: Messages have been retrieved successfully.
-- `4xx`: Client error
-- `5xx`: Server error
-
-Headers:
-- `content-type: X` where `X` is `application/json` (when format is `json`) or `application/octet-stream` (when format is `plaintext`).
-- `newque-response-length: X` where `X` is the number of messages returned.
-- (if backend supports it) `newque-response-last-id: X` where `X` is the ID of the last message returned.
-- (if backend supports it) `newque-response-last-ts: X` where `X` is the timestamp (in nanoseconds) of the last message returned.
-
-**Body (`json` format)**:
-
-A JSON object. Example:
-```json
-{
-  "code": 200,
-  "errors": [],
-  "messages": ["message1", "message2", "message3"]
-}
-```
-
-| Property | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `code` | Integer | Yes | | The HTTP status code. |
-| `errors` | Array of strings | Yes | | A list of errors. |
-| `messages` | Array of strings | Yes | | A list of messages. |
-
-**Body (`plaintext` format)**: All the messages concatenated by the `separator` string.
-
-### Read (Streaming)
-
-This is a special case. Adding the `Transfer-Encoding: Chunked` header to a Read call will make Newque stream messages back as fast as possible in `plaintext` format (no matter the format configured on the Channel). This can be useful when reading a very large number of messages at once because they do not have to be buffered up in memory before being returned.
-
-### Count
-
-#### Request
-
-Endpoint: `http://hostname:port/v1/mychannel/count`
-
-Method: `GET`
-
-Headers: N/A
-
-Body: N/A
-
-#### Response
-
-Status:
-- `200`: Success
-- `4xx`: Client error
-- `5xx`: Server error
-
-Headers:
-- `content-type: application/json`
-
-Body:
-
-A JSON object. Example:
-```json
-{
-  "code": 200,
-  "errors": [],
-  "count": 3
-}
-```
-
-| Property | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `code` | Integer | Yes | | The HTTP status code. |
-| `errors` | Array of strings | Yes | | A list of errors. |
-| `count` | Integer | No | | How many messages are present in the backend. |
-
-### Delete
-
-#### Request
-
-Endpoint: `http://hostname:port/v1/mychannel`
-
-Method: `DELETE`
-
-Headers: N/A
-
-Body: N/A
-
-#### Response
-
-Status:
-- `200`: Success
-- `4xx`: Client error
-- `5xx`: Server error
-
-Headers:
-- `content-type: application/json`
-
-Body:
-
-A JSON object. Example:
-```json
-{
-  "code": 200,
-  "errors": []
-}
-```
-
-| Property | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `code` | Integer | Yes | | The HTTP status code. |
-| `errors` | Array of strings | Yes | | A list of errors. |
-
-### Health
-
-It's possible to check the health for a single channel or the entire system.
-
-#### Request
-
-Endpoint: `http://hostname:port/v1/mychannel/health` **or** `http://hostname:port/v1/health`
-
-Method: `GET`
-
-Headers: N/A
-
-Body: N/A
-
-#### Response
-
-Status:
-- `200`: Success
-- `4xx`: Client error
-- `5xx`: Server error
-
-Headers:
-- `content-type: application/json`
-
-Body:
-
-A JSON object. Example:
-```json
-{
-  "code": 200,
-  "errors": []
-}
-```
-
-| Property | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `code` | Integer | Yes | | The HTTP status code. |
-| `errors` | Array of strings | Yes | | A list of errors. |
+The formats, as well as every possible operation are defined in the [HTTP API Spec](https://newque.github.io/).
 
 ## ZMQ
 
-ZMQ is (much) faster and easier to use, once the boilerplate is in place.
+ZMQ is much faster and does not suffer from the same overhead as HTTP, but being a long-lived TCP socket, it can be much harder to load balance than HTTP.
 
-**All the formats are already defined in [this file](https://github.com/SGrondin/newque/blob/master/protobuf/zmq_obj.proto)**
+**All the formats are already defined in [the ZMQ API Spec](https://github.com/newque/newque/blob/master/specs/zmq_api.proto)**
 
-So go ahead and use your language's code generator for `.proto` files. Send `Input` Protobuf objects as defined in [the spec](https://github.com/SGrondin/newque/blob/master/protobuf/zmq_obj.proto) and Newque will return `Output` objects.
+Use your language's code generator for `.proto` files. Send `Input` Protobuf objects as defined in [the spec](https://github.com/newque/newque/blob/master/specs/zmq_api.proto) and Newque will return `Output` objects.
 
 Then open a ZMQ socket in `dealer` mode and `connect` to a Newque ZMQ Listener using the address `tcp://ListenerHost:ListenerPort`.
 
-A complete Node.js example is available [here](https://github.com/SGrondin/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/zmq.js).
+A complete Node.js example is available [here](https://github.com/newque/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/zmq.js).
 
 ### Basic operations
 
@@ -604,11 +464,11 @@ A complete Node.js example is available [here](https://github.com/SGrondin/newqu
 
 Send [`UID`, `Input`, message1, message2, etc] on the ZMQ socket.
 
-`UID` must be a unique string. `Input` is a [Protobuf object](https://github.com/SGrondin/newque/blob/master/protobuf/zmq_obj.proto) with the `action` field set to `Write_Input`.
+`UID` must be a unique string. `Input` is a [Protobuf object](https://github.com/newque/newque/blob/master/specs/zmq_api.proto) with the `action` field set to `Write_Input`.
 
 Newque will return [`UID`, `Output`].
 
-`UID` will be the exact same string that was sent with the request. This is so that you can associate responses with their requests. `Output` is a [Protobuf object](https://github.com/SGrondin/newque/blob/master/protobuf/zmq_obj.proto) with the `action` field set to `Write_Output` or `Error_Output`.
+`UID` will be the exact same string that was sent with the request. This is so that you can associate responses with their requests. `Output` is a [Protobuf object](https://github.com/newque/newque/blob/master/specs/zmq_api.proto) with the `action` field set to `Write_Output` or `Error_Output`.
 
 #### Read
 
@@ -636,20 +496,15 @@ Newque will return [`UID`, `Output`].
 
 ### Backend integrations
 
-#### Pubsub
+This section describes how to accept requests from Newque and serve as a backend for a channel.
 
-To receive messages from a `pubsub` backend, open a ZMQ socket in `sub` mode and `connect` to the Channel using the address `tcp://PubsubChannelHost:PubsubChannelPort` and finally subscribe to all messages.
+## Roadmap
 
-Newque will be sending data in the following format: [`Input`, message1, message2, etc].
+Planned features:
 
-A full example is available [here](https://github.com/SGrondin/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/pubsub.js).
+- Redis integration
+- PostgreSQL integration
 
-#### FIFO
+## Contributing
 
-To receive messages from a `fifo` backend, open a ZMQ socket in `dealer` mode and `connect` to the Channel using the address `tcp://FifoChannelHost:FifoChannelPort`.
-
-Newque will be sending data in the following format: [`UID`, `Input`].
-
-`fifo` requires an Acknowledgement or else the client making a request to Newque will receive a timeout error. Using the same socket, send [`UID`, `Output`] back to Newque.
-
-A full example is available [here](https://github.com/SGrondin/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/fifo.js).
+All contributions are welcome. Please start a discussion by opening an issue or continuing the conversation in an existing issue. If you wish to contribute to the source, great! Instructions to compile Newque is in [DEVELOPMENT.md](DEVELOPMENT.md). **If you plan on developing a feature or fix**, please discuss in an issue first. Doing so may help avoid having a rejected pull request, saving you time.
