@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Lwt
 open Cohttp
 open Cohttp_lwt_unix
@@ -14,7 +14,7 @@ type httpproxy_t = {
   output_format: Http_format.t;
   splitter: Util.splitter;
   chan_separator: string;
-} [@@deriving sexp]
+}
 
 let create ~chan_name base_urls base_headers timeout_ms ~input ~output ~splitter ~chan_separator =
   let base_urls = Array.map ~f:Uri.of_string base_urls in
@@ -43,7 +43,7 @@ let get_base instance =
 
 module M = struct
 
-  type t = httpproxy_t [@@deriving sexp]
+  type t = httpproxy_t
 
   let close instance = return_unit
 

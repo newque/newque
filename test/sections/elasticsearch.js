@@ -45,10 +45,10 @@ module.exports = function (backend, backendSettings, raw) {
       this.timeout(5000)
       var ctr = 0
 
-      return Promise.all([
+      return Promise.delay(200).then(() => Promise.all([
         Fn.call('GET', 8000, '/v1/example/count').then(Fn.shouldFail(500)),
         Fn.call('POST', 8000, '/v1/example', 'somestring', [[C.modeHeader, 'single']]).then(Fn.shouldFail(500))
-      ])
+      ]))
       .then(function (done) {
         server.close(done)
       })

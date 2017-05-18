@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 
 val log_level_of_variant : Config_t.config_log_level -> Lwt_log.level
 val int_of_level : Lwt_log.level -> int

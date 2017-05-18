@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Lwt
 open Cohttp
 open Cohttp_lwt_unix
@@ -10,7 +10,7 @@ type elasticsearch_t = {
   index: string;
   typename: string;
   timeout: float; (* in seconds *)
-} [@@deriving sexp]
+}
 
 let get_base instance =
   let arr = instance.base_urls in
@@ -28,7 +28,7 @@ let create base_urls ~index ~typename timeout_ms =
 
 module M = struct
 
-  type t = elasticsearch_t [@@deriving sexp]
+  type t = elasticsearch_t
 
   let close instance = return_unit
 

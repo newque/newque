@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Lwt
 
 module Logger = Log.Make (struct let section = "Zmq" end)
@@ -19,27 +19,16 @@ type t = {
   proxy: unit Lwt.t;
   stop_w: unit Lwt.u;
 }
-let sexp_of_t zmq =
-  let open Config_t in
-  Sexp.List [
-    Sexp.List [
-      Sexp.Atom zmq.generic.name;
-      Sexp.Atom zmq.generic.host;
-      Sexp.Atom (Int.to_string zmq.generic.port);
-    ];
-    Sexp.List [
-      Sexp.Atom (Int.to_string zmq.specific.concurrency);
-    ];
-  ]
 
-let invalid_read_output = Zmq_obj_pb.({ length = 0; last_id = None; last_timens = None })
+let invalid_read_output = Zmq_obj_types.({ length = 0; last_id = None; last_timens = None })
 
 let handler zmq routing socket frames =
   let open Routing in
+  let open Zmq_obj_types in
+  let open Zmq_obj_pb in
   let%lwt zmq = zmq in
   match frames with
   | header::id::meta::msgs ->
-    let open Zmq_obj_pb in
 
     let%lwt (output, messages) = begin try%lwt
         let input = decode_input (Pbrt.Decoder.of_bytes meta) in
@@ -127,7 +116,6 @@ let handler zmq routing socket frames =
     let printable = Yojson.Basic.to_string (`List (List.map ~f:(fun s -> `String s) strs)) in
     let%lwt () = Logger.notice (sprintf "Received invalid msg parts on %s: %s" zmq.inbound printable) in
     let error =
-      let open Zmq_obj_pb in
       let errors = [sprintf "Received invalid msg parts on %s. Expected [id], [input], [msgs...]." zmq.inbound] in
       let output = { errors; action = Error_output } in
       let encoder = Pbrt.Encoder.create () in

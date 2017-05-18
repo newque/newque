@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Lwt
 (* Not opening Sqlite3, to make it more explicit and to wrap all calls to it *)
 module S3 = Sqlite3
@@ -17,11 +17,11 @@ type statements = {
   quick_check: Sqlite3.stmt * string;
 }
 type t = {
-  db: Sqlite3.db sexp_opaque;
+  db: Sqlite3.db;
   file: string;
   avg_read: int;
-  stmts: statements sexp_opaque;
-} [@@deriving sexp]
+  stmts: statements;
+}
 
 (* Ridiculously high number of retries by default,
    because it is only retried when the db is locked.

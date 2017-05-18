@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "required": ["abc"],
+  "properties": {
+    "abc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["def"],
+      "properties": {
+        "def": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

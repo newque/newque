@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 
 type admin_routing = {
   listeners_by_port: int option -> Yojson.Basic.json;

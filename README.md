@@ -133,6 +133,10 @@ newque/
 ├── conf/
 │   ├── channels/
 │   │   └── mychannel.json
+│   ├── jsonschemas/
+│   │   └── myschema.json
+│   ├── scripts/
+│   │   └── myscript.lua
 │   └── newque.json
 ├── data/
 │   ├── channels/
@@ -148,7 +152,7 @@ newque/
 ```
 
 __Directories__
-- `conf/` contains the `newque.json` file and a folder with the settings for every channel.
+- `conf/` contains the `newque.json` file and folders for the channel settings and scripts.
 - `data/` is created when starting Newque and contains data generated during operation. Do not modify.
 - `logs/` is created when starting Newque and contains the output and error logs.
 - `lib/` contains the libraries needed to run Newque, it must be located in the same folder as the `newque` executable. Do not modify.
@@ -166,6 +170,42 @@ When Writing a batch of messages, they can be flagged as `atomic`. They will be 
 __Raw__
 
 A Channel can enable the option `raw`. Atomics don't exist in this mode. Performance is marginally better for all non-atomic messages. Messages are passed as-is to the Backend, which can be useful if your `fifo`, `pubsub` or `httpproxy` remote servers need to be able to make sense of those messages. The ElasticSearch backend requires this option to be enabled.
+
+__JSON Schema Validation__
+
+It's possible to offload all of your JSON validation to Newque. Each channel can specify one [JSON Schema](http://json-schema.org/). Every message on that channel must successfully validate with the schema before it is sent to the channel's backend. If many messages are sent in the same call, any failure will cause the whole call to be rejected with an error.
+
+By default, JSON Schema validations happen in the main thread to avoid excessive context switching, but calls with 10 or more messages will be validated in a background thread. This value (`10`) is configurable. See [the JSON Schema Validation object format](#json-schema-validation-object).
+
+Note: JSON Schema files are checked on startup to ensure that they don't themselves contain errors. Newque won't start if any JSON Schema contains errors.
+
+__Lua Scripting__
+
+Newque offers Lua scripting. Scripts are invoked *after JSON Schema Validation, but before Batching*. A channel can have more than 1 script. They are invoked in order: the original messages are passed to the first script, then the output is passed to the second script, and so on. The output of the final script is then passed to the Batcher (if applicable) or to the channel's backend.
+
+Scripts are simple Lua files that *must return a function that takes 2 arrays of strings and returns 2 arrays of strings*. [Here](https://github.com/newque/newque/blob/master/conf/scripts/to_uppercase.lua) is an example of a script that upper cases every message. The number of messages and the IDs must always match, but it is possible to insert or drop messages and IDs.
+
+Each channel has its own Lua sandbox. A global variable created in a script on one channel is accessible in other scripts and in subsequent invokations. This is on purpose, it makes it possible for the user to cache values or even keep (e.g.) database connections open! However, it means that only one script per channel can be executing at any time. This restriction also ensures that the ordering of messages isn't altered due to one script invokation taking a longer time the next one. In other words, this access lock on each channel's Lua sandbox prevents race conditions.
+
+The Lua sandboxes do not run in the main thread. It's safe to execute blocking operations, such as I/O (HTTP calls, reading files, etc.) or heavy CPU-bound processing.
+
+Calling `error({location = "some string", message = "some other string"})` will return a formatted error message to the user. This is helpful when Lua scripts are used to do custom validation on messages.
+
+Calling `error()` with any value other than an object having the keys `location` and `message` will be considered an "unexpected error". Strings or Numbers passed to `error()` will be logged in the Newque logs and a generic error message will be returned to the user.
+
+From a script, it's possible to `require()` other Lua scripts located in the `conf/scripts/` directory.
+
+Note: Lua scripts are compiled on startup and Newque won't start if any Lua script contains syntax errors.
+
+__Batching__
+
+Batching is an easy way to improve your application's performance. When batching is enabled on a channel, all incoming messages are added to a queue instead of being immediately sent to the channel's backend.
+
+Batches are flushed to the backend when either one of 2 conditions are met:
+- the batch size reaches `maxSize`
+- the batch has not been flushed in the last `maxTime` milliseconds
+
+Note: Setting `maxSize` to `1` will split all incoming messages into their own batch. For example, a user sending 3 messages in one call will create 3 batches.
 
 ## Logging
 
@@ -374,7 +414,9 @@ __Write Settings Object__
 | `httpFormat` | String | No | `json` | Format that the Channel accepts for writes. One of `plaintext` or `json`. |
 | `acknowledgement` | String | No | `saved` | Whether to wait for the Write operation to be acknowledged before returning the results. One of `saved` or `instant`. |
 | `forward` | Array of strings | No | | List of Channel names where the messages must also be written after they've successfully been written to the Channel. |
-| `batching` | Object | No | | Settings related to batching writes. Generally results in large performance gains. |
+| `jsonValidation` | Object | No | | Settings related to JSON Schema Validation. See [JSON Schema Validation Object](#json-schema-validation-object). |
+| `scripting` | Object | No | | Settings related to Lua Scripting. See [Lua Scripting Object](#lua-scripting-object). |
+| `batching` | Object | No | | Settings related to batching writes. Generally results in large performance gains. See [Batching Object](#batching-object). |
 
 __Batching Object__
 
@@ -382,6 +424,19 @@ __Batching Object__
 |----------|------|----------|---------|-------------|
 | `maxTime` | Double | Yes | | How long can messages linger in the queue before they have to be written to the Backend. In milliseconds. |
 | `maxSize` | Integer | Yes | | Maximum size the queue can reach before they have to be written to the Backend. |
+
+__JSON Schema Validation Object__
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `schemaName` | String | Yes | | The name of the file in `/conf/jsonschemas` that contains the JSON Schema, e.g. `myschema.json`. |
+| `parallelismThreshold` | Integer | No | `10` | The smallest numbest of messages in a call to make Newque execute the JSON Schema validation over all those calls in a separate thread. A value of `1` means Newque will never use the main thread for JSON Schema validations. |
+
+__Lua Scripting Object__
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `mappers` | Array of strings | Yes | | A list of all the scripts to execute, in order. Those files must be located in `/conf/scripts`. |
 
 ## HTTP
 

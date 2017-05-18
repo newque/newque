@@ -3,11 +3,6 @@ type pair = {
   value: string;
 }
 
-type cardinality = [
-  | C_one <json name="one">
-  | C_all <json name="all">
-] <ocaml repr="classic">
-
 type config_channel_format = [
   | C_plaintext <json name="plaintext">
   | C_json <json name="json">
@@ -112,6 +107,15 @@ type config_channel_acknowledgement = [
   | C_saved <json name="saved">
 ] <ocaml repr="classic">
 
+type config_json_validation = {
+  schema_name <json name="schemaName">: string;
+  ~parallelism_threshold <json name="parallelismThreshold"><ocaml default="10">: int;
+} <ocaml field_prefix="c_">
+
+type config_scripting = {
+  mappers: string list <ocaml repr="array">;
+} <ocaml field_prefix="c_">
+
 type config_batching = {
   max_time <json name="maxTime">: int <ocaml repr="float">;
   max_size <json name="maxSize">: int;
@@ -121,6 +125,8 @@ type config_channel_write = {
   ~http_format <json name="httpFormat"><ocaml default="C_json">: config_channel_format;
   ~ack <json name="acknowledgement"><ocaml default="C_saved">: config_channel_acknowledgement;
   forward: string list;
+  ?json_validation <json name="jsonValidation">: config_json_validation nullable;
+  ?scripting: config_scripting nullable;
   ?batching: config_batching nullable;
 } <ocaml field_prefix="c_">
 

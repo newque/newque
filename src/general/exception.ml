@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 
 exception Multiple_exn of string list
 
@@ -6,6 +6,9 @@ let json_error_regexp = Str.regexp "[ \\\n]"
 
 let human ex = match ex with
   | Failure str -> str
+
+  | Scripting.Lua_exn (str, _) -> str
+  | Scripting.Lua_user_exn str -> str
 
   | Multiple_exn [] -> "Multiple Unknown Errors"
   | Multiple_exn [str] -> str
@@ -22,7 +25,7 @@ let human ex = match ex with
     sprintf "JSON Parsing Error: %s" (Str.global_replace json_error_regexp " " str)
 
   | Unix.Unix_error (c, n, p) ->
-    sprintf "System Error %s {call: %s(%s)}" (String.uppercase (Unix.error_message c)) n p
+    sprintf "System Error %s {call: %s(%s)}" (String.uppercase (Unix.Error.message c)) n p
 
   | unknown ->
     Exn.to_string unknown

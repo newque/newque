@@ -257,6 +257,57 @@ module.exports = function (backend, backendSettings, raw) {
       })
     })
 
+    describe('Scripting', function () {
+      if (backend !== 'elasticsearch') { // Because the scripts don't return JSON
+        it('Mapping', function () {
+          var buf = 'abcdef2'
+          Scenarios.set('scripting', 'last_id', 'added by an external script')
+          Scenarios.set('scripting', 'last_timens', 999)
+          return Fn.call('POST', 8000, '/v1/scripting', buf, [[C.modeHeader, 'single']])
+          .then(Fn.shouldHaveWritten(3))
+          .then(() => Fn.call('GET', 8000, '/v1/scripting', null, [[C.modeHeader, 'many 3']]))
+          .then(Fn.shouldHaveRead(['ABCDEF2', 'added msg 2', 'added by an external script'], '\n'))
+        })
+      }
+      it('Runtime errors', function () {
+        var buf = 'abcdef'
+        return Fn.call('POST', 8000, '/v1/scripting_invalid', buf, [[C.modeHeader, 'single']])
+        .then(Fn.shouldFail(500))
+      })
+    })
+
+    describe('JSON Schema Validation', function () {
+      it('Accept valid objects', function () {
+        var buf = '{"abc":{"def":764}}\n{"abc":{"def": 0}}'
+        return Fn.call('POST', 8000, '/v1/json_validation', buf, [[C.modeHeader, 'multiple']])
+        .then(Fn.shouldHaveWritten(2))
+      })
+
+      it('Reject incorrectly-formatted JSON', function () {
+        var buf = '{"abc":{def":764}}\n{"abc":{"def": }}'
+        return Fn.call('POST', 8000, '/v1/json_validation', buf, [[C.modeHeader, 'multiple']])
+        .then(Fn.shouldFail(500))
+      })
+
+      it('Reject binary non-JSON data', function () {
+        var buf = '{"abc":"def\u9876":{5}}'
+        return Fn.call('POST', 8000, '/v1/json_validation', buf, [[C.modeHeader, 'multiple']])
+        .then(Fn.shouldFail(500))
+      })
+
+      it('Reject invalid JSON object (incorrect type)', function () {
+        var buf = '{"abc":{"def":9.5}}'
+        return Fn.call('POST', 8000, '/v1/json_validation', buf, [[C.modeHeader, 'multiple']])
+        .then(Fn.shouldFail(500))
+      })
+
+      it('Reject invalid JSON object (extra key)', function () {
+        var buf = '{"abc": {"def":9, "ghi": 10}}'
+        return Fn.call('POST', 8000, '/v1/json_validation', buf, [[C.modeHeader, 'multiple']])
+        .then(Fn.shouldFail(500))
+      })
+    })
+
     describe('Routing', function () {
       it('Invalid path, empty channel', function () {
         var buf = ''

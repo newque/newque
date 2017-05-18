@@ -2,11 +2,13 @@
   Printexc.record_backtrace true
   #endif
 
-open Core.Std
+let newque_version = "0.0.4"
+
+open Core
 open Lwt
 open Http_prot
 
-let () = Lwt_engine.set ~transfer:true ~destroy:true (new Lwt_engine.libev)
+let () = Lwt_engine.set ~transfer:true ~destroy:true (new Lwt_engine.libev ())
 
 let () = Lwt.async_exception_hook := fun ex ->
     print_endline (sprintf "UNCAUGHT EXCEPTION: %s" (Exception.full ex))
@@ -22,7 +24,7 @@ let () = Lwt_preemptive.init 4 25 (fun str ->
 let () = Lwt_log.add_rule "*" Lwt_log.Debug
 
 let start config_path =
-  let%lwt () = Log.write_stdout Lwt_log.Info "Starting Newque" in
+  let%lwt () = Log.write_stdout Lwt_log.Info (sprintf "Starting Newque %s" newque_version) in
   (* Make directories for logs and channels *)
   let check_directory path =
     let dir = Fs.is_directory ~create:true path in
@@ -90,7 +92,7 @@ let start config_path =
 
 let _ =
   try
-    Lwt_unix.run (start (sprintf "%s%s" Fs.conf_dir "newque.json"))
+    Lwt_main.run (start (sprintf "%s%s" Fs.conf_dir "newque.json"))
   with
   | ex ->
     print_endline (sprintf

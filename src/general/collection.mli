@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 
 type 'a t
 
@@ -26,6 +26,7 @@ val to_coll_map : f:('a -> 'b) -> 'a t -> 'b t
 val to_coll_concat_map : f:('a -> 'b list) -> 'a t -> 'b t
 
 val iter : 'a t -> f:('a -> unit) -> unit
+val iteri : 'a t -> f:(int -> 'a -> unit) -> unit
 val fold : 'a t -> init:'accum -> f:('accum -> 'a -> 'accum) -> 'accum
 val foldi : 'a t -> init:'accum -> f:(int -> 'accum -> 'a -> 'accum) -> 'accum
 

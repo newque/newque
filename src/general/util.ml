@@ -1,8 +1,8 @@
-open Core.Std
+open Core
 open Lwt
 open Cohttp
 
-type splitter = (string -> string list) [@@deriving sexp]
+type splitter = (string -> string list)
 let make_splitter ~sep =
   let delim = Str.regexp_string sep in
   Str.split_delim delim
@@ -72,6 +72,6 @@ let rec make_interval every callback () =
   ignore_result (callback ());
   make_interval every callback ()
 
-let time_ns_int64 () = Int63.to_int64 (Time_ns.to_int63_ns_since_epoch (Time_ns.now ()))
 let time_ns_int63 () = Time_ns.to_int63_ns_since_epoch (Time_ns.now ())
-let time_ms_float () = Time.to_float (Time.now ()) *. 1000.
+let time_ns_int64 () = time_ns_int63 () |> Int63.to_int64
+let time_ms_float () = Int63.( * ) (time_ns_int63 ()) (Int63.of_int 1000) |> Int63.to_float

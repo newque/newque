@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Lwt
 
 type t = {
@@ -27,7 +27,14 @@ let create name conf_channel =
   let stream_slice_size = Option.value_map read ~default:Int64.max_value ~f:(fun r -> r.Read_settings.stream_slice_size) in
 
   let write = Option.map conf_channel.write_settings ~f:Write_settings.create in
+  let json_validation = Option.bind write (fun w -> w.Write_settings.json_validation) in
+  let scripting = Option.bind write (fun w -> w.Write_settings.scripting) in
   let batching = Option.bind write (fun w -> w.Write_settings.batching) in
+
+  Option.iter scripting ~f:(fun scripting ->
+    if Array.length scripting.Write_settings.mappers = 0
+    then failwith (sprintf "Channel [%s] has scripting enabled, but no script is specified" name)
+  );
 
   if String.is_empty conf_channel.separator
   then failwith (sprintf "Channel [%s] has invalid separator (empty string)" name) else
@@ -41,6 +48,8 @@ let create name conf_channel =
         let create () = None.create ()
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
+        let json_validation = json_validation
+        let scripting = scripting
         let batching = batching
       end in
       (module Persistence.Make (Arg) : Persistence.S)
@@ -54,6 +63,8 @@ let create name conf_channel =
             ~avg_read:conf_channel.avg_read
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
+        let json_validation = json_validation
+        let scripting = scripting
         let batching = batching
       end in
       (module Persistence.Make (Arg) : Persistence.S)
@@ -67,6 +78,8 @@ let create name conf_channel =
             ~avg_read:conf_channel.avg_read
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
+        let json_validation = json_validation
+        let scripting = scripting
         let batching = batching
       end in
       (module Persistence.Make (Arg) : Persistence.S)
@@ -87,6 +100,8 @@ let create name conf_channel =
             ~chan_separator:conf_channel.separator
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
+        let json_validation = json_validation
+        let scripting = scripting
         let batching = batching
       end in
       (module Persistence.Make (Arg) : Persistence.S)
@@ -104,6 +119,8 @@ let create name conf_channel =
             ~socket_settings:pubsub.p_socket_settings
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
+        let json_validation = json_validation
+        let scripting = scripting
         let batching = batching
       end in
       (module Persistence.Make (Arg) : Persistence.S)
@@ -127,6 +144,8 @@ let create name conf_channel =
             ~health_time_limit_ms
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
+        let json_validation = json_validation
+        let scripting = scripting
         let batching = batching
       end in
       (module Persistence.Make (Arg) : Persistence.S)
@@ -144,6 +163,8 @@ let create name conf_channel =
             es.timeout
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
+        let json_validation = json_validation
+        let scripting = scripting
         let batching = batching
       end in
       (module Persistence.Make (Arg) : Persistence.S)
@@ -154,6 +175,8 @@ let create name conf_channel =
         let create () = Redis.create redis.redis_host redis.redis_port redis.redis_auth
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
+        let json_validation = json_validation
+        let scripting = scripting
         let batching = batching
       end in
       (module Persistence.Make (Arg) : Persistence.S)

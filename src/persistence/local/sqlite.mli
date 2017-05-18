@@ -1,6 +1,6 @@
-open Core.Std
+open Core
 
-type t [@@deriving sexp]
+type t
 
 val create : string -> avg_read:int -> t Lwt.t
 

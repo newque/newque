@@ -1,5 +1,5 @@
 Name: newque
-Version: 0.0.3
+Version: 0.0.4
 Synopsis: Fast modular message broker.
 Authors: Simon Grondin <github@simongrondin.name>
 License: MPL
@@ -20,7 +20,10 @@ PreCleanCommand: ./scripts/preclean.sh
 Executable "newque"
   Path: tmp
   MainIs: newque.ml
-  CompiledObject: best
+  CompiledObject: native
+  CSources: conversions.c, lua_newque.c, rapidjson_schema.c, rapidjson_newque.c
+  CCOpt: "-x c++" -std=c++11 -O3 -Wall -I/usr/include/lua5.1 -I../src/bindings -I..
+  CCLib: -llua5.1 -lstdc++
   BuildDepends:
     atd,
     atdgen,
@@ -32,6 +35,7 @@ Executable "newque"
     lwt.preemptive,
     lwt.unix,
     lwt-zmq,
+    lua,
     ocaml-protoc,
     ppx_sexp_conv,
     ppx_deriving_protobuf,

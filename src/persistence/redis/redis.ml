@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Lwt
 
 type redis_t = {
@@ -6,7 +6,7 @@ type redis_t = {
   host: string;
   port: int;
   auth: string option;
-} [@@deriving sexp]
+}
 
 let create host port auth =
   let instance = {conn = (); host; port; auth;} in
@@ -14,7 +14,7 @@ let create host port auth =
 
 module M = struct
 
-  type t = redis_t [@@deriving sexp]
+  type t = redis_t
 
   let close instance = return_unit
 

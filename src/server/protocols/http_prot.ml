@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Lwt
 open Cohttp
 open Cohttp_lwt_unix
@@ -13,18 +13,6 @@ type t = {
   ctx: Cohttp_lwt_unix_net.ctx;
   thread: unit Lwt.t;
 }
-let sexp_of_t http =
-  let open Config_t in
-  Sexp.List [
-    Sexp.List [
-      Sexp.Atom http.generic.name;
-      Sexp.Atom http.generic.host;
-      Sexp.Atom (Int.to_string http.generic.port);
-    ];
-    Sexp.List [
-      Sexp.Atom (Int.to_string http.specific.backlog);
-    ];
-  ]
 
 let missing_header = "<no header>"
 
@@ -236,10 +224,13 @@ let make_socket ~backlog host port =
   let sock = Lwt_unix.socket (Unix.domain_of_sockaddr sockaddr)
       Unix.SOCK_STREAM 0 in
   Lwt_unix.setsockopt sock SO_REUSEADDR true;
-  Lwt_unix.bind sock sockaddr;
+  let%lwt () = Lwt_unix.bind sock sockaddr in
   Lwt_unix.listen sock backlog;
   Lwt_unix.set_close_on_exec sock;
   return sock
+
+let conn_closed name conn =
+  async (fun () -> Logger.debug_lazy (lazy (sprintf "Connection closed on [%s]" name)))
 
 let start generic specific routing =
   let open Config_t in
@@ -258,8 +249,10 @@ let start generic specific routing =
   let mode = `TCP (`Socket sock) in
   let (instance_t, instance_w) = wait () in
   let conf = match routing with
-    | Standard routing -> Server.make ~callback:(handler instance_t routing) ()
-    | Admin routing -> Server.make ~callback:(Admin.handler routing) ()
+    | Standard routing ->
+      Server.make ~callback:(handler instance_t routing) ()
+    | Admin routing ->
+      Server.make ~callback:(Admin.handler routing) ()
   in
   let (stop_t, stop_w) = wait () in
   let thread = Server.create ~stop:stop_t ~ctx ~mode conf in

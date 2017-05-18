@@ -13,12 +13,19 @@ setup.data
 setup.log
 setup.ml
 
+libnewque_stubs.clib
+
 test/node_modules
 test/running
 test/newque
 test/logs
 test/remoteRunning
 test/remoteConf/channels
+
+rapidjson
+
+newque-conduit
+newque-lua
 
 data
 logs

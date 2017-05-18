@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 open Lwt
 
 type slice_metadata = {
@@ -11,7 +11,7 @@ type slice = {
 }
 
 module type Template = sig
-  type t [@@deriving sexp]
+  type t
 
   val close : t -> unit Lwt.t
 
@@ -34,11 +34,13 @@ module type Argument = sig
   val create : unit -> IO.t Lwt.t
   val stream_slice_size : int64
   val raw : bool
+  val json_validation : Write_settings.json_validation option
+  val scripting : Write_settings.scripting option
   val batching : Write_settings.batching option
 end
 
 module type S = sig
-  type t [@@deriving sexp]
+  type t
 
   val ready : unit -> unit Lwt.t
 
@@ -58,14 +60,15 @@ end
 module Make (Argument: Argument) : S = struct
   type t = Argument.IO.t
 
-  let sexp_of_t = Argument.IO.sexp_of_t
-  let t_of_sexp = Argument.IO.t_of_sexp
-
   let instance = Argument.create ()
 
-  let ready () =
-    let%lwt _ = instance in
-    return_unit
+  let rj_opt_t = Option.map Argument.json_validation ~f:(fun json_validation ->
+      Rapidjson.create json_validation.Write_settings.schema_name json_validation.Write_settings.parallelism_threshold
+    )
+
+  let lua_opt_t = Option.map Argument.scripting ~f:(fun scripting ->
+      Scripting.create ~mappers:(scripting.Write_settings.mappers)
+    )
 
   (******************
      PUSH
@@ -75,17 +78,20 @@ module Make (Argument: Argument) : S = struct
     | true -> Message.serialize_raw
     | false -> Message.serialize_full
 
-  let fast_push =
+  (* A closure to pick the right closure to call the Batcher, or skip *)
+  let push_batching =
     let open Write_settings in
     match Argument.batching with
     | None ->
       fun msgs ids ->
+        (* Runtime *)
         let%lwt instance = instance in
         Argument.IO.push instance ~msgs ~ids
 
     | Some { max_time; max_size = 1; _ } ->
       (* Special case optimization *)
       fun msgs ids ->
+        (* Runtime *)
         let%lwt instance = instance in
         let threads =
           Collection.to_list_mapi_two msgs ids ~f:(fun i msg id ->
@@ -106,12 +112,45 @@ module Make (Argument: Argument) : S = struct
         )
       in
       fun msgs ids ->
+        (* Runtime *)
         let%lwt () = Batcher.submit batcher msgs ids in
         return (Collection.length msgs)
 
-  let push msgs ids =
-    let msgs = fast_serialize msgs in
-    fast_push msgs ids
+  let done_mapping msgs ids = push_batching (fast_serialize msgs) ids
+
+  (* push: JSON Validation => Lua Scripting => Batching => Backend *)
+  let push =
+    let open Write_settings in
+
+    (* A closure to do Lua Scripting or skip *)
+    let push_lua = match (Argument.scripting, lua_opt_t) with
+      | None, None -> done_mapping
+      | (Some { mappers }), (Some lua_t) ->
+        fun msgs ids ->
+          (* Runtime *)
+          let%lwt lua = lua_t in
+          let raw = Message.serialize_raw msgs in
+          let%lwt (mapped_msgs, mapped_ids) = Scripting.run_mappers lua mappers ~msgs:raw ~ids in
+          (* That the lengths match is checked in scripting.ml *)
+          if (Collection.length mapped_msgs) = 0
+          then return 0
+          else done_mapping (Message.swap_contents msgs mapped_msgs) mapped_ids
+      | _ -> done_mapping (* Impossible case *)
+    in
+
+    (* Return a closure that does JSON validation or skips *)
+    match (Argument.json_validation, rj_opt_t) with
+    | None, None -> push_lua
+    | (Some { schema_name }), (Some rj_t) ->
+      fun msgs ids ->
+        (* Runtime *)
+        let%lwt rj = rj_t in
+        let raw = Message.serialize_raw msgs in
+        begin match%lwt Rapidjson.validate rj raw with
+          | Ok () -> done_mapping msgs ids
+          | Error str -> fail_with str
+        end
+    | _ -> done_mapping (* Impossible case *)
 
   (******************
      PULL
@@ -200,5 +239,27 @@ module Make (Argument: Argument) : S = struct
   let health () =
     let%lwt instance = instance in
     Argument.IO.health instance
+
+  (******************
+     SETUP
+   ********************)
+  let ready () =
+    (* Wait for instance *)
+    let%lwt _ = instance in
+    (* Wait for JSON Validator *)
+    let%lwt () = match rj_opt_t with
+      | None -> return_unit
+      | Some rj_t ->
+        let%lwt _ = rj_t in
+        return_unit
+    in
+    (* Wait for Lua scripting *)
+    let%lwt () = match lua_opt_t with
+      | None -> return_unit
+      | Some lua_t ->
+        let%lwt _ = lua_t in
+        return_unit
+    in
+    return_unit
 
 end

@@ -16,7 +16,7 @@ module.exports = function (backend, backendSettings, raw) {
     it('Push', function () {
       var buf = `{"a":"abc"}\n{"a":"def"}\n{"a":"ghi"}\n{"a":"jkl"}`
       return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'multiple']])
-      .then(Fn.shouldHaveWritten(0))
+      .then(Fn.shouldHaveWritten(4))
     })
 
     it('Pull', function () {

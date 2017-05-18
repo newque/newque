@@ -1,17 +1,17 @@
-open Core.Std
+open Core
 open Lwt
 
-type none_t = unit [@@deriving sexp]
+type none_t = unit
 
 let create () = return_unit
 
 module M = struct
 
-  type t = none_t [@@deriving sexp]
+  type t = none_t
 
   let close instance = return_unit
 
-  let push instance ~msgs ~ids = return Int.zero
+  let push instance ~msgs ~ids = return (Collection.length msgs)
 
   let pull instance ~search ~fetch_last = return (Collection.empty, None, None)
 

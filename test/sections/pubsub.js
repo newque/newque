@@ -32,7 +32,7 @@ module.exports = function (backend, backendSettings, raw) {
     })
 
     it('Push to multiple subscribers', function () {
-      this.timeout(4000)
+      this.timeout(5000)
       var originalIds = ['id1', 'id2', 'id3', 'id4']
       var originalIdsStr = originalIds.join(',')
       var buf = `{"a":"abc"}\n{"a":"def"}\n{"a":"ghi"}\n{"a":"jkl"}`

@@ -1,4 +1,4 @@
-open Core.Std
+open Core
 
 val parse_main : string -> Config_t.config_newque Lwt.t
 

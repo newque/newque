@@ -1,7 +1,7 @@
-open Core.Std
+open Core
 open Cohttp
 
-type splitter = (string -> string list) [@@deriving sexp]
+type splitter = (string -> string list)
 val make_splitter : sep:string -> splitter
 
 val parse_int64 : string -> int64 option
@@ -30,6 +30,6 @@ val header_name_to_int64_opt : Header.t -> string -> int64 option
 
 val make_interval : float -> (unit -> 'a Lwt.t) -> unit -> 'b Lwt.t
 
-val time_ns_int64 : unit -> int64
 val time_ns_int63 : unit -> Int63.t
+val time_ns_int64 : unit -> int64
 val time_ms_float : unit -> float
