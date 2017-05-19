@@ -2,10 +2,9 @@
 #thread
 
 #require "core.top";;
-open Core.Std
+open Core
 
 #require "ppx_sexp_conv";;
-#require "ppx_deriving_protobuf";;
 
 #require "lwt"
 #require "lwt.unix"
@@ -15,24 +14,8 @@ open Lwt
 
 #require "cohttp"
 #require "cohttp.lwt"
-open Cohttp
-open Cohttp_lwt_unix
 
-#require "conduit"
-#require "conduit.lwt"
-#require "conduit.lwt-unix"
+#require "lua"
+#mod_use "src/general/collection.ml"
 
-#require "ZMQ"
-#require "lwt-zmq"
-
-#require "atd"
-#require "atdgen"
-
-#require "uuidm"
-#require "sqlite3"
-
-#require "ocaml-protoc"
-
-#mod_use "src/exception.ml"
-#mod_use "src/collection.ml"
-#mod_use "src/util.ml"
+#require "redis-lwt"
