@@ -19,3 +19,8 @@ open Lwt
 #mod_use "src/general/collection.ml"
 
 #require "redis-lwt"
+
+#require "atd"
+#require "atdgen"
+#mod_use "src/serialization/json_obj_t.ml"
+#mod_use "src/serialization/json_obj_j.ml"

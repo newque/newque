@@ -22,7 +22,7 @@ opam pin add ocaml-lua newque-lua -y
 git clone https://github.com/SGrondin/ocaml-conduit.git newque-conduit
 opam pin add conduit newque-conduit -y
 
-opam install atdgen cohttp conf-libev core cppo lwt-zmq oasis ocaml-protoc ocp-indent ppx_deriving_protobuf sqlite3 utop uuidm -y
+opam install atdgen cohttp conf-libev core cppo lwt-zmq oasis ocaml-protoc ocp-indent pla ppx_deriving_protobuf redis-lwt sqlite3 utop uuidm -y
 
 rm -rf newque-lua
 rm -rf newque-conduit

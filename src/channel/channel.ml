@@ -171,8 +171,14 @@ let create name conf_channel =
 
     | `Redis redis ->
       let module Arg = struct
-        module IO = Redis.M
-        let create () = Redis.create redis.redis_host redis.redis_port redis.redis_auth
+        module IO = Redis_.M
+        let create () = Redis_.create
+            ~chan_name:name
+            redis.redis_host
+            redis.redis_port
+            ~auth:redis.redis_auth
+            ~database:redis.redis_database
+            ~pool_size:redis.redis_pool_size
         let stream_slice_size = stream_slice_size
         let raw = conf_channel.raw
         let json_validation = json_validation

@@ -1,10 +1,13 @@
 open Core
 
+type after =
+  | After_id of string
+  | After_ts of int64
+  | After_rowid of int64
+
 type t = {
   limit: int64;
-  after_id: string option;
-  after_ts: int64 option;
-  after_rowid: int64 option;
+  after: after option;
   only_once: bool;
 }
 
@@ -13,41 +16,29 @@ let create max_read ~mode ~only_once =
   | `One ->
     {
       limit = Int64.one;
-      after_id = None;
-      after_ts = None;
-      after_rowid = None;
+      after = None;
       only_once;
     }
   | `Many x ->
     {
       limit = Int64.min max_read x;
-      after_id = None;
-      after_ts = None;
-      after_rowid = None;
+      after = None;
       only_once;
     }
   | `After_id id ->
     {
       limit = max_read;
-      after_id = Some id;
-      after_ts = None;
-      after_rowid = None;
+      after = Some (After_id id);
       only_once;
     }
   | `After_ts ts ->
     {
       limit = max_read;
-      after_id = None;
-      after_ts = Some ts;
-      after_rowid = None;
+      after = Some (After_ts ts);
       only_once;
     }
 
-let has_any_filters search = match search with
-  | { after_id = None; after_ts = None; after_rowid = None; } -> false
-  | _ -> true
-
 let mode_and_limit search = match search with
-  | { after_id = Some id; limit; } -> ((`After_id id), limit)
-  | { after_ts = Some ts; limit; } -> ((`After_ts ts), limit)
+  | { after = Some (After_id id); limit; } -> ((`After_id id), limit)
+  | { after = Some (After_ts ts); limit; } -> ((`After_ts ts), limit)
   | { limit; _ } -> ((`Many limit), limit)

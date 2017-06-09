@@ -56,7 +56,9 @@ type config_listener = {
 type config_redis = {
   host <json name="host">: string;
   port <json name="port">: int;
+  ~database <json name="database"><ocaml default="0">: int;
   ?auth <json name="auth">: string nullable;
+  ~pool_size <json name="connectionPoolSize"><ocaml default="5">: int;
 } <ocaml field_prefix="redis_">
 
 type config_httpproxy = {

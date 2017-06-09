@@ -37,8 +37,11 @@ Executable "newque"
     lwt-zmq,
     lua,
     ocaml-protoc,
+    pla,
+    pla.ppx,
     ppx_sexp_conv,
     ppx_deriving_protobuf,
+    redis-lwt,
     sqlite3,
     threads,
     uuidm

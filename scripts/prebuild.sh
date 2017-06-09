@@ -24,7 +24,7 @@ cp src/serialization/zmq_obj.proto specs/zmq_api.proto
 ocaml-protoc -ml_out src/serialization src/serialization/zmq_obj.proto
 
 # Run the preprocessor on .ml and .mli, and copy the output to tmp/
-find src -type f -name '*.ml*' -print0 | xargs -0 -I % sh -c 'cppo -D DEBUG % -o tmp/`basename %`'
+find src -type f -name '*.ml*' -print0 | xargs -0 -I % sh -c 'cppo -I src/persistence/redis/scripts -D DEBUG -n % -o tmp/`basename %`'
 # Copy C files to tmp/
 find src -type f -name '*.c' -print0 | xargs -0 -I % sh -c 'cp % tmp/`basename %`'
 find src -type f -name '*.h' -print0 | xargs -0 -I % sh -c 'cp % tmp/`basename %`'

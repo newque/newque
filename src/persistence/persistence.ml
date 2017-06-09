@@ -191,8 +191,8 @@ module Make (Argument: Argument) : S = struct
           let%lwt (payloads, last_rowid, last_row_data) = Argument.IO.pull instance ~search:!next_search ~fetch_last:false in
           let filter = match (last_rowid, last_row_data) with
             | None, None -> None
-            | (Some rowid), _ -> Some (`After_rowid rowid)
-            | _, Some (last_id, _) -> Some (`After_id last_id)
+            | (Some rowid), _ -> Some (After_rowid rowid)
+            | _, Some (last_id, _) -> Some (After_id last_id)
           in
           if Collection.is_empty payloads
           then return_none else
@@ -205,21 +205,11 @@ module Make (Argument: Argument) : S = struct
                 !next_search with
                 limit = Int64.zero;
               }
-            | Some (`After_rowid rowid) ->
+            | Some _ ->
               {
                 !next_search with
                 limit = Int64.min !left Argument.stream_slice_size;
-                after_id = search.after_id;
-                after_ts = search.after_ts;
-                after_rowid = Some rowid;
-              }
-            | Some (`After_id id) ->
-              {
-                !next_search with
-                limit = Int64.min !left Argument.stream_slice_size;
-                after_id = Some id;
-                after_ts = search.after_ts;
-                after_rowid = search.after_rowid;
+                after = filter;
               }
           end;
           return_some payloads
