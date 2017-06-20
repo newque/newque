@@ -1,0 +1,17 @@
+{
+  "listeners": ["http8000", "zmq8005"],
+  "backend": "redis",
+  "backendSettings": {
+    "host": "127.0.0.1",
+    "port": "6379"
+  },
+  "acknowledgement": "saved",
+  "readSettings": {
+    "onlyOnce": true
+  },
+  "writeSettings": {
+    "forward": []
+  },
+  "raw": true,
+  "emptiable": true
+}

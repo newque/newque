@@ -42,3 +42,10 @@ let mode_and_limit search = match search with
   | { after = Some (After_id id); limit; } -> ((`After_id id), limit)
   | { after = Some (After_ts ts); limit; } -> ((`After_ts ts), limit)
   | { limit; _ } -> ((`Many limit), limit)
+
+let after_to_strings search =
+  match search.after with
+  | None -> ("after_rowid", "-1")
+  | Some (After_id id) -> ("after_id", id)
+  | Some (After_ts ts) -> ("after_ts", (Int64.to_string ts))
+  | Some (After_rowid rowid) -> ("after_rowid", (Int64.to_string rowid))

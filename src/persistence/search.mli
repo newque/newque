@@ -12,3 +12,5 @@ type t = {
 val create : int64 -> mode:Mode.Read.t -> only_once:bool -> t
 
 val mode_and_limit : t -> Mode.Read.t * int64
+
+val after_to_strings : t -> string * string

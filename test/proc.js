@@ -2,6 +2,7 @@ var fs = require('fs')
 var spawn = require('child_process').spawn
 var exec = require('child_process').exec
 var request = require('superagent')
+var redis = require('redis')
 
 var zmq = require('zmq')
 var protobuf = require("protocol-buffers")
@@ -375,10 +376,27 @@ var clearEs = exports.clearEs = function (backendSettings) {
   })
 }
 
+var clearRedis = exports.clearRedis = function (backendSettings) {
+  var client = redis.createClient(backendSettings)
+  return new Promise(function (resolve, reject) {
+    client.on('error', function (err) {
+      return reject(err)
+    })
+    var multi = client.multi([['script', 'flush']])
+    return Promise.promisify(multi.exec.bind(multi))()
+    .then(() => Promise.promisify(client.flushall.bind(client))())
+    .then(() => client.quit())
+    .then(resolve)
+    .catch(reject)
+  })
+}
+
 exports.teardown = function (env, backend, backendSettings) {
   // Reset all the indices
   if (backend === 'elasticsearch') {
     var promise = clearEs(backendSettings)
+  } else if (backend === 'redis') {
+    var promise = clearRedis(backendSettings)
   } else {
     var promise = Promise.resolve()
   }
@@ -393,5 +411,9 @@ exports.teardown = function (env, backend, backendSettings) {
   })
   .then(function () {
     env.processes.forEach((p) => p.kill())
+  })
+  .catch(function (err) {
+    console.log('TEARDOWN ERROR: ', err.toString('utf8'))
+    return Promise.reject(err)
   })
 }
