@@ -397,6 +397,7 @@ exports.teardown = function (env, backend, backendSettings) {
     var promise = clearEs(backendSettings)
   } else if (backend === 'redis') {
     var promise = clearRedis(backendSettings)
+    // var promise = Promise.resolve()
   } else {
     var promise = Promise.resolve()
   }

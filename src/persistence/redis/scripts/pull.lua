@@ -20,8 +20,6 @@ local debug = {
   'fetch_last', tostring(fetch_last)
 }
 
-local pattern = '(.*):'
-
 if filter_type == 'after_id' then
   local index_lookup = redis.call(
     'zrangebylex', index_id_key,
@@ -29,16 +27,14 @@ if filter_type == 'after_id' then
     'limit', 0, 1
   )
 
-  table.insert(debug, 'index_lookup:')
-  table.insert(debug, index_lookup)
+  table.insert(debug, 'index_lookup:'..tostring(index_lookup))
 
   if #index_lookup == 0 then
     start_rowid = nil
   else
-    local id_retrieved = string.match(index_lookup[1], pattern)
+    local id_retrieved = string.sub(index_lookup[1], 1, string.find(index_lookup[1], ':') - 1)
 
-    table.insert(debug, 'id_retrieved:')
-    table.insert(debug, id_retrieved)
+    table.insert(debug, 'id_retrieved:'..tostring(id_retrieved))
 
     if id_retrieved ~= filter_value then
       start_rowid = nil
@@ -56,8 +52,7 @@ elseif filter_type == 'after_ts' then
     'limit', 0, 1
   )
 
-  table.insert(debug, 'index_lookup:')
-  table.insert(debug, index_lookup)
+  table.insert(debug, 'index_lookup:'..tostring(index_lookup))
 
   if #index_lookup == 0 then
     start_rowid = nil
@@ -78,39 +73,36 @@ if start_rowid == nil then
   return {{}, '', '', '', debug}
 end
 
-table.insert(debug, 'start_rowid:')
-table.insert(debug, start_rowid)
-table.insert(debug, 'start_mode:')
-table.insert(debug, start_mode)
+table.insert(debug, 'start_rowid:'..tostring(start_rowid))
+table.insert(debug, 'start_mode:'..tostring(start_mode))
 
-table.insert(debug, 'zrangebyscore '..data_key..' '..(start_mode..tostring(start_rowid))..' +inf withscores limit 0 '..tostring(limit))
-
-local msgs_rowid = redis.call(
+local main_lookup_args = {
   'zrangebyscore', data_key,
-  (start_mode..tostring(start_rowid)), '+inf', 'withscores',
+  (start_mode..tostring(start_rowid)), '+inf',
   'limit', 0, limit
-)
+}
+
+for i = 1, #main_lookup_args do
+  table.insert(debug, main_lookup_args[i])
+end
+
+local msgs_rowid = redis.call(unpack(main_lookup_args))
 
 if #msgs_rowid == 0 then
   table.insert(debug, 'EXIT 2')
   return {{}, '', '', '', debug}
 end
 
-table.insert(debug, 'msgs_rowid:')
-table.insert(debug, msgs_rowid)
-
-local last_rowid = msgs_rowid[#msgs_rowid]
-
-table.insert(debug, 'last_rowid:')
-table.insert(debug, last_rowid)
-
 local msgs = {}
-for i = 1, #msgs_rowid, 2 do
-  table.insert(msgs, string.sub(msgs_rowid[i], string.find(msgs_rowid[i], ':') + 1))
+local rowids = {}
+
+for i = 1, #msgs_rowid do
+  local pos = string.find(msgs_rowid[i], ':')
+  table.insert(msgs, string.sub(msgs_rowid[i], pos + 1))
+  table.insert(rowids, string.sub(msgs_rowid[i], 1, pos - 1))
 end
 
-table.insert(debug, 'msgs:')
-table.insert(debug, msgs)
+local last_rowid = rowids[#rowids]
 
 local last_msg_meta
 if fetch_last then
@@ -121,12 +113,9 @@ if fetch_last then
   )
 end
 
-table.insert(debug, 'last_msg_meta:')
-table.insert(debug, last_msg_meta)
-
 local last_id
 local last_timens
-if #last_msg_meta == 2 then
+if last_msg_meta ~= nil and #last_msg_meta == 2 then
   last_id = last_msg_meta[1]
   last_timens = last_msg_meta[2]
 else
@@ -134,11 +123,11 @@ else
   last_timens = ''
 end
 
-table.insert(debug, 'last_id:')
-table.insert(debug, last_id)
-table.insert(debug, 'last_timens:')
-table.insert(debug, last_timens)
+table.insert(debug, 'last_id:'..tostring(last_id))
+table.insert(debug, 'last_timens:'..tostring(last_timens))
+
+if only_once then
+  delete_rowids(rowids, index_id_key, index_ts_key, data_key, meta_key, debug)
+end
 
 return {msgs, last_rowid, last_id, last_timens, debug}
-
--- TODO: only_once, using ZREMRANGEBYSCORE
