@@ -13,21 +13,6 @@ type redis_t = {
   keys: string list;
 }
 
-let rec debug_reply ?(nested=false) reply =
-  match reply with
-  | `Bulk s -> sprintf "\"%s\"" (Option.value ~default:"---" s)
-  | `Error s -> sprintf "(ERROR %s)" s
-  | `Int i -> sprintf "%d" i
-  | `Int64 i -> sprintf "(INT64 %Ld)" i
-  | `Status s -> sprintf "(STATUS %s)" s
-  | `Multibulk ll ->
-    let stringified =
-      List.map ll ~f:(debug_reply ~nested:true)
-      |> String.concat ~sep:", "
-    in
-    if nested then sprintf "{%s}" stringified
-    else sprintf "{%s}" stringified
-
 let lua_push = [%pla{|
  #include "push.lua"
  |}] |> Pla.print
@@ -48,15 +33,31 @@ let lua_health = [%pla{|
 let lua_delete = [%pla{|
   #include "delete.lua"
   |}] |> Pla.print
+# 37
+
+let rec debug_reply ?(nested=false) reply =
+  match reply with
+  | `Bulk s -> sprintf "\"%s\"" (Option.value ~default:"---" s)
+  | `Error s -> sprintf "(ERROR %s)" s
+  | `Int i -> sprintf "%d" i
+  | `Int64 i -> sprintf "(INT64 %Ld)" i
+  | `Status s -> sprintf "(STATUS %s)" s
+  | `Multibulk ll ->
+    let stringified =
+      List.map ll ~f:(debug_reply ~nested:true)
+      |> String.concat ~sep:", "
+    in
+    if nested then sprintf "{%s}" stringified
+    else sprintf "{%s}" stringified
 
 let scripts = String.Table.create ()
 
 let debug_query script keys args =
-  sprintf "evalsha %s %d %s %s"
+  sprintf "evalsha %s %d %s (%d arguments)"
     (String.Table.find_exn scripts script)
     (List.length keys)
     (String.concat ~sep:" " keys)
-    (String.concat ~sep:" " args)
+    (List.length args)
 
 let load_scripts conn =
   let load_script name lua =
@@ -72,27 +73,47 @@ let load_scripts conn =
     (load_script "delete" lua_delete);
   ]
 
+let last_used_table = String.Table.create ()
+let pool_table = String.Table.create ()
+let get_conn_pool host port ~auth ~database ~pool_size =
+  let key = sprintf "%s:%d:%d" host port database in
+  String.Table.find_or_add pool_table key ~default:(fun () ->
+    Lwt_pool.create pool_size
+      ~check:(fun conn cb ->
+        (* Runs after a call failed *)
+        ignore (async (fun () -> Client.disconnect conn));
+        cb false
+      )
+      ~validate:(fun conn ->
+        (* Runs before a connection is used *)
+        let now = Util.time_ns_int63 () in
+        let last_used = Option.value ~default:Int63.zero (String.Table.find last_used_table key) in
+        String.Table.set last_used_table ~key ~data:now;
+        if Int63.(now < (last_used + (of_int 2_000_000_000)))
+        then return true
+        else try%lwt
+            Client.ping conn
+          with err ->
+            fail_with "Server unreachable"
+      )
+      (fun () ->
+         let%lwt () = Logger.warning (sprintf "Connecting to [%s]" key) in
+         let%lwt conn = Client.(connect {host; port}) in
+         let%lwt () = match auth with
+           | None -> return_unit
+           | Some pw -> Client.auth conn pw
+         in
+         let%lwt () = if database <> 0 then Client.select conn database else return_unit in
+         let%lwt () = load_scripts conn in
+         return conn
+      )
+  )
+
 let exec_script conn script keys args =
   async (fun () -> Logger.debug_lazy (lazy (debug_query script keys args)));
   match String.Table.find scripts script with
   | None -> fail_with (sprintf "Redis script %s could not be found" script)
   | Some sha -> Client.evalsha conn sha keys args
-
-let pool_table = String.Table.create ()
-let get_conn_pool host port ~auth ~database ~pool_size =
-  let key = sprintf "%s:%d:%d" host port database in
-  String.Table.find_or_add pool_table key ~default:(fun () ->
-    Lwt_pool.create pool_size (fun () ->
-      let%lwt conn = Client.(connect {host; port}) in
-      let%lwt () = match auth with
-        | None -> return_unit
-        | Some pw -> Client.auth conn pw
-      in
-      let%lwt () = if database <> 0 then Client.select conn database else return_unit in
-      let%lwt () = load_scripts conn in
-      return conn
-    )
-  )
 
 let create ~chan_name host port ~auth ~database ~pool_size =
   let pool = get_conn_pool host port ~auth ~database ~pool_size in
@@ -118,7 +139,7 @@ module M = struct
   let push instance ~msgs ~ids =
     Lwt_pool.use instance.pool (fun conn ->
       let queue_args = Queue.create ~capacity:((Collection.length msgs) + (Collection.length ids) + 1) () in
-      Queue.enqueue queue_args (Util.time_ns_int64 () |> Int64.to_string);
+      Queue.enqueue queue_args (Util.time_ns_string ());
       Collection.add_to_queue msgs queue_args;
       Collection.add_to_queue ids queue_args;
       let args = Queue.to_list queue_args in

@@ -386,8 +386,9 @@ let add_to_queue coll queue =
 
 let to_indexable coll =
   match coll.data with
-  | List _ | Queue _ -> towards_queue coll
+  | Queue _ -> towards_queue coll
   | Array _ | Both _ -> towards_array coll
+  | List _ -> make_array (towards_array coll) |> fst
 
 let make_stack coll =
   let i = ref 0 in
@@ -471,6 +472,22 @@ let concat_string ~sep coll =
     done;
     Bigbuffer.add_string buffer (Queue.get q (len - 1));
     Bigbuffer.contents buffer
+
+let split ~every coll =
+  let len = length coll in
+  let num_blocks, last_block = match len mod every with
+    | 0 -> (len / every), every
+    | x -> (len / every) + 1, x
+  in
+  let get = match to_indexable coll with
+    | Array arr | Both (arr, _) -> Array.get arr
+    | Queue queue -> Queue.get queue
+    | List _ -> failwith "Collection: split impossible case"
+  in
+  Array.init num_blocks ~f:(fun i ->
+    let size = if Int.(<>) i (num_blocks - 1) then every else last_block in
+    Array.init size ~f:(fun j -> get ((i * every) + j))
+  )
 
 let to_list_or_array coll =
   match apply_maps coll with

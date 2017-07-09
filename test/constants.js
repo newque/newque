@@ -9,6 +9,8 @@ exports.spawnDelay = 750
 exports.setupTimeout = 10000
 
 exports.esDelay = 1500 // Due to ES's refresh interval default being 1000ms
-exports.esTimeout = 5000 // Test timeouts due to ES being slow
+exports.esTimeout = 7000 // Test timeouts due to ES being slow
+
+exports.redisDelay = 100
 
 exports.remotePort = 8100

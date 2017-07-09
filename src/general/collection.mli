@@ -36,5 +36,7 @@ val to_list_mapi_two : 'a t -> 'b t -> f:(int -> 'a -> 'b -> 'c) -> 'c t * 'c li
 val to_list_concat_mapi_two : 'a t -> 'b t -> f:(int -> 'a -> 'b -> 'c list) -> 'c t * 'c list
 val concat_mapi_two : 'a t -> 'b t -> f:(int -> 'a -> 'b -> 'c list) -> 'c t
 
+val split : every:int -> 'a t -> 'a array array
+
 val to_list_or_array : 'a t -> [ `List of 'a list | `Array of 'a array ]
 val first : 'a t -> 'a option
