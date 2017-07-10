@@ -5,7 +5,7 @@ exports.lastIdHeader = 'newque-response-last-id'
 exports.lastTsHeader = 'newque-response-last-ts'
 exports.limitHeader = 'newque-read-max'
 
-exports.spawnDelay = 750
+exports.spawnDelay = 1000
 exports.setupTimeout = 10000
 
 exports.esDelay = 1500 // Due to ES's refresh interval default being 1000ms

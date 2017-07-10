@@ -23,7 +23,7 @@ type t = {
   stmts: statements;
 }
 
-let sqlite_max_values = 2
+let sqlite_max_values = 500
 
 (* Ridiculously high number of retries by default,
    because it is only retried when the db is locked.
@@ -266,31 +266,22 @@ let close db =
 let push db ~msgs ~ids =
   let time = Util.time_ns_int64 () in
   (* Sqlite has a limit of 500 insert values per statement *)
-  let batch_size = Collection.length msgs in
-
-  let batched_msgs = Collection.split msgs ~every:sqlite_max_values in
-  let batched_ids = Collection.split ids ~every:sqlite_max_values in
-  let num_stmts, last_stmt =
-    match (batch_size / sqlite_max_values), (batch_size mod sqlite_max_values) with
-    | x, 0 -> x, sqlite_max_values
-    | x, y -> (x + 1), y
-  in
-  let num_values = List.init num_stmts ~f:(fun i ->
-      if Int.(<>) i (num_stmts - 1) then sqlite_max_values else last_stmt
+  let args = Collection.concat_mapi_two msgs ids ~f:(fun i raw id ->
+      let pos = (i mod sqlite_max_values) * 3 in
+      [ ((pos + 1), Data.BLOB id); ((pos + 2), Data.INT time); ((pos + 3), Data.BLOB raw) ]
     )
   in
-  let%lwt stmts = Lwt_list.mapi_p (fun i num_values ->
-      let%lwt (st, _) as stmt = prepare db.db (insert_sql num_values) in
-      let stmt_msgs = Collection.of_array (Array.get batched_msgs i) in
-      let stmt_ids = Collection.of_array (Array.get batched_ids i) in
-      let args = Collection.concat_mapi_two stmt_msgs stmt_ids ~f:(fun j raw id ->
-          let pos = j * 3 in
-          [ ((pos + 1), Data.BLOB id); ((pos + 2), Data.INT time); ((pos + 3), Data.BLOB raw) ]
-        )
+  let batched_args = Collection.split ~every:(sqlite_max_values * 3) args in
+  let num_batches = List.length batched_args in
+  let%lwt stmts = Lwt_list.mapi_p (fun i args_batch ->
+      let num_values = if i = (num_batches - 1)
+        then (Collection.length args_batch / 3)
+        else sqlite_max_values
       in
-      let%lwt () = bind st args in
+      let%lwt (st, _) as stmt = prepare db.db (insert_sql num_values) in
+      let%lwt () = bind st args_batch in
       return stmt
-    ) num_values
+    ) batched_args
   in
   transaction db ~destroy:true stmts
 

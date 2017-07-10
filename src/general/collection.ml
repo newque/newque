@@ -484,9 +484,9 @@ let split ~every coll =
     | Queue queue -> Queue.get queue
     | List _ -> failwith "Collection: split impossible case"
   in
-  Array.init num_blocks ~f:(fun i ->
+  List.init num_blocks ~f:(fun i ->
     let size = if Int.(<>) i (num_blocks - 1) then every else last_block in
-    Array.init size ~f:(fun j -> get ((i * every) + j))
+    of_array (Array.init size ~f:(fun j -> get ((i * every) + j)))
   )
 
 let to_list_or_array coll =

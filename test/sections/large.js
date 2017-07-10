@@ -1,4 +1,9 @@
 module.exports = function (backend, backendSettings, raw) {
+
+  if (backend === 'fifo') {
+    backendSettings.timeout = 5000
+  }
+
   describe('LargeBatches ' + backend + (!!raw ? ' raw' : ''), function () {
     if (backend === 'elasticsearch') {
       var delay = C.esDelay
@@ -6,8 +11,6 @@ module.exports = function (backend, backendSettings, raw) {
     } else if (backend === 'redis') {
       var delay = C.redisDelay
       this.timeout(5000)
-    } else if (backend === 'disk' || backend === 'memory') {
-      this.timeout(10000)
     } else {
       var delay = 0
       this.timeout(5000)
@@ -123,6 +126,10 @@ module.exports = function (backend, backendSettings, raw) {
 
       it('25,000x 10b', function () {
         return runTest(25*1000, 10)
+      })
+
+      it('50,000x 10b', function () {
+        return runTest(50*1000, 10)
       })
     })
 

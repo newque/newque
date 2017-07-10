@@ -97,7 +97,7 @@ let get_conn_pool host port ~auth ~database ~pool_size =
             fail_with "Server unreachable"
       )
       (fun () ->
-         let%lwt () = Logger.warning (sprintf "Connecting to [%s]" key) in
+         let%lwt () = Logger.info (sprintf "Connecting to [%s]" key) in
          let%lwt conn = Client.(connect {host; port}) in
          let%lwt () = match auth with
            | None -> return_unit
