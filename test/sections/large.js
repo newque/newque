@@ -1,24 +1,22 @@
 module.exports = function (backend, backendSettings, raw) {
-
-  if (backend === 'fifo') {
-    backendSettings.timeout = 5000
-  }
-
   describe('LargeBatches ' + backend + (!!raw ? ' raw' : ''), function () {
+    var overrideBackendSettings = JSON.parse(JSON.stringify(backendSettings))
+    var delay = 0
+    this.timeout(5000)
+
     if (backend === 'elasticsearch') {
-      var delay = C.esDelay
+      delay = C.esDelay
       this.timeout(C.esTimeout)
     } else if (backend === 'redis') {
-      var delay = C.redisDelay
-      this.timeout(5000)
-    } else {
-      var delay = 0
-      this.timeout(5000)
+      delay = 50
+    } else if (backend === 'fifo') {
+      overrideBackendSettings.timeout = 5000
     }
+
     var env
     before(function () {
       this.timeout(C.setupTimeout)
-      return Proc.setupEnvironment(backend, backendSettings, raw)
+      return Proc.setupEnvironment(backend, overrideBackendSettings, raw)
       .then(function (pEnv) {
         env = pEnv
         return Promise.delay(C.spawnDelay)
@@ -90,45 +88,45 @@ module.exports = function (backend, backendSettings, raw) {
     }
 
     describe('Increasing message size', function () {
-      it('100x 10b', function () {
+      it('100x 10b (' + delay + 'ms delay)', function () {
         return runTest(100, 10)
       })
 
-      it('100x 1Kb', function () {
+      it('100x 1Kb (' + delay + 'ms delay)', function () {
         return runTest(100, 1024)
       })
 
-      it('100x 10Kb', function () {
+      it('100x 10Kb (' + delay + 'ms delay)', function () {
         return runTest(100, 10*1024)
       })
 
-      it('100x 100Kb', function () {
+      it('100x 100Kb (' + delay + 'ms delay)', function () {
         return runTest(100, 100*1024)
       })
 
-      it('2x 1Mb', function () {
+      it('2x 1Mb (' + delay + 'ms delay)', function () {
         return runTest(2, 1024*1024)
       })
     })
 
     describe('Increasing number of messages', function () {
-      it('500x 10b', function () {
+      it('500x 10b (' + delay + 'ms delay)', function () {
         return runTest(500, 10)
       })
 
-      it('1000x 10b', function () {
+      it('1000x 10b (' + delay + 'ms delay)', function () {
         return runTest(1000, 10)
       })
 
-      it('10,000x 10b', function () {
+      it('10,000x 10b (' + delay + 'ms delay)', function () {
         return runTest(10*1000, 10)
       })
 
-      it('25,000x 10b', function () {
+      it('25,000x 10b (' + delay + 'ms delay)', function () {
         return runTest(25*1000, 10)
       })
 
-      it('50,000x 10b', function () {
+      it('50,000x 10b (' + delay + 'ms delay)', function () {
         return runTest(50*1000, 10)
       })
     })

@@ -202,7 +202,7 @@ var setupFifoClient = function (backend, backendSettings, fifoPorts) {
       }
     }
   }
-  for (var name in fifoPorts) {
+  Object.keys(fifoPorts).forEach(function (name) {
     var sock = zmq.socket('dealer')
     var addr = 'tcp://' + backendSettings.host + ':' + fifoPorts[name]
     sock.on('message', handler(name, addr))
@@ -211,12 +211,17 @@ var setupFifoClient = function (backend, backendSettings, fifoPorts) {
       socket: sock,
       addr: addr
     }
-  }
+  })
 
   return Promise.resolve(sockets)
 }
 
-var portIncr = 9000
+var portIncr = 0
+var getPort = function () {
+  portIncr = (portIncr + 1) % 50
+  return 9000 + portIncr
+}
+
 exports.setupEnvironment = function (backend, backendSettings, raw) {
   var type = backend.split(' ')[0]
   var remoteType = backend.split(' ')[1]
@@ -288,16 +293,12 @@ exports.setupEnvironment = function (backend, backendSettings, raw) {
             })
           })
         } else if (type === 'pubsub') {
-          portIncr++
           parsed.readSettings = null
           parsed.emptiable = false
-          pubsubPorts[channelName] = portIncr
-          parsed.backendSettings.port = portIncr
+          pubsubPorts[channelName] = parsed.backendSettings.port = getPort()
           var promise = Promise.resolve()
         } else if (type === 'fifo') {
-          portIncr++
-          fifoPorts[channelName] = portIncr
-          parsed.backendSettings.port = portIncr
+          fifoPorts[channelName] = parsed.backendSettings.port = getPort()
           var promise = Promise.resolve()
         } else {
           var promise = Promise.resolve()
@@ -311,7 +312,7 @@ exports.setupEnvironment = function (backend, backendSettings, raw) {
   })
   .then(function () {
     if (type === 'fifo' && remoteType !== 'no-consumer') {
-      setupFifoClient(backend, backendSettings, fifoPorts)
+      return setupFifoClient(backend, backendSettings, fifoPorts)
     }
   })
   .then(function (pSockets) {

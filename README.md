@@ -348,11 +348,11 @@ The `none` Backend does not have a `backendSettings` object.
 
 __`memory` `backendSettings` Object__
 
-The `none` Backend does not have a `backendSettings` object.
+The `memory` Backend does not have a `backendSettings` object.
 
 __`disk` `backendSettings` Object__
 
-The `none` Backend does not have a `backendSettings` object.
+The `disk` Backend does not have a `backendSettings` object.
 
 __`httpproxy` `backendSettings` Object__
 

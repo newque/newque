@@ -7,7 +7,6 @@ global.C = require('./constants')
 global.Proc = require('./proc')
 
 var localSettings = {
-  insertBatchSize: 500
 }
 
 var httpJsonSettings = {
@@ -125,6 +124,7 @@ Proc.pathExists(Proc.newquePath)
   require('./sections/health')('httpproxy plaintext', httpPlaintextSettings, false)
   require('./sections/health')('pubsub', pubsubSettings, true)
   require('./sections/health')('fifo', fifoSettings, false)
+  require('./sections/health')('fifo', fifoSettings, true)
   require('./sections/health')('elasticsearch', esSettings, true)
   require('./sections/health')('redis', redisSettings, false)
   require('./sections/health')('redis', redisSettings, true)
