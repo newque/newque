@@ -6,10 +6,14 @@ module Logger = Log.Make (struct let section = "Watcher" end)
 type t = {
   router: Router.t;
   table: Listener.t Int.Table.t;
+  main_environment: Environment.t;
 }
 
-(* Listener by port *)
-let create () = { table = Int.Table.create ~size:5 (); router = Router.create () }
+let create main_environment = {
+  table = Int.Table.create ~size:5 (); (* Listener by port *)
+  router = Router.create ();
+  main_environment;
+}
 
 let router watcher = watcher.router
 let table watcher = watcher.table
@@ -56,7 +60,7 @@ let channels_to_json watcher chan_name_opt =
     (* Only return that one *)
     begin match Router.find_chan watcher.router ~listen_name:Listener.(private_listener.id) ~chan_name with
       | Ok chan -> return (convert_list [chan_name, chan])
-      | Error errors -> fail (Exception.Multiple_exn errors)
+      | Error err -> fail (Exception.Public_exn err)
     end
   | None ->
     (* Return all *)
@@ -83,12 +87,12 @@ let make_standard_routing watcher listen_name =
 let start_http watcher generic specific =
   let open Config_t in
   let standard = make_standard_routing watcher generic.name in
-  Http_prot.start generic specific standard
+  Http_prot.start watcher.main_environment generic specific standard
 
 let start_zmq watcher generic specific =
   let open Config_t in
   let standard = make_standard_routing watcher generic.name in
-  Zmq_prot.start generic specific standard
+  Zmq_prot.start watcher.main_environment generic specific standard
 
 let rec monitor watcher listen =
   let open Listener in
@@ -135,13 +139,13 @@ let create_listeners watcher endpoints =
         let%lwt () = Logger.notice (sprintf "Starting [%s] on HTTP %s:%s" generic.name generic.host (Int.to_string generic.port)) in
         let%lwt http = start_http watcher generic specific in
         let (_, wakener) = wait () in
-        return { id = generic.name; server=(HTTP (http, wakener)) }
+        return { id = generic.name; server = HTTP (http, wakener); }
 
       | Config_zmq_prot specific ->
         let%lwt () = Logger.notice (sprintf "Starting [%s] on ZMQ %s:%s" generic.name generic.host (Int.to_string generic.port)) in
         let%lwt zmq = start_zmq watcher generic specific in
         let (_, wakener) = wait () in
-        return { id = generic.name; server= ZMQ (zmq, wakener); }
+        return { id = generic.name; server = ZMQ (zmq, wakener); }
     in
     async (fun () -> monitor watcher started);
     Int.Table.add_exn watcher.table ~key:generic.port ~data:started;
@@ -169,11 +173,12 @@ let create_admin_server watcher config =
     name = "newque_admin";
     host = config.admin.a_host;
     port = config.admin.a_port;
+    listener_environment = Some C_production;
     protocol_settings = Config_http_prot admin_spec_conf;
   } in
   let%lwt admin_server =
     let open Routing in
-    Http_prot.start admin_conf admin_spec_conf (make_admin_routing watcher)
+    Http_prot.start Environment.Production admin_conf admin_spec_conf (make_admin_routing watcher)
   in
   let (_, wakener) = wait () in
   let open Listener in

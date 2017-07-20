@@ -81,7 +81,7 @@ let get_conn_pool host port ~auth ~database ~pool_size =
     Lwt_pool.create pool_size
       ~check:(fun conn cb ->
         (* Runs after a call failed *)
-        ignore (async (fun () -> Client.disconnect conn));
+        async (fun () -> Client.disconnect conn);
         cb false
       )
       ~validate:(fun conn ->

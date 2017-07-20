@@ -54,11 +54,11 @@ module M = struct
     let%lwt () = Lwt_zmq.Socket.send_all instance.socket (input::(Collection.to_list msgs |> snd)) in
     return (Collection.length msgs)
 
-  let pull instance ~search ~fetch_last = fail_with "Invalid operation: Pubsub read"
+  let pull instance ~search ~fetch_last = fail (Exception.Public_exn "Invalid operation on this channel (READ)")
 
-  let size instance = fail_with "Invalid operation: Pubsub size"
+  let size instance = fail (Exception.Public_exn "Invalid operation on this channel (SIZE)")
 
-  let delete instance = fail_with "Invalid operation: Pubsub count"
+  let delete instance = fail (Exception.Public_exn "Invalid operation on this channel (DELETE)")
 
   let health instance =
     match Util.parse_sync ZMQ.Socket.get_fd instance.pub with

@@ -1,7 +1,5 @@
 open Core
 
-exception Upstream_error of string
-
 type 'a t
 
 val create : float -> 'a t

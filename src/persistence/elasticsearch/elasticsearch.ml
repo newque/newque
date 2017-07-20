@@ -89,7 +89,7 @@ module M = struct
       )
     | _ -> fail_with (sprintf "Incorrect ES bulk json: %s" body_str)
 
-  let pull instance ~search ~fetch_last = fail_with "Unimplemented: ES read"
+  let pull instance ~search ~fetch_last = fail (Exception.Public_exn "Invalid operation on this channel (READ)")
 
   let size instance =
     let open Json_obj_j in
@@ -108,7 +108,7 @@ module M = struct
         )
     end
 
-  let delete instance = fail_with "Unimplemented: ES delete"
+  let delete instance = fail (Exception.Public_exn "Invalid operation on this channel (DELETE)")
 
   let health instance =
     let uri = Http_tools.append_to_path (get_base instance) (sprintf "%s/_stats/docs" instance.index) in

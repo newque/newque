@@ -13,8 +13,7 @@ module.exports = function (backend, backendSettings, raw) {
       return Proc.setupEnvironment(backend, backendSettings, raw)
       .then(function (pEnv) {
         env = pEnv
-        return Promise.delay(1000)
-        // return Promise.delay(C.spawnDelay)
+        return Promise.delay(C.spawnDelay)
       })
     })
     beforeEach(function () {
@@ -29,6 +28,11 @@ module.exports = function (backend, backendSettings, raw) {
     it('Count', function () {
       return Fn.call('GET', 8000, '/v1/example/count')
       .then(Fn.shouldFail(500))
+    })
+
+    it('Delete', function () {
+      Fn.call('DELETE', 8000, '/v1/example')
+      .then(Fn.shouldFail(400))
     })
 
     it('Push to multiple subscribers', function () {
@@ -108,11 +112,6 @@ module.exports = function (backend, backendSettings, raw) {
       .then(Fn.shouldHaveWritten(4))
       .then(() => receive1)
       .then(() => receive2)
-    })
-
-    it('Delete', function () {
-      Fn.call('DELETE', 8000, '/v1/example')
-      .then(Fn.shouldFail(400))
     })
 
     after(function () {

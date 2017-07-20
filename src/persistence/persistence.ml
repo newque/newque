@@ -148,7 +148,7 @@ module Make (Argument: Argument) : S = struct
         let raw = Message.serialize_raw msgs in
         begin match%lwt Rapidjson.validate rj raw with
           | Ok () -> done_mapping msgs ids
-          | Error str -> fail_with str
+          | Error str -> fail (Exception.Public_exn str)
         end
     | _ -> done_mapping (* Impossible case *)
 

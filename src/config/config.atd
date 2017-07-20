@@ -3,6 +3,11 @@ type pair = {
   value: string;
 }
 
+type config_environment = [
+  | C_production <json name="production">
+  | C_development <json name="development">
+] <ocaml repr="classic">
+
 type config_channel_format = [
   | C_plaintext <json name="plaintext">
   | C_json <json name="json">
@@ -48,6 +53,7 @@ type config_listener = {
   name: string;
   host: string;
   port: int;
+  ?listener_environment <json name="environment">: config_environment option;
   protocol_settings <json name="protocolSettings" tag_field="protocol">: config_proto;
 }
 
@@ -160,6 +166,7 @@ type config_admin = {
 
 type config_newque = {
   log_level <json name="logLevel">: config_log_level;
+  main_environment <json name="environment">: config_environment;
   admin: config_admin;
   endpoints <json name="listeners">: config_listener list;
 }

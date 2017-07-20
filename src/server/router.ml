@@ -49,10 +49,10 @@ let register_channels router channels =
 
 let find_chan router ~listen_name ~chan_name =
   match String.Table.find router.table listen_name with
-  | None -> Error [sprintf "Unknown listener [%s]" listen_name]
+  | None -> Error (sprintf "Unknown listener [%s]" listen_name)
   | Some chan_table ->
     begin match String.Table.find chan_table chan_name with
-      | None -> Error [sprintf "No channel [%s] associated with listener [%s]" chan_name listen_name]
+      | None -> Error (sprintf "No channel [%s] associated with listener [%s]" chan_name listen_name)
       | Some chan -> Ok chan
     end
 
@@ -112,7 +112,7 @@ let write_shared router ~listen_name ~chan ~write ~msgs ~ids =
 *)
 let write_http router ~listen_name ~chan_name ~id_header ~mode stream =
   match find_chan router ~listen_name ~chan_name with
-  | (Error _) as err -> return err
+  | Error err -> return (Error [err])
   | Ok chan ->
     let open Channel in
     begin match chan.write with
@@ -155,7 +155,7 @@ let write_http router ~listen_name ~chan_name ~id_header ~mode stream =
 
 let write_zmq router ~listen_name ~chan_name ~ids ~msgs ~atomic =
   match find_chan router ~listen_name ~chan_name with
-  | (Error _) as err -> return err
+  | Error err -> return (Error [err])
   | Ok chan ->
     let open Channel in
     begin match chan.write with
@@ -172,7 +172,7 @@ let write_zmq router ~listen_name ~chan_name ~ids ~msgs ~atomic =
 
 let read_slice router ~listen_name ~chan_name ~mode ~limit =
   match find_chan router ~listen_name ~chan_name with
-  | (Error _) as err -> return err
+  | Error err -> return (Error [err])
   | Ok chan ->
     begin match chan.Channel.read with
       | None -> return (Error [sprintf "Channel [%s] doesn't support Reading from it" chan_name])
@@ -194,7 +194,7 @@ let read_slice router ~listen_name ~chan_name ~mode ~limit =
 
 let read_stream router ~listen_name ~chan_name ~mode =
   match find_chan router ~listen_name ~chan_name with
-  | (Error _) as err -> return err
+  | Error err -> return (Error [err])
   | Ok chan ->
     begin match chan.Channel.read with
       | None -> return (Error [sprintf "Channel [%s] doesn't support Reading from it" chan_name])
@@ -214,7 +214,7 @@ let read_stream router ~listen_name ~chan_name ~mode =
 
 let count router ~listen_name ~chan_name ~mode =
   match find_chan router ~listen_name ~chan_name with
-  | (Error _) as err -> return err
+  | Error err -> return (Error [err])
   | Ok chan ->
     let%lwt count = Channel.size chan in
     async (fun () ->
@@ -230,7 +230,7 @@ let count router ~listen_name ~chan_name ~mode =
 
 let delete router ~listen_name ~chan_name ~mode =
   match find_chan router ~listen_name ~chan_name with
-  | (Error _) as err -> return err
+  | Error err -> return (Error [err])
   | Ok chan ->
     begin match chan.Channel.emptiable with
       | false -> return (Error [sprintf "Channel [%s] doesn't support Deleting from it" chan_name])
@@ -270,7 +270,7 @@ let rec health router ~listen_name ~chan_name ~mode =
   (* Channel health check *)
   | Some chan_name ->
     begin match find_chan router ~listen_name ~chan_name with
-      | Error errors -> return errors
+      | Error err -> return [err]
       | Ok chan ->
         let%lwt result = Channel.health chan in
         async (fun () ->
