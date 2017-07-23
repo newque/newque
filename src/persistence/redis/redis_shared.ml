@@ -31,6 +31,8 @@ let rec debug_reply ?(nested=false) reply =
   | `Int i -> sprintf "%d" i
   | `Int64 i -> sprintf "(INT64 %Ld)" i
   | `Status s -> sprintf "(STATUS %s)" s
+  | `Ask _ -> "ASK REDIRECTION"
+  | `Moved _ -> "MOVED REDIRECTION"
   | `Multibulk ll ->
     let stringified =
       List.map ll ~f:(debug_reply ~nested:true)
