@@ -13,110 +13,8 @@ type redis_t = {
   keys: string list;
 }
 
-let lua_push = [%pla{|
- #include "push.lua"
- |}] |> Pla.print
-
-let lua_pull = [%pla{|
- #include "delete_rowids.lua"
- #include "pull.lua"
- |}] |> Pla.print
-
-let lua_size = [%pla{|
- #include "size.lua"
- |}] |> Pla.print
-
-let lua_health = [%pla{|
- #include "health.lua"
- |}] |> Pla.print
-
-let lua_delete = [%pla{|
-  #include "delete.lua"
-  |}] |> Pla.print
-# 37
-
-let rec debug_reply ?(nested=false) reply =
-  match reply with
-  | `Bulk s -> sprintf "\"%s\"" (Option.value ~default:"---" s)
-  | `Error s -> sprintf "(ERROR %s)" s
-  | `Int i -> sprintf "%d" i
-  | `Int64 i -> sprintf "(INT64 %Ld)" i
-  | `Status s -> sprintf "(STATUS %s)" s
-  | `Multibulk ll ->
-    let stringified =
-      List.map ll ~f:(debug_reply ~nested:true)
-      |> String.concat ~sep:", "
-    in
-    if nested then sprintf "{%s}" stringified
-    else sprintf "{%s}" stringified
-
-let scripts = String.Table.create ()
-
-let debug_query script keys args =
-  sprintf "evalsha %s %d %s (%d arguments)"
-    (String.Table.find_exn scripts script)
-    (List.length keys)
-    (String.concat ~sep:" " keys)
-    (List.length args)
-
-let load_scripts conn =
-  let load_script name lua =
-    let%lwt sha = Client.script_load conn lua in
-    String.Table.add scripts ~key:name ~data:sha |> ignore;
-    return_unit
-  in
-  join [
-    (load_script "push" lua_push);
-    (load_script "pull" lua_pull);
-    (load_script "size" lua_size);
-    (load_script "health" lua_health);
-    (load_script "delete" lua_delete);
-  ]
-
-let last_used_table = String.Table.create ()
-let pool_table = String.Table.create ()
-let get_conn_pool host port ~auth ~database ~pool_size =
-  let key = sprintf "%s:%d:%d" host port database in
-  String.Table.find_or_add pool_table key ~default:(fun () ->
-    Lwt_pool.create pool_size
-      ~check:(fun conn cb ->
-        (* Runs after a call failed *)
-        async (fun () -> Client.disconnect conn);
-        cb false
-      )
-      ~validate:(fun conn ->
-        (* Runs before a connection is used *)
-        let now = Util.time_ns_int63 () in
-        let last_used = Option.value ~default:Int63.zero (String.Table.find last_used_table key) in
-        String.Table.set last_used_table ~key ~data:now;
-        if Int63.(now < (last_used + (of_int 2_000_000_000)))
-        then return true
-        else try%lwt
-            Client.ping conn
-          with err ->
-            fail_with "Server unreachable"
-      )
-      (fun () ->
-         let%lwt () = Logger.info (sprintf "Connecting to [%s]" key) in
-         let%lwt conn = Client.(connect {host; port}) in
-         let%lwt () = match auth with
-           | None -> return_unit
-           | Some pw -> Client.auth conn pw
-         in
-         let%lwt () = if database <> 0 then Client.select conn database else return_unit in
-         let%lwt () = load_scripts conn in
-         return conn
-      )
-  )
-
-let exec_script conn script keys args =
-  async (fun () -> Logger.debug_lazy (lazy (debug_query script keys args)));
-  match String.Table.find scripts script with
-  | None -> fail_with (sprintf "Redis script %s could not be found" script)
-  | Some sha -> Client.evalsha conn sha keys args
-
 let create ~chan_name host port ~auth ~database ~pool_size =
-  let pool = get_conn_pool host port ~auth ~database ~pool_size in
+  let pool = Redis_shared.get_conn_pool host port ~auth ~database ~pool_size ~info:Logger.info in
   let instance = {
     pool;
     host;
@@ -143,11 +41,11 @@ module M = struct
       Collection.add_to_queue msgs queue_args;
       Collection.add_to_queue ids queue_args;
       let args = Queue.to_list queue_args in
-      let%lwt reply = exec_script conn "push" instance.keys args in
+      let%lwt reply = Redis_shared.exec_script conn "push" ~keys:instance.keys ~args ~debug:Logger.debug_lazy in
       match reply with
       | `Int saved -> return saved
       | `Int64 saved -> return (Int64.to_int_exn saved)
-      | incorrect -> fail_with (sprintf "Invalid Redis Push result: %s" (debug_reply incorrect))
+      | incorrect -> fail_with (sprintf "Invalid Redis Push result: %s" (Redis_shared.debug_reply incorrect))
     )
 
   let pull instance ~search ~fetch_last =
@@ -161,7 +59,7 @@ module M = struct
         Bool.to_string fetch_last;
       ]
       in
-      let%lwt reply = exec_script conn "pull" instance.keys args in
+      let%lwt reply = Redis_shared.exec_script conn "pull" ~keys:instance.keys ~args ~debug:Logger.debug_lazy in
       match reply with
       | `Multibulk [
           `Multibulk r_msgs;
@@ -170,7 +68,7 @@ module M = struct
           `Bulk (Some r_last_timens);
           (`Multibulk _) as debug;
         ] ->
-        async (fun () -> Logger.debug_lazy (lazy (sprintf "REDIS PULL DEBUG: %s" (debug_reply debug))));
+        async (fun () -> Logger.debug_lazy (lazy (sprintf "REDIS PULL DEBUG: %s" (Redis_shared.debug_reply debug))));
         let msgs = List.map r_msgs ~f:(fun bulk ->
             match bulk with
             | `Bulk (Some msg) -> msg
@@ -185,23 +83,23 @@ module M = struct
         in
         return (Collection.of_list msgs, last_rowid, meta)
       | incorrect ->
-        fail_with (sprintf "Invalid Redis Pull result: %s" (debug_reply incorrect))
+        fail_with (sprintf "Invalid Redis Pull result: %s" (Redis_shared.debug_reply incorrect))
     )
 
   let size instance =
     Lwt_pool.use instance.pool (fun conn ->
-      let%lwt reply = exec_script conn "size" instance.keys [] in
+      let%lwt reply = Redis_shared.exec_script conn "size" ~keys:instance.keys ~args:[] ~debug:Logger.debug_lazy in
       match reply with
       | `Int i -> return (Int64.of_int i)
       | `Int64 i -> return i
       | incorrect ->
-        fail_with (sprintf "Invalid Redis Size result: %s" (debug_reply incorrect))
+        fail_with (sprintf "Invalid Redis Size result: %s" (Redis_shared.debug_reply incorrect))
     )
 
   let delete instance = fail_with "Invalid operation: Redis delete"
 
   let health instance = Lwt_pool.use instance.pool (fun conn ->
-      let%lwt reply = exec_script conn "health" instance.keys [] in
+      let%lwt reply = Redis_shared.exec_script conn "health" ~keys:instance.keys ~args:[] ~debug:Logger.debug_lazy in
       match reply with
       | `Bulk (Some "OK") -> return []
       | `Multibulk [
@@ -225,15 +123,15 @@ module M = struct
             data_size index_id_size index_ts_size meta_size
         ]
       | incorrect ->
-        fail_with (sprintf "Invalid Redis Health result: %s" (debug_reply incorrect))
+        fail_with (sprintf "Invalid Redis Health result: %s" (Redis_shared.debug_reply incorrect))
     )
 
   let delete instance = Lwt_pool.use instance.pool (fun conn ->
-      let%lwt reply = exec_script conn "delete" instance.keys [] in
+      let%lwt reply = Redis_shared.exec_script conn "delete" ~keys:instance.keys ~args:[] ~debug:Logger.debug_lazy in
       match reply with
       | `Bulk (Some "OK") -> return_unit
       | incorrect ->
-        fail_with (sprintf "Invalid Redis Delete result: %s" (debug_reply incorrect))
+        fail_with (sprintf "Invalid Redis Delete result: %s" (Redis_shared.debug_reply incorrect))
     )
 
 end

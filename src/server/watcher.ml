@@ -173,12 +173,12 @@ let create_admin_server watcher config =
     name = "newque_admin";
     host = config.admin.a_host;
     port = config.admin.a_port;
-    listener_environment = Some C_production;
+    listener_environment = Some C_development;
     protocol_settings = Config_http_prot admin_spec_conf;
   } in
   let%lwt admin_server =
     let open Routing in
-    Http_prot.start Environment.Production admin_conf admin_spec_conf (make_admin_routing watcher)
+    Http_prot.start Environment.Development admin_conf admin_spec_conf (make_admin_routing watcher)
   in
   let (_, wakener) = wait () in
   let open Listener in

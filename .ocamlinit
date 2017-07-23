@@ -24,3 +24,6 @@ open Lwt
 #require "atdgen"
 #mod_use "src/serialization/json_obj_t.ml"
 #mod_use "src/serialization/json_obj_j.ml"
+
+#mod_use "src/general/fs.ml"
+#mod_use "src/log.ml"
