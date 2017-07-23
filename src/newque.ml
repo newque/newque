@@ -1,8 +1,9 @@
 #ifdef DEBUG
   Printexc.record_backtrace true
   #endif
+# 5
 
-let newque_version = "0.0.4"
+let newque_version = "0.0.5"
 
 open Core
 open Lwt
@@ -54,7 +55,8 @@ let start config_path =
     |> Lwt_log.string_of_level
   in
   let%lwt () = Logger.info (sprintf "Active Log Level: [%s]" log_level_str) in
-  let watcher = Watcher.create () in
+  let environment = Environment.create (config.Config_t.main_environment) in
+  let watcher = Watcher.create environment in
   let%lwt () = Configtools.apply_main config watcher in
 
   (* Create admin server *)
@@ -77,7 +79,8 @@ let start config_path =
         Logger.error (String.concat ~sep:"\n" errors)
       | [] ->
         let%lwt () = Logger.info "Global health check succeeded" in
-        let%lwt () = Logger.info "*** SERVER STARTED ***" in
+        let env_name = Environment.to_string environment in
+        let%lwt () = Logger.info (sprintf "*** SERVER STARTED IN %s MODE ***" (String.uppercase env_name)) in
         let listeners_json = Watcher.listeners_to_json watcher None in
         print_endline (Yojson.Basic.pretty_to_string listeners_json);
         (* Run forever *)

@@ -148,7 +148,7 @@ module Make (Argument: Argument) : S = struct
         let raw = Message.serialize_raw msgs in
         begin match%lwt Rapidjson.validate rj raw with
           | Ok () -> done_mapping msgs ids
-          | Error str -> fail_with str
+          | Error str -> fail (Exception.Public_exn str)
         end
     | _ -> done_mapping (* Impossible case *)
 
@@ -191,8 +191,8 @@ module Make (Argument: Argument) : S = struct
           let%lwt (payloads, last_rowid, last_row_data) = Argument.IO.pull instance ~search:!next_search ~fetch_last:false in
           let filter = match (last_rowid, last_row_data) with
             | None, None -> None
-            | (Some rowid), _ -> Some [|`After_rowid rowid|]
-            | _, Some (last_id, _) -> Some [|`After_id last_id|]
+            | (Some rowid), _ -> Some (After_rowid rowid)
+            | _, Some (last_id, _) -> Some (After_id last_id)
           in
           if Collection.is_empty payloads
           then return_none else
@@ -205,11 +205,11 @@ module Make (Argument: Argument) : S = struct
                 !next_search with
                 limit = Int64.zero;
               }
-            | Some filter ->
+            | Some _ ->
               {
                 !next_search with
                 limit = Int64.min !left Argument.stream_slice_size;
-                filters = Array.append filter search.filters;
+                after = filter;
               }
           end;
           return_some payloads

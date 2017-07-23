@@ -60,7 +60,7 @@ let handler instance input messages =
 
   (* Process response *)
   let%lwt (output, msgs_recv) as pair = match frames with
-    | [] -> fail_with "No frames received"
+    | [] -> fail (Exception.Public_exn "No frames received")
     | head::msgs_recv ->
       wrap2 (fun head msgs_recv ->
         let output = decode_output (Pbrt.Decoder.of_bytes head) in
@@ -69,7 +69,7 @@ let handler instance input messages =
   in
   match output.errors with
   | [] -> return pair
-  | errors -> fail (Exception.Multiple_exn errors)
+  | errors -> fail (Exception.Multiple_public_exn errors)
 
 let create ~chan_name ~host ~port ~socket_settings ~timeout_ms ~health_time_limit_ms =
   let outbound = sprintf "tcp://%s:%d" host port in
@@ -88,11 +88,11 @@ let create ~chan_name ~host ~port ~socket_settings ~timeout_ms ~health_time_limi
       let rec loop socket =
         let%lwt () = try%lwt
             match%lwt Lwt_zmq.Socket.recv_all socket with
-            | [] -> fail_with "No frames received"
+            | [] -> fail (Exception.Public_exn "No frames received")
             | uid::frames ->
               Connector.resolve connector uid frames
           with
-          | (Connector.Upstream_error _) as ex ->
+          | (Exception.Upstream_error _) as ex ->
             Logger.notice_lazy (lazy (sprintf
                 "Upstream error on channel [%s]: %s" chan_name (Exception.human ex)
             ))

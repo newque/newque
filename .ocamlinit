@@ -1,11 +1,7 @@
 #use "topfind"
 #thread
 
-#require "core.top";;
-open Core.Std
-
-#require "ppx_sexp_conv";;
-#require "ppx_deriving_protobuf";;
+#require "ppx_sexp_conv"
 
 #require "lwt"
 #require "lwt.unix"
@@ -15,24 +11,26 @@ open Lwt
 
 #require "cohttp"
 #require "cohttp.lwt"
-open Cohttp
-open Cohttp_lwt_unix
 
-#require "conduit"
-#require "conduit.lwt"
-#require "conduit.lwt-unix"
+#require "lua"
 
-#require "ZMQ"
-#require "lwt-zmq"
+#require "redis-lwt"
 
 #require "atd"
 #require "atdgen"
 
-#require "uuidm"
-#require "sqlite3"
-
 #require "ocaml-protoc"
 
-#mod_use "src/exception.ml"
-#mod_use "src/collection.ml"
-#mod_use "src/util.ml"
+type bytes = string;;
+#mod_use "src/serialization/json_obj_t.ml"
+#mod_use "src/serialization/json_obj_j.ml"
+#mod_use "src/serialization/zmq_obj_types.ml"
+#mod_use "src/serialization/zmq_obj_pb.ml"
+
+#require "core.top"
+open Core
+
+#mod_use "src/general/collection.ml"
+
+#mod_use "src/general/fs.ml"
+#mod_use "src/log.ml"

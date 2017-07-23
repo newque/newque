@@ -9,7 +9,7 @@ val create : unit -> t
 val register_listeners : t -> Listener.t list -> (unit, string list) Result.t
 val register_channels : t -> Channel.t list -> (unit, string list) Result.t
 
-val find_chan : t -> listen_name:string -> chan_name:string -> (Channel.t, string list) Result.t
+val find_chan : t -> listen_name:string -> chan_name:string -> (Channel.t, string) Result.t
 val all_channels : t -> (string * Channel.t) list Lwt.t
 
 val write_shared :

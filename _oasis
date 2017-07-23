@@ -1,5 +1,5 @@
 Name: newque
-Version: 0.0.4
+Version: 0.0.5
 Synopsis: Fast modular message broker.
 Authors: Simon Grondin <github@simongrondin.name>
 License: MPL
@@ -37,8 +37,11 @@ Executable "newque"
     lwt-zmq,
     lua,
     ocaml-protoc,
+    pla,
+    pla.ppx,
     ppx_sexp_conv,
     ppx_deriving_protobuf,
+    redis-lwt,
     sqlite3,
     threads,
     uuidm

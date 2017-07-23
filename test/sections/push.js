@@ -272,7 +272,7 @@ module.exports = function (backend, backendSettings, raw) {
       it('Runtime errors', function () {
         var buf = 'abcdef'
         return Fn.call('POST', 8000, '/v1/scripting_invalid', buf, [[C.modeHeader, 'single']])
-        .then(Fn.shouldFail(500))
+        .then(Fn.shouldFail(400))
       })
     })
 
@@ -286,25 +286,25 @@ module.exports = function (backend, backendSettings, raw) {
       it('Reject incorrectly-formatted JSON', function () {
         var buf = '{"abc":{def":764}}\n{"abc":{"def": }}'
         return Fn.call('POST', 8000, '/v1/json_validation', buf, [[C.modeHeader, 'multiple']])
-        .then(Fn.shouldFail(500))
+        .then(Fn.shouldFail(400))
       })
 
       it('Reject binary non-JSON data', function () {
         var buf = '{"abc":"def\u9876":{5}}'
         return Fn.call('POST', 8000, '/v1/json_validation', buf, [[C.modeHeader, 'multiple']])
-        .then(Fn.shouldFail(500))
+        .then(Fn.shouldFail(400))
       })
 
       it('Reject invalid JSON object (incorrect type)', function () {
         var buf = '{"abc":{"def":9.5}}'
         return Fn.call('POST', 8000, '/v1/json_validation', buf, [[C.modeHeader, 'multiple']])
-        .then(Fn.shouldFail(500))
+        .then(Fn.shouldFail(400))
       })
 
       it('Reject invalid JSON object (extra key)', function () {
         var buf = '{"abc": {"def":9, "ghi": 10}}'
         return Fn.call('POST', 8000, '/v1/json_validation', buf, [[C.modeHeader, 'multiple']])
-        .then(Fn.shouldFail(500))
+        .then(Fn.shouldFail(400))
       })
     })
 

@@ -20,6 +20,7 @@
     "bluebird": "^3.4.6",
     "mocha": "^3.0.2",
     "protocol-buffers": "^3.2.1",
+    "redis": "^2.7.1",
     "superagent": "^2.2.0",
     "zmq": "^2.15.3"
   }

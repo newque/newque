@@ -12,6 +12,7 @@ type t = {
   stop_w: unit Lwt.u;
   ctx: Cohttp_lwt_unix_net.ctx;
   thread: unit Lwt.t;
+  exception_filter: Exception.exn_filter;
 }
 
 let missing_header = "<no header>"
@@ -208,7 +209,11 @@ let handler http routing ((ch, _) as conn) req body =
       | Ok (None, _) -> fail_with "Invalid routing"
     end
   with
-  | ex -> handle_errors 500 (Exception.human_list ex)
+  | ex ->
+    (* Catch errors that bubbled up from the backend *)
+    match http.exception_filter ex with
+    | errors, true -> handle_errors 400 errors
+    | errors, false -> handle_errors 500 errors
 
 let open_sockets = Int.Table.create ~size:5 ()
 
@@ -232,7 +237,7 @@ let make_socket ~backlog host port =
 let conn_closed name conn =
   async (fun () -> Logger.debug_lazy (lazy (sprintf "Connection closed on [%s]" name)))
 
-let start generic specific routing =
+let start main_env generic specific routing =
   let open Config_t in
   let open Routing in
   let thunk () = make_socket ~backlog:specific.backlog generic.host generic.port in
@@ -256,7 +261,18 @@ let start generic specific routing =
   in
   let (stop_t, stop_w) = wait () in
   let thread = Server.create ~stop:stop_t ~ctx ~mode conf in
-  let instance = {generic; specific; sock; stop_w; ctx; thread;} in
+  let listener_env = Option.map ~f:Environment.create generic.listener_environment in
+  let exception_filter = Exception.create_exception_filter ~section:generic.name ~main_env ~listener_env in
+  let instance = {
+    generic;
+    specific;
+    sock;
+    stop_w;
+    ctx;
+    thread;
+    exception_filter;
+  }
+  in
   wakeup instance_w instance;
   return instance
 

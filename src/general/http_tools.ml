@@ -9,10 +9,10 @@ let call ?ctx ?headers ?body ?chunked ~timeout meth uri =
     pick [thread; Lwt_unix.timeout timeout]
   with
   | Lwt_unix.Timeout ->
-    fail_with (sprintf
-        "No response from upstream [HTTP %s %s] within %F seconds"
-        (Code.string_of_method meth) (Uri.to_string uri) timeout
-    )
+    fail (Exception.Upstream_error (sprintf
+          "No response from upstream [HTTP %s %s] within %F seconds"
+          (Code.string_of_method meth) (Uri.to_string uri) timeout
+      ))
   | ex ->
     fail_with (sprintf
         "[%s %s] %s"

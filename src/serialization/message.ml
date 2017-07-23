@@ -77,7 +77,9 @@ let parse_full_exn blob =
   with
   | Protobuf.Decoder.Failure err ->
     let str = Protobuf.Decoder.error_to_string err in
-    failwith (sprintf "Unable to parse the wrapped messages, did it get corrupted? Reason: %s" str)
+    raise (Exception.Public_exn
+        (sprintf "Unable to parse the wrapped messages, did it get corrupted? Reason: %s" str)
+    )
 
 let length ~raw msg =
   match msg with

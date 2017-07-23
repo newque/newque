@@ -134,11 +134,11 @@ let extract_lua_result_sync : type a. Lua.state -> a lua_type -> a =
         let second_len = Lua.objlen ls (-1) in
         if first_len <> second_len then
           let () = Lua.pop ls 2 in
-          failwith (sprintf
-              "Scripts on this channel returned a mismatching number of IDs [%d] and Messages [%d]"
-              second_len
-              first_len
-          )
+          raise (Lua_user_exn (sprintf
+                "Scripts on this channel returned a mismatching number of IDs [%d] and Messages [%d]"
+                second_len
+                first_len
+            ))
         else
         let first = extract_string_table ls in
         Lua.pop ls 1;

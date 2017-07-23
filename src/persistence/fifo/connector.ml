@@ -1,8 +1,6 @@
 open Core
 open Lwt
 
-exception Upstream_error of string
-
 type 'a t = {
   table: 'a Lwt.u String.Table.t;
   expiration: float; (* in seconds *)
@@ -22,7 +20,7 @@ let submit connector uid outbound =
       String.Table.remove connector.table uid;
       match ex with
       | Lwt_unix.Timeout ->
-        let error = Upstream_error (
+        let error = Exception.Upstream_error (
             sprintf "No response from upstream [ZMQ %s] within %F seconds"
               outbound connector.expiration
           )
@@ -33,7 +31,7 @@ let submit connector uid outbound =
 let resolve connector uid obj =
   match String.Table.find_and_remove connector.table uid with
   | None ->
-    let error = Upstream_error (sprintf "Unknown UID received: %s" uid) in
+    let error = Exception.Upstream_error (sprintf "Unknown UID received: %s" uid) in
     fail error
   | Some wakener ->
     wakeup_later wakener obj;

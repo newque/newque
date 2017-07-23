@@ -1,19 +1,51 @@
 open Core
 
+type after =
+  | After_id of string
+  | After_ts of int64
+  | After_rowid of int64
+
 type t = {
   limit: int64;
-  filters: [ `After_id of string | `After_ts of int64 | `After_rowid of int64 | `Tag of string ] array;
+  after: after option;
   only_once: bool;
 }
 
 let create max_read ~mode ~only_once =
   match mode with
-  | `One -> { limit = Int64.one; filters = [| |]; only_once; }
-  | `Many x -> { limit = (Int64.min max_read x); filters = [| |]; only_once; }
-  | `After_id id -> { limit = max_read; filters = [|`After_id id|]; only_once; }
-  | `After_ts ts -> { limit = max_read; filters = [|`After_ts ts|]; only_once; }
+  | `One ->
+    {
+      limit = Int64.one;
+      after = None;
+      only_once;
+    }
+  | `Many x ->
+    {
+      limit = Int64.min max_read x;
+      after = None;
+      only_once;
+    }
+  | `After_id id ->
+    {
+      limit = max_read;
+      after = Some (After_id id);
+      only_once;
+    }
+  | `After_ts ts ->
+    {
+      limit = max_read;
+      after = Some (After_ts ts);
+      only_once;
+    }
 
 let mode_and_limit search = match search with
-  | { filters = [| ((`After_id _) as mode) |]; limit; _ }
-  | { filters = [| ((`After_ts _) as mode) |]; limit; _ } -> (mode, limit)
+  | { after = Some (After_id id); limit; } -> ((`After_id id), limit)
+  | { after = Some (After_ts ts); limit; } -> ((`After_ts ts), limit)
   | { limit; _ } -> ((`Many limit), limit)
+
+let after_to_strings search =
+  match search.after with
+  | None -> ("after_rowid", "-1")
+  | Some (After_id id) -> ("after_id", id)
+  | Some (After_ts ts) -> ("after_ts", (Int64.to_string ts))
+  | Some (After_rowid rowid) -> ("after_rowid", (Int64.to_string rowid))

@@ -18,6 +18,7 @@ type t = {
   workers: worker array;
   proxy: unit Lwt.t;
   stop_w: unit Lwt.u;
+  exception_filter: Exception.exn_filter;
 }
 
 let invalid_read_output = Zmq_obj_types.({ length = 0; last_id = None; last_timens = None })
@@ -30,7 +31,8 @@ let handler zmq routing socket frames =
   match frames with
   | header::id::meta::msgs ->
 
-    let%lwt (output, messages) = begin try%lwt
+    let%lwt (output, messages) = begin
+      try%lwt
         let input = decode_input (Pbrt.Decoder.of_bytes meta) in
         let chan_name = input.channel in
         begin match input.action with
@@ -103,7 +105,8 @@ let handler zmq routing socket frames =
         end
       with
       | ex ->
-        let errors = Exception.human_list ex in
+        (* Catch errors that bubbled up from the backend *)
+        let errors = zmq.exception_filter ex |> fst in
         return ({ errors; action = Error_output }, Collection.empty)
     end
     in
@@ -124,7 +127,7 @@ let handler zmq routing socket frames =
     in
     Lwt_zmq.Socket.send_all socket (error::strs)
 
-let start generic specific routing =
+let start main_env generic specific routing =
   let open Config_t in
   let open Routing in
   let inproc = sprintf "inproc://%s" generic.name in
@@ -173,6 +176,8 @@ let start generic specific routing =
       { socket; accept; }
     )
   in
+  let listener_env = Option.map ~f:Environment.create generic.listener_environment in
+  let exception_filter = Exception.create_exception_filter ~section:generic.name ~main_env ~listener_env in
   let instance = {
     generic;
     specific;
@@ -183,6 +188,7 @@ let start generic specific routing =
     workers;
     proxy;
     stop_w;
+    exception_filter;
   }
   in
   wakeup instance_w instance;

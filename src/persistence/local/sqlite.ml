@@ -23,6 +23,8 @@ type t = {
   stmts: statements;
 }
 
+let sqlite_max_values = 500
+
 (* Ridiculously high number of retries by default,
    because it is only retried when the db is locked.
    We only want it to fail in catastrophic cases. *)
@@ -36,7 +38,11 @@ let clean_sync ~destroy stmt =
   | true -> ignore (S3.finalize stmt)
   | false ->
     begin try
-        (* S3.reset itself can throw *)
+        let () = begin match (S3.clear_bindings stmt) with
+          | Rc.OK -> ()
+          | _ -> failwith "Failed to clear bindings from statement"
+        end
+        in
         begin match (S3.reset stmt) with
           | Rc.OK -> ()
           | _ -> failwith "Failed to reset statement"
@@ -131,7 +137,7 @@ let query : type a. t -> ?retry:int -> destroy:bool -> S3.stmt * string -> a rep
       ((Collection.of_queue queue), last_rowid)
     ) ()
 
-let transaction db ~destroy ?query stmts =
+let transaction db ~destroy stmts =
   Lwt_preemptive.detach (fun () ->
     ignore (exec_sync db.db ~destroy:false db.stmts.begin_transaction);
     try
@@ -180,27 +186,28 @@ let create_table_sql = "CREATE TABLE IF NOT EXISTS MESSAGES (uuid BLOB NOT NULL,
 let create_timens_index_sql = "CREATE INDEX IF NOT EXISTS MESSAGES_TIMENS_IDX ON MESSAGES (timens);"
 let create_tag_index_sql = "CREATE INDEX IF NOT EXISTS MESSAGES_TAG_IDX ON MESSAGES (tag);"
 
-let make_filters filters =
-  let strings = Array.map filters ~f:(fun filter ->
-      match filter with
-      | `After_id _ -> "(ROWID > (SELECT ROWID FROM MESSAGES WHERE uuid = ?))"
-      | `After_ts _ -> "(timens > ?)"
-      | `After_rowid _ -> "(ROWID > ?)"
-      | `Tag _ -> "(tag = ?)"
-    ) in
-  String.concat_array ~sep:" AND " strings
+let make_filters after =
+  let open Search in
+  match after with
+  | After_id _ -> "(ROWID > (SELECT ROWID FROM MESSAGES WHERE uuid = ?))"
+  | After_ts _ -> "(timens > ?)"
+  | After_rowid _ -> "(ROWID > ?)"
 
 let read_sql ~search =
   let open Search in
-  match search.filters with
-  | [| |] -> sprintf "SELECT raw, ROWID FROM MESSAGES LIMIT %Ld;" search.limit
-  | _ -> sprintf "SELECT raw, ROWID FROM MESSAGES WHERE %s LIMIT %Ld;" (make_filters search.filters) search.limit
+  if Option.is_some search.after then
+    sprintf "SELECT raw, ROWID FROM MESSAGES WHERE %s LIMIT %Ld;"
+      (make_filters (Option.value_exn search.after)) search.limit
+  else
+    sprintf "SELECT raw, ROWID FROM MESSAGES LIMIT %Ld;" search.limit
 
 let add_tag_sql ~search =
   let open Search in
-  match search.filters with
-  | [| |] -> sprintf "UPDATE MESSAGES SET tag = ? LIMIT %Ld;" search.limit
-  | _ -> sprintf "UPDATE MESSAGES SET tag = ? WHERE %s LIMIT %Ld;" (make_filters search.filters) search.limit
+  if Option.is_some search.after then
+    sprintf "UPDATE MESSAGES SET tag = ? WHERE %s LIMIT %Ld;"
+      (make_filters (Option.value_exn search.after)) search.limit
+  else
+    sprintf "UPDATE MESSAGES SET tag = ? LIMIT %Ld;" search.limit
 
 let read_tag_sql = "SELECT raw, ROWID FROM MESSAGES INDEXED BY MESSAGES_TAG_IDX WHERE (tag = ?);"
 let delete_tag_sql = "DELETE FROM MESSAGES INDEXED BY MESSAGES_TAG_IDX WHERE (tag = ?);"
@@ -239,7 +246,7 @@ let create file ~avg_read =
   let%lwt quick_check = prepare db quick_check_sql in
 
   let stmts = {last_row; count; begin_transaction; commit_transaction; rollback_transaction; truncate; quick_check} in
-  let instance = {db; file; avg_read; stmts} in
+  let instance = { db; file; avg_read; stmts; } in
   return instance
 
 let close db =
@@ -258,26 +265,37 @@ let close db =
 
 let push db ~msgs ~ids =
   let time = Util.time_ns_int64 () in
-  let%lwt stmt =
-    let%lwt (st, _) as stmt = prepare db.db (insert_sql (Collection.length msgs)) in
-    let args = Collection.concat_mapi_two msgs ids ~f:(fun i raw id ->
-        let pos = i * 3 in
-        [ ((pos + 1), Data.BLOB id); ((pos + 2), Data.INT time); ((pos + 3), Data.BLOB raw) ]
-      )
-    in
-    let%lwt () = bind st args in
-    return stmt
+  (* Sqlite has a limit of 500 insert values per statement *)
+  let args = Collection.concat_mapi_two msgs ids ~f:(fun i raw id ->
+      let pos = (i mod sqlite_max_values) * 3 in
+      [ ((pos + 1), Data.BLOB id); ((pos + 2), Data.INT time); ((pos + 3), Data.BLOB raw) ]
+    )
   in
-  execute db ~destroy:true stmt
+  let batched_args = Collection.split ~every:(sqlite_max_values * 3) args in
+  let num_batches = List.length batched_args in
+  let%lwt stmts = Lwt_list.mapi_p (fun i args_batch ->
+      let num_values = if i = (num_batches - 1)
+        then (Collection.length args_batch / 3)
+        else sqlite_max_values
+      in
+      let%lwt (st, _) as stmt = prepare db.db (insert_sql num_values) in
+      let%lwt () = bind st args_batch in
+      return stmt
+    ) batched_args
+  in
+  transaction db ~destroy:true stmts
 
-let make_args filters =
-  Array.mapi filters ~f:(fun i filter ->
-    match filter with
-    | `After_id id -> ((i + 1), Data.BLOB id)
-    | `After_ts ts -> ((i + 1), Data.INT ts)
-    | `After_rowid rowid -> ((i + 1), Data.INT rowid)
-    | `Tag tag -> ((i + 1), Data.BLOB tag)
-  )
+let make_args ?tag ~after () =
+  let open Search in
+  let queue = Queue.create ~capacity:2 () in
+  let () = match after with
+    | None -> ()
+    | Some (After_id id) -> Queue.enqueue queue (1, Data.BLOB id)
+    | Some (After_ts ts) -> Queue.enqueue queue (1, Data.INT ts)
+    | Some (After_rowid rowid) -> Queue.enqueue queue (1, Data.INT rowid)
+  in
+  Option.iter tag ~f:(fun tag_ -> Queue.enqueue queue (((Queue.length queue) + 1), Data.BLOB tag_));
+  Queue.to_array queue
 
 let fetch_last_row db ~rowid =
   let (st, sql) as stmt = db.stmts.last_row in
@@ -290,19 +308,20 @@ let fetch_last_row db ~rowid =
 
 let pull db ~search ~fetch_last =
   let open Search in
+  let after = search.after in
   match search.only_once with
   | true ->
     let tag = Id.uuid () in
 
     (* Add tag *)
     let%lwt (st, _) as stmt = prepare db.db (add_tag_sql ~search) in
-    let args = make_args (Array.append [| `Tag tag |] search.filters) in
+    let args = make_args ~tag ~after () in
     let%lwt () = bind st (Collection.of_array args) in
     let%lwt cnt1 = execute db ~destroy:true stmt in
 
     (* Select tag *)
     let%lwt (st, _) as stmt = prepare db.db read_tag_sql in
-    let args = make_args [| `Tag tag |] in
+    let args = make_args ~tag ~after:None () in
     let%lwt () = bind st (Collection.of_array args) in
     let%lwt (rows, last_rowid) = query db ~destroy:false stmt FBlobRowid in
     let cnt2 = Collection.length rows in
@@ -317,7 +336,7 @@ let pull db ~search ~fetch_last =
 
     (* Delete tag *)
     let%lwt (st, _) as stmt = prepare db.db delete_tag_sql in
-    let args = make_args [| `Tag tag |] in
+    let args = make_args ~tag ~after:None () in
     let%lwt () = bind st (Collection.of_array args) in
     let%lwt cnt3 = execute db ~destroy:false stmt in
 
@@ -331,7 +350,7 @@ let pull db ~search ~fetch_last =
   | false ->
     (* Just SELECT *)
     let%lwt (st, _) as stmt = prepare db.db (read_sql ~search) in
-    let args = make_args search.filters in
+    let args = make_args ~after () in
     let%lwt () = bind st (Collection.of_array args) in
     let%lwt (rows, last_rowid) = query db ~destroy:true stmt FBlobRowid in
 

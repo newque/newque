@@ -33,7 +33,8 @@ var call = exports.call = function (method, port, path, buf, headers) {
   })
   .catch(function (err) {
     console.log('Fn.call ERROR!!!')
-    console.log(method, port, path, buf, headers)
+    console.log(method, port, path, headers)
+    // console.log(buf)
     console.log(err.stack)
     return Promise.reject(err)
   })

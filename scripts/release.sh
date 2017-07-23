@@ -7,5 +7,5 @@ cp _build/tmp/newque.native newque/newque
 cp -R lib newque
 cp -R conf newque
 patchelf --set-rpath '$ORIGIN/lib/' newque/newque
-tar czvf newque.0.0.4.tar.gz newque/
+tar czvf newque.0.0.5.tar.gz newque/
 echo 'Done'

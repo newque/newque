@@ -10,9 +10,11 @@ type t = {
   stop_w : unit Lwt.u;
   ctx : Cohttp_lwt_unix_net.ctx;
   thread : unit Lwt.t;
+  exception_filter: Exception.exn_filter;
 }
 
 val start :
+  Environment.t ->
   Config_t.config_listener ->
   Config_t.config_http_settings ->
   routing ->

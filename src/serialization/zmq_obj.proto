@@ -80,3 +80,16 @@ message Output {
   }
 
 }
+
+// ------------------------------------
+
+// WRAPPERS
+
+// Some messaging systems, such as Redis' Pubsub don't
+// support sending more than one message at a time.
+// This wrapper simply exists to imitate how ZMQ only
+// ever sends "lists" of buffers. More info in the docs.
+
+message Many {
+  repeated bytes buffers = 1;
+}

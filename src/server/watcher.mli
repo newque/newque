@@ -2,7 +2,7 @@ open Core
 
 type t
 
-val create : unit -> t
+val create : Environment.t -> t
 
 val router : t -> Router.t
 val table : t -> Listener.t Int.Table.t

@@ -16,9 +16,11 @@ type t = {
   workers: worker array;
   proxy: unit Lwt.t;
   stop_w: unit Lwt.u;
+  exception_filter: Exception.exn_filter;
 }
 
 val start :
+  Environment.t ->
   Config_t.config_listener ->
   Config_t.config_zmq_settings ->
   routing ->
