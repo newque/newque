@@ -11,6 +11,8 @@ module.exports = function (backend, backendSettings, raw) {
       delay = 50
     } else if (backend === 'fifo') {
       overrideBackendSettings.timeout = 5000
+    } else if (backend.split(' ').slice(0, 1)[0] === 'httpproxy') {
+      overrideBackendSettings.timeout = 5000
     }
 
     var env
@@ -72,13 +74,16 @@ module.exports = function (backend, backendSettings, raw) {
       return Fn.call('POST', 8000, '/v1/large', buf, [[C.modeHeader, 'multiple']])
       .then(Fn.shouldHaveWritten(num))
       .delay(delay)
-      .then(() => Fn.call('GET', 8000, '/v1/large/count'))
-
-      // ES doesn't support reading from it, so "onlyOnce" won't work:
-      .then(Fn.shouldHaveCounted(backend === 'elasticsearch' ? counter : num))
-
+      .then(function () {
+        if (C.noCount.indexOf(backend) >= 0) {
+          return Promise.resolve()
+        } else {
+          return Fn.call('GET', 8000, '/v1/large/count')
+          .then(Fn.shouldHaveCounted(C.noRead.indexOf(backend) >= 0 ? counter : num))
+        }
+      })
       .then(() => {
-        if (backend === 'elasticsearch') {
+        if (C.noRead.indexOf(backend) >= 0) {
           return Promise.resolve()
         } else {
           return Fn.call('GET', 8000, '/v1/large', null, [[C.modeHeader, 'many ' + num]])

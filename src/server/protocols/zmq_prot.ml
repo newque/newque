@@ -106,7 +106,7 @@ let handler zmq routing socket frames =
       with
       | ex ->
         (* Catch errors that bubbled up from the backend *)
-        let errors = zmq.exception_filter ex in
+        let errors = zmq.exception_filter ex |> fst in
         return ({ errors; action = Error_output }, Collection.empty)
     end
     in

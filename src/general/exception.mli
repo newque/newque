@@ -1,4 +1,4 @@
-type exn_filter = (exn -> string list)
+type exn_filter = (exn -> string list * bool)
 
 exception Multiple_public_exn of string list
 exception Public_exn of string

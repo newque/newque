@@ -211,7 +211,9 @@ let handler http routing ((ch, _) as conn) req body =
   with
   | ex ->
     (* Catch errors that bubbled up from the backend *)
-    handle_errors 500 (http.exception_filter ex)
+    match http.exception_filter ex with
+    | errors, true -> handle_errors 400 errors
+    | errors, false -> handle_errors 500 errors
 
 let open_sockets = Int.Table.create ~size:5 ()
 

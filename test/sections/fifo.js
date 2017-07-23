@@ -31,10 +31,10 @@ module.exports = function (backend, backendSettings, raw) {
       })
 
       return Promise.delay(200).then(() => Promise.all([
-        Fn.call('GET', 8000, '/v1/example/count').then(Fn.shouldFail(500)),
-        Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'one']]).then(Fn.shouldFail(500)),
-        Fn.call('POST', 8000, '/v1/example', 'somestring', [[C.modeHeader, 'single']]).then(Fn.shouldFail(500)),
-        Fn.call('DELETE', 8000, '/v1/example').then(Fn.shouldFail(500)),
+        Fn.call('GET', 8000, '/v1/example/count').then(Fn.shouldFail(400)),
+        Fn.call('GET', 8000, '/v1/example', null, [[C.modeHeader, 'one']]).then(Fn.shouldFail(400)),
+        Fn.call('POST', 8000, '/v1/example', 'somestring', [[C.modeHeader, 'single']]).then(Fn.shouldFail(400)),
+        Fn.call('DELETE', 8000, '/v1/example').then(Fn.shouldFail(400)),
       ]))
       .then(function () {
         Fn.assert(ctr === 5)

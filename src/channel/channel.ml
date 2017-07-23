@@ -186,6 +186,28 @@ let create name conf_channel =
         let batching = batching
       end in
       (module Persistence.Make (Arg) : Persistence.S)
+
+    | `Redis_pubsub redis_pubsub ->
+      if not conf_channel.raw then failwith (sprintf "Channel [%s] has backend type [redis_pubsub], setting 'raw' must be set to true" name) else
+      if Option.is_some read then failwith (sprintf "Channel [%s] has backend type [redis_pubsub], reading must be disabled" name) else
+      if conf_channel.emptiable then failwith (sprintf "Channel [%s] has backend type [redis_pubsub], setting 'emptiable' must be set to false" name) else
+      let module Arg = struct
+        module IO = Redis_pubsub.M
+        let create () = Redis_pubsub.create
+            ~chan_name:name
+            redis_pubsub.redis_pubsub_host
+            redis_pubsub.redis_pubsub_port
+            ~auth:redis_pubsub.redis_pubsub_auth
+            ~database:redis_pubsub.redis_pubsub_database
+            ~pool_size:redis_pubsub.redis_pubsub_pool_size
+            ~broadcast:redis_pubsub.redis_pubsub_broadcast
+        let stream_slice_size = stream_slice_size
+        let raw = conf_channel.raw
+        let json_validation = json_validation
+        let scripting = scripting
+        let batching = batching
+      end in
+      (module Persistence.Make (Arg) : Persistence.S)
   ) : Persistence.S)
   in
   let instance = {

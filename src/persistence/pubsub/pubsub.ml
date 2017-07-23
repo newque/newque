@@ -50,8 +50,8 @@ module M = struct
     let input = { channel = instance.chan_name; action = Write_input { atomic = None; ids = (Collection.to_list ids |> snd); } } in
     let encoder = Pbrt.Encoder.create () in
     encode_input input encoder;
-    let input = Pbrt.Encoder.to_bytes encoder in
-    let%lwt () = Lwt_zmq.Socket.send_all instance.socket (input::(Collection.to_list msgs |> snd)) in
+    let encoded_input = Pbrt.Encoder.to_bytes encoder in
+    let%lwt () = Lwt_zmq.Socket.send_all instance.socket (encoded_input::(Collection.to_list msgs |> snd)) in
     return (Collection.length msgs)
 
   let pull instance ~search ~fetch_last = fail (Exception.Public_exn "Invalid operation on this channel (READ)")

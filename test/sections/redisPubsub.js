@@ -1,12 +1,12 @@
 var fs = require('fs')
 var protobuf = require("protocol-buffers")
 var specs = protobuf(fs.readFileSync('../specs/zmq_api.proto'))
-var zmq = require('zmq')
-var socket1 = zmq.socket('sub')
-var socket2 = zmq.socket('sub')
+var redis = require('redis')
+var client1 = redis.createClient()
+var client2 = redis.createClient()
 
 module.exports = function (backend, backendSettings, raw) {
-  describe('Pubsub' + (!!raw ? ' raw' : ''), function () {
+  describe('RedisPubsub' + (!!raw ? ' raw' : ''), function () {
     var env
     before(function () {
       this.timeout(C.setupTimeout)
@@ -40,12 +40,20 @@ module.exports = function (backend, backendSettings, raw) {
       var originalIdsStr = originalIds.join(',')
       var buf = `{"a":"abc"}\n{"a":"def"}\n{"a":"ghi"}\n{"a":"jkl"}`
 
-      var receiveOnSocket = function (socket, addr) {
+      var receiveOnClient = function (client, broadcast) {
         return new Promise(function (resolve, reject) {
-          socket.connect(addr)
-          socket.subscribe(new Buffer([]))
-          socket.on('message', function (input, msg1, msg2, msg3, msg4) {
-            var decoded = specs.Input.decode(input)
+          client.on('error', function (err) {
+            return reject(err)
+          })
+          client.subscribe(broadcast)
+          client.on('message_buffer', function (channel, many) {
+            var unwrapped = specs.Many.decode(many)
+            var decoded = specs.Input.decode(unwrapped.buffers[0])
+            var msg1 = unwrapped.buffers[1]
+            var msg2 = unwrapped.buffers[2]
+            var msg3 = unwrapped.buffers[3]
+            var msg4 = unwrapped.buffers[4]
+
             Fn.assert(decoded.channel.toString('utf8') === 'example')
             Fn.assert(decoded.write_input.atomic !== true)
             var receivedIds = decoded.write_input.ids.map(x => x.toString('utf8'))
@@ -57,15 +65,15 @@ module.exports = function (backend, backendSettings, raw) {
             Fn.assert(msg3.toString('utf8') === splitBuf[2])
             Fn.assert(msg4.toString('utf8') === splitBuf[3])
 
-            socket.removeAllListeners('message')
-            socket.disconnect(addr)
+            client.removeAllListeners('message_buffer')
+            client.removeAllListeners('error')
+            client.unsubscribe()
             resolve()
           })
         })
       }
-      var addr = 'tcp://127.0.0.1:' + env.pubsubPorts.example
-      var receive1 = receiveOnSocket(socket1, addr)
-      var receive2 = receiveOnSocket(socket2, addr)
+      var receive1 = receiveOnClient(client1, backendSettings.broadcast)
+      var receive2 = receiveOnClient(client2, backendSettings.broadcast)
       return Fn.call('POST', 8000, '/v1/example', buf, [[C.modeHeader, 'multiple'], [C.idHeader, originalIdsStr]])
       .then(Fn.shouldHaveWritten(4))
       .then(() => receive1)
@@ -78,13 +86,17 @@ module.exports = function (backend, backendSettings, raw) {
       var buf = `1\n2\n4\n8`
       var shouldTotal = 1 + 2 + 4 + 8
 
-      var receiveOnSocket = function (socket, addr) {
+      var receiveOnClient = function (client, broadcast) {
         var total = 0
         return new Promise(function (resolve, reject) {
-          socket.connect(addr)
-          socket.subscribe(new Buffer([]))
-          socket.on('message', function (input, msg) {
-            var decoded = specs.Input.decode(input)
+          client.on('error', function (err) {
+            return reject(err)
+          })
+          client.subscribe(broadcast)
+          client.on('message_buffer', function (channel, many) {
+            var unwrapped = specs.Many.decode(many)
+            var decoded = specs.Input.decode(unwrapped.buffers[0])
+            var msg = unwrapped.buffers[1]
             Fn.assert(decoded.channel.toString('utf8') === 'singlebatches')
             Fn.assert(decoded.write_input.atomic !== true)
 
@@ -96,16 +108,16 @@ module.exports = function (backend, backendSettings, raw) {
 
             total += parseInt(receivedMsg, 10)
             if (total === shouldTotal) {
-              socket.removeAllListeners('message')
-              socket.disconnect(addr)
+              client.removeAllListeners('message_buffer')
+              client.removeAllListeners('error')
+              client.unsubscribe()
               resolve()
             }
           })
         })
       }
-      var addr = 'tcp://127.0.0.1:' + env.pubsubPorts.singlebatches
-      var receive1 = receiveOnSocket(socket1, addr)
-      var receive2 = receiveOnSocket(socket2, addr)
+      var receive1 = receiveOnClient(client1, backendSettings.broadcast)
+      var receive2 = receiveOnClient(client2, backendSettings.broadcast)
       return Fn.call('POST', 8000, '/v1/singlebatches', buf, [[C.modeHeader, 'multiple'], [C.idHeader, originalIdsStr]])
       .then(Fn.shouldHaveWritten(4))
       .then(() => receive1)

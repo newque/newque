@@ -96,7 +96,13 @@ module M = struct
         fail_with (sprintf "Invalid Redis Size result: %s" (Redis_shared.debug_reply incorrect))
     )
 
-  let delete instance = fail_with "Invalid operation: Redis delete"
+  let delete instance = Lwt_pool.use instance.pool (fun conn ->
+      let%lwt reply = Redis_shared.exec_script conn "delete" ~keys:instance.keys ~args:[] ~debug:Logger.debug_lazy in
+      match reply with
+      | `Bulk (Some "OK") -> return_unit
+      | incorrect ->
+        fail_with (sprintf "Invalid Redis Delete result: %s" (Redis_shared.debug_reply incorrect))
+    )
 
   let health instance = Lwt_pool.use instance.pool (fun conn ->
       let%lwt reply = Redis_shared.exec_script conn "health" ~keys:instance.keys ~args:[] ~debug:Logger.debug_lazy in
@@ -124,14 +130,6 @@ module M = struct
         ]
       | incorrect ->
         fail_with (sprintf "Invalid Redis Health result: %s" (Redis_shared.debug_reply incorrect))
-    )
-
-  let delete instance = Lwt_pool.use instance.pool (fun conn ->
-      let%lwt reply = Redis_shared.exec_script conn "delete" ~keys:instance.keys ~args:[] ~debug:Logger.debug_lazy in
-      match reply with
-      | `Bulk (Some "OK") -> return_unit
-      | incorrect ->
-        fail_with (sprintf "Invalid Redis Delete result: %s" (Redis_shared.debug_reply incorrect))
     )
 
 end

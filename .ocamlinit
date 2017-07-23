@@ -1,9 +1,6 @@
 #use "topfind"
 #thread
 
-#require "core.top"
-open Core
-
 #require "ppx_sexp_conv"
 
 #require "lwt"
@@ -16,14 +13,24 @@ open Lwt
 #require "cohttp.lwt"
 
 #require "lua"
-#mod_use "src/general/collection.ml"
 
 #require "redis-lwt"
 
 #require "atd"
 #require "atdgen"
+
+#require "ocaml-protoc"
+
+type bytes = string;;
 #mod_use "src/serialization/json_obj_t.ml"
 #mod_use "src/serialization/json_obj_j.ml"
+#mod_use "src/serialization/zmq_obj_types.ml"
+#mod_use "src/serialization/zmq_obj_pb.ml"
+
+#require "core.top"
+open Core
+
+#mod_use "src/general/collection.ml"
 
 #mod_use "src/general/fs.ml"
 #mod_use "src/log.ml"

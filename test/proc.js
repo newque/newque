@@ -297,6 +297,10 @@ exports.setupEnvironment = function (backend, backendSettings, raw) {
           parsed.emptiable = false
           pubsubPorts[channelName] = parsed.backendSettings.port = getPort()
           var promise = Promise.resolve()
+        } else if (type === 'redisPubsub') {
+          parsed.readSettings = null
+          parsed.emptiable = false
+          var promise = Promise.resolve()
         } else if (type === 'fifo') {
           fifoPorts[channelName] = parsed.backendSettings.port = getPort()
           var promise = Promise.resolve()

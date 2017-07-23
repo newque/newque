@@ -12,3 +12,6 @@ exports.esDelay = 1500 // Due to ES's refresh interval default being 1000ms
 exports.esTimeout = 7000 // Test timeouts due to ES being slow
 
 exports.remotePort = 8100
+
+exports.noRead = ['elasticsearch', 'pubsub', 'redisPubsub']
+exports.noCount = ['pubsub', 'redisPubsub']

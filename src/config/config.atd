@@ -67,6 +67,15 @@ type config_redis = {
   ~pool_size <json name="connectionPoolSize"><ocaml default="5">: int;
 } <ocaml field_prefix="redis_">
 
+type config_redis_pubsub = {
+  host <json name="host">: string;
+  port <json name="port">: int;
+  ~database <json name="database"><ocaml default="0">: int;
+  ?auth <json name="auth">: string nullable;
+  ~pool_size <json name="connectionPoolSize"><ocaml default="5">: int;
+  broadcast: string;
+} <ocaml field_prefix="redis_pubsub_">
+
 type config_httpproxy = {
   base_urls <json name="baseUrls">: string list <ocaml repr="array">;
   base_headers <json name="baseHeaders">: pair list;
@@ -106,6 +115,7 @@ type config_backend = [
   | Fifo <json name="fifo"> of config_fifo
   | Elasticsearch <json name="elasticsearch"> of config_elasticsearch
   | Redis <json name="redis"> of config_redis
+  | Redis_pubsub <json name="redisPubsub"> of config_redis_pubsub
 ]
 
 

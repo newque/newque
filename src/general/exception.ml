@@ -1,7 +1,7 @@
 open Core
 open Lwt
 
-type exn_filter = (exn -> string list)
+type exn_filter = (exn -> string list * bool)
 
 exception Multiple_public_exn of string list
 exception Public_exn of string
@@ -66,23 +66,26 @@ let is_public ex = match ex with
 let create_exception_filter ~section ~main_env ~listener_env =
   let module Logger = Log.Make (struct let section = section end) in
   match Option.value listener_env ~default:main_env with
-  | Environment.Production -> begin
+  | Environment.Production ->
+    begin
       fun ex ->
-        match is_public ex with
-        | true ->
-          async (fun () -> Logger.notice (human ex));
-          human_list ex
-        | false ->
-          async (fun () -> Logger.error (full ex));
-          [default_error]
+        let public = is_public ex in
+        begin if public
+          then
+            let () = async (fun () -> Logger.notice (human ex)) in
+            (human_list ex), public
+          else
+          let () = async (fun () -> Logger.error (full ex)) in
+          [default_error], public
+        end
     end
-  | Environment.Development -> begin
+  | Environment.Development ->
+    begin
       fun ex ->
-        let () = match is_public ex with
-          | true ->
-            async (fun () -> Logger.notice (human ex))
-          | false ->
-            async (fun () -> Logger.error (full ex))
-        in
-        human_list ex
+        let public = is_public ex in
+        begin if public
+          then async (fun () -> Logger.notice (human ex))
+          else async (fun () -> Logger.error (full ex))
+        end;
+        (human_list ex), public
     end
