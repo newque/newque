@@ -3,7 +3,7 @@
   #endif
 # 5
 
-let newque_version = "0.0.4"
+let newque_version = "0.0.5"
 
 open Core
 open Lwt
