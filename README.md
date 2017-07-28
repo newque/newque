@@ -1,6 +1,6 @@
 # Newque
 
-> Fast, configurable message broker that saves you time and rids datastore headaches.
+> Performant and modular toolbox for networked applications.
 
 ## Table of Contents
 
@@ -8,16 +8,19 @@
   - [Basics](#basics)
   - [Newque Overview](#newque-overview)
   - [Key Benefits](#key-benefits)
-  - [Common Use Case](#common-use-case)
+  - [Example Use Case](#example-use-case)
 - [Getting Started](#getting-started)
 - [Integrations](#integrations)
-- [Examples](#examples)
-  - [Pubsub](#pubsub)
-  - [FIFO](#fifo)
 - [Directory Structure](#directory-structure)
 - [Concepts](#concepts)
 - [Logging](#logging)
+- [Environments](#environments)
 - [JSON Configuration](#json-configuration)
+  - [Main Configuration File](#main-configuration-file)
+  - [Channel Configuration Files](#channel-configuration-files)
+- [HTTP](#http)
+- [ZMQ](#zmq)
+- [Low Level API](#low-level-api)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
 
@@ -25,106 +28,66 @@
 
 ### Basics
 
-A message broker acts as a service in between networked applications, devices, datastores, etc. It can accept client applications' requests to return aggregate data from your backend servers, or itself acting as a collector. Message brokers offset developer workload and application complexity by handling several things, including:
+Newque acts as a service in between networked services, devices, datastores, etc. The list of things it can do is long, and it replace entire microservices with just a few JSON files of configuration. A few of the many things it can do:
 
 - Collecting data
-- Log aggregation
-- Message parsing
-- Message validation
-- Request batching
-- One-to-many routing (pubsub)
-- Producer-consumer routing
-- Proxying
-- Logging
+- Aggregating logs
+- Parsing and validating messages
+- Batching streams of data into chunks to be processed
+- Routing between services (1-to-1, 1-to-many, etc)
+- Cache data
+- Serving jobs to workers
+- Proxying requests
+- Custom scripting
+- ... all at the same time, and more
 
 ### Newque Overview
 
-Newque - pronounced `nuke` - is a fast, declarative message broker. It can be used for common operations listed above and more. With Newque, you can:
+Newque - pronounced `nuke` - is a fast, declarative service that acts as the nervous system of your applications. It is entirely configured with simple and short JSON files.
 
-1. Design your architecture using common patterns
-2. Define it into JSON config files
-3. Let Newque handle all your message needs
-4. Develop and iterate faster instead of reinventing the wheel
+1. First, design your architecture (how data flows) by combining reusable patterns
+2. Then set it up using the simple configuration format, in JSON
+3. Start Newque and interact with it using the library for your programming language
+4. Keep iterating and experimenting with new architectures and flows of data without changing your application code. Newque is the perfect systems prototyping tool.
 
 Newque is configured with JSON files that are loaded on startup. The format of those JSON files is documented [below](https://github.com/newque/newque#configuration-files).
 
-Newque is built around the concept of Listeners and Channels (sometimes known as "topics"). Each Channel can be accessed from zero or more Listeners. Listeners expose a protocol ([HTTP](https://github.com/newque/newque#http) or [ZMQ](https://github.com/newque/newque#zmq)) over a port. Both protocols have pros and cons. Each Channel has a Backend where messages are sent before they can be read. Messages are binary blobs; it is possible to send anything from UTF-8 text to images, JSON, compressed video, etc.
+Newque is built around the concept of Listeners and Channels (also known as "topics"). Each Channel can be accessed from zero or more Listeners. Listeners expose a protocol (either [HTTP](https://github.com/newque/newque#http) or [ZMQ](https://github.com/newque/newque#zmq)) over a port. Each Channel has a Backend where messages are sent before they can be read. Messages are binary blobs; it is possible to send anything from UTF-8 text to images, strings of JSON, video, etc.
 
 ### Key Benefits
 
 Using Newque can afford you:
 
-- **Peace of mind**: you no longer have to ask yourself worrisome questions such as: 'What happens if one of my data processing servers goes down?'
-- **Fast architecture prototyping**: it takes seconds to change the entire flow of data in your system to try different architectures. Avoid having to reinvent the wheel, or writing complicated and error-prone code to move data around.
-- **Time**: queue management over failed instances, pending queues, etc require hours of development and testing. Newque handles it all.
-- **Fast application performance**
+- **Peace of mind**: Newque is battle-tested, let it handle as much complex logic as possible.
+- **Fast architecture prototyping**: It only takes seconds to change the entire flow of data between your services. Avoid having to reinvent the wheel, or writing complicated and error-prone code to move data around, instead leverage the built-in tools.
+- **Fast application performance**: Newque is optimized for throughput and can take load off of your application servers by offloading boilerplate to it.
 
-### Common Use Case
+### Example Use Case
 
-Imagine clients (producers) recording events in an application. In this scenario, events happen continuously and the producers stream those single messages to Newque on a Channel (let's call it "Main") using the local disk as its Backend. This log allows the user to replay events later by Reading messages from that Backend.
+Imagine clients (producers) recording temperature from sensors. In this scenario, events happen continuously and the producers stream those single messages to Newque on a Channel (let's call it "Main") using the local disk as its Backend. This log allows the user to replay events later by Reading messages from that Backend. Here the user can setup validations (using custom scripts or JSONSchema), to make Newque reject incorrectly formatted messages.
 
-The user also configured Newque to Forward messages received on the Main Channel to another Channel using ElasticSearch as its Backend (let's call that Channel "Indexer"). Indexer is not directly exposed on a Listener. The user, aware of the high overhead of HTTP requests to ElasticSearch, configured the Indexer Channel to use Batching (for example, with: size = 1000, time = 2 seconds). Therefore Newque will only make a request to ES once at least 1000 messages have been received or once 2 seconds have elapsed since the last request was made.
+The user also configured Newque to Forward messages received on the Main Channel to another Channel using ElasticSearch as its Backend (let's call that Channel "Indexer"). Indexer is not directly exposed on a Listener. The user, aware of the high overhead of HTTP requests to ElasticSearch, configured the Indexer Channel to use Batching (for example, with: size = 1000, time = 2 seconds). Therefore Newque will only make a request to ES once 1000 messages have been received or once 2 seconds have elapsed since the last request was made.
 
-In this imaginary scenario, the user also needs to Forward the messages to a pool of clients (consumers) that will process them. There are multiple Backend choices available to accomplish this task: `httpproxy`, `pubsub` or `fifo`.
+In this imaginary scenario, the user also needs to Forward the messages (our temperatures plus some metadata) to a pool of clients (consumers) that will process them. There are multiple Backend choices available to accomplish this task: `httpproxy`, `pubsub`, `redisPubsub` and `fifo`.
 
-The user then uses the Newque high level library (driver) for the language of their choice. By not having to write all the code to route data to all these services themselves, the user can focus on what really matters: the business logic. By relying on a battle-tested platform such as Newque, they avoid reinventing the wheel with all the debugging and performance optimizations it involves.
-
-The main operations are:
-
-- Writing to a Channel's Backend
-- Reading from a Channel's Backend
-- Streaming from a Channel's Backend
-- Counting the number of messages in a Channel's Backend
-- Deleting all data from a Channel's Backend
-- Checking the Health of a Channel's Backend
-- Checking the Health of the whole system
-
-The current Backend options are:
-
-- `memory`: Use the local RAM to store messages.
-- `disk`: Use the local disk to store messages.
-- `httpproxy`: Proxy messages to a remote HTTP or another Newque server.
-- `elasticsearch`: Write to ES. Messages must be valid JSON, for obvious reasons.
-- `pubsub`: Broadcast to a ZMQ pubsub address. Publisher-Subscriber. (1-to-many, no ack)
-- `fifo`: Send to a ZMQ FIFO address. Producer-Consumer. (1-to-1, with ack)
-- `none`: Does nothing besides Forwarding to other Channels, if applicable
-- ...more coming soon (Redis and PostgreSQL)
+The user then uses the Newque high level library (driver) for the language of their choice. By not having to write all the code to route data to between these services themselves, the user can focus on what really matters: the business logic.
 
 ## Getting Started
 
 To set up and run Newque:
 
-1. Download the latest release from https://github.com/newque/newque/releases/latest and unzip it to a `path/`
-1. Edit the configuration files in `path/conf/` to your needs (see [JSON Configuration](#json-configuration))
-1. Run `path/newque`
+1. Download the latest release from https://github.com/newque/newque/releases/latest and unzip it
+1. Edit the configuration files in `conf/` to your needs (see [JSON Configuration](#json-configuration))
+1. Run `./newque`
 
 ## Integrations
 
-- Disk
 - ElasticSearch
 - ZMQ
-- Redis (coming soon)
-- PostgreSQL (coming soon)
-
-## Examples
-
-### Pubsub
-
-To receive messages on a `pubsub` backend, open a ZMQ socket in `sub` mode and `connect` to the Channel using the ZMQ address `tcp://PubsubChannelHost:PubsubChannelPort` and finally `subscribe` to all messages.
-
-Newque will be sending data in the following format: [`Input`, message1, message2, etc].
-
-A full example is available [here](https://github.com/newque/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/pubsub.js).
-
-### FIFO
-
-To receive messages on a `fifo` backend, open a ZMQ socket in `dealer` mode and `connect` to the Channel using the ZMQ address `tcp://FifoChannelHost:FifoChannelPort`.
-
-Newque will be sending data in the following format: [`UID`, `Input`, message1, message2, etc].
-
-`fifo` requires an Acknowledgement or else the client making a request to Newque will receive a timeout error. Using the same socket, send [`UID`, `Output`] back to Newque, where `UID` is the exact same string/buffer that was sent by Newque.
-
-A full example is available [here](https://github.com/newque/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/fifo.js).
+- Redis
+- AWS Lambda (coming soon)
+- AMQP (coming RabbitMQ and other systems implementing this protocol
+- AWS Lambda integration, to pass messages to Lambdas. Lambdas can then pass them to other AWS services such as SES, SQS, S3, etc
 
 ## Directory structure
 
@@ -145,9 +108,7 @@ newque/
 │   ├── out.log
 │   └── err.log
 ├── lib/
-│   ├── libev.so.4
-│   ├── libsqlite3.so.0
-│   └── libzmq.so.4
+│   └── (dependencies, do not edit)
 └── newque
 ```
 
@@ -158,6 +119,30 @@ __Directories__
 - `lib/` contains the libraries needed to run Newque, it must be located in the same folder as the `newque` executable. Do not modify.
 
 ## Concepts
+
+__Main operations__
+
+- Writing to a Channel's Backend
+- Reading from a Channel's Backend
+- Streaming from a Channel's Backend
+- Counting the number of messages in a Channel's Backend
+- Deleting all data from a Channel's Backend
+- Checking the Health of a Channel's Backend
+- Checking the Health of the whole system
+
+__Backend options__
+
+- `memory`: Use the local RAM to store messages.
+- `disk`: Use the local disk to store messages.
+- `httpproxy`: Proxy messages to a remote HTTP or even another Newque server.
+- `elasticsearch`: Write to ES. Messages must be valid JSON, for obvious reasons.
+- `pubsub`: Broadcast to a ZMQ pubsub address. Publisher-Subscriber. (1-to-many, no ack)
+- `fifo`: Send to a ZMQ FIFO address. Producer-Consumer. (1-to-1, with ack)
+- `redis`: Use Redis to store messages.
+- `redisPubsub`: Identical to `pubsub`, but using Redis' [pubsub](https://redis.io/commands/#pubsub).
+- `none`: Does nothing besides Forwarding to other Channels, if applicable
+- ...more coming soon (AMQP, AWS Lambda, and RabbitMQ and other systems implementing this protocol
+- AWS Lambda integration, to pass messages to Lambdas. Lambdas can then pass them to other AWS services such as SES, SQS, S3, etc
 
 __IDs__
 
@@ -177,19 +162,21 @@ It's possible to offload all of your JSON validation to Newque. Each channel can
 
 By default, JSON Schema validations happen in the main thread to avoid excessive context switching, but calls with 10 or more messages will be validated in a background thread. This value (`10`) is configurable. See [the JSON Schema Validation object format](#json-schema-validation-object).
 
+Validation is done using the unbelievably fast [RapidJson](https://github.com/miloyip/rapidjson/) library.
+
 Note: JSON Schema files are checked on startup to ensure that they don't themselves contain errors. Newque won't start if any JSON Schema contains errors.
 
 __Lua Scripting__
 
-Newque offers Lua scripting. Scripts are invoked *after JSON Schema Validation, but before Batching*. A channel can have more than 1 script. They are invoked in order: the original messages are passed to the first script, then the output is passed to the second script, and so on. The output of the final script is then passed to the Batcher (if applicable) or to the channel's backend.
+Newque offers Lua scripting. Scripts are invoked during Write operations, *after JSON Schema Validation, but before Batching*. A channel can have more than 1 script. They are invoked in order: the original messages are passed to the first script, then the output is passed to the second script, and so on. The output of the final script is then passed to the Batcher (if applicable) or to the channel's backend.
 
-Scripts are simple Lua files that *must return a function that takes 2 arrays of strings and returns 2 arrays of strings*. [Here](https://github.com/newque/newque/blob/master/conf/scripts/to_uppercase.lua) is an example of a script that upper cases every message. The number of messages and the IDs must always match, but it is possible to insert or drop messages and IDs.
+Scripts are simple Lua files that *must return a function that takes 2 arrays of strings and returns 2 arrays of strings*. [Here](https://github.com/newque/newque/blob/master/conf/scripts/to_uppercase.lua) is an example of a script that upper cases every message. The number of messages and the number of IDs must always match, but it is possible to insert or drop messages and IDs.
 
-Each channel has its own Lua sandbox. A global variable created in a script on one channel is accessible in other scripts and in subsequent invokations. This is on purpose, it makes it possible for the user to cache values or even keep (e.g.) database connections open! However, it means that only one script per channel can be executing at any time. This restriction also ensures that the ordering of messages isn't altered due to one script invokation taking a longer time the next one. In other words, this access lock on each channel's Lua sandbox prevents race conditions.
+Each channel has its own Lua sandbox. A Lua global variable created in a script is accessible in other scripts in the same channel and in subsequent invokations. This is on purpose, as it makes it possible for the user to cache values or even keep (e.g.) database connections open! However, it means that only one script per channel can be executing at any time. This restriction also ensures that the ordering of messages isn't altered due to one script invokation taking a longer time than the next one. In other words, the synchronization lock on each channel's Lua sandbox prevents race conditions.
 
 The Lua sandboxes do not run in the main thread. It's safe to execute blocking operations, such as I/O (HTTP calls, reading files, etc.) or heavy CPU-bound processing.
 
-Calling `error({location = "some string", message = "some other string"})` will return a formatted error message to the user. This is helpful when Lua scripts are used to do custom validation on messages.
+Calling (e.g.) `error({location = "File myscript.lua, line 36", message = "Invalid blah"})` will return a formatted error message to the user. This is helpful when Lua scripts are used for custom validation on messages.
 
 Calling `error()` with any value other than an object having the keys `location` and `message` will be considered an "unexpected error". Strings or Numbers passed to `error()` will be logged in the Newque logs and a generic error message will be returned to the user.
 
@@ -201,7 +188,7 @@ __Batching__
 
 Batching is an easy way to improve your application's performance. When batching is enabled on a channel, all incoming messages are added to a queue instead of being immediately sent to the channel's backend.
 
-Batches are flushed to the backend when either one of 2 conditions are met:
+Batches are flushed to the backend as soon as either one of 2 conditions are met:
 - the batch size reaches `maxSize`
 - the batch has not been flushed in the last `maxTime` milliseconds
 
@@ -221,16 +208,25 @@ Levels `warning`, `error` and `fatal` are written to STDERR and `./logs/err.log`
 
 **Note:** If the `NEWQUE_ENV` environment variable is set, it'll be used in the log format.
 
+## Environments
+
+Newque can be started in either `development` or `production` mode. Each Listener can locally override this setting.
+
+Production mode is recommended for public facing servers/listeners. In this mode, many error messages are replaced with a generic `An error occured, please consult the logs for details.` message. This avoids exposing possibly sensitive information through error messages.
+
+Development mode returns all error messages as-is.
+
 ## JSON Configuration
 
-### Main configuration file (`newque.json`)
+### Main configuration file
 
-This file must be located in `conf/` from the location of the `newque` executable.
+The `newque.json` file must be located in `conf/` from the location of the `newque` executable.
 
 __Example__
 ```json
 {
   "logLevel": "info",
+  "environment": "development",
   "admin": {
     "host": "0.0.0.0",
     "port": 8001
@@ -259,8 +255,9 @@ __Example__
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `logLevel` | String | Yes | | Verbosity level. One of `debug`, `info`, `notice`, `warning`, `error` or `fatal` |
+| `environment` | String | Yes | | Must be `production` or `development`. See [Environments](#environments). |
 | `admin` | Object | Yes | | Admin API settings. See `Admin object`. |
-| `listeners` | Array of Objects | Yes | | Newque network settings. See `Listener object`. |
+| `listeners` | Array of Listener Objects | Yes | | Newque network settings. See `Listener object`. |
 
 __Admin object__
 
@@ -273,6 +270,7 @@ __Listener object__
 
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
+| `environment` | String | No | | Overrides the environment mode within this Listener only. Must be `production` or `development`. See [Environments](#environments). |
 | `protocol` | String | Yes | | Protocol, must be `http` or `zmq` |
 | `name` | String | Yes | | Unique name |
 | `host` | String | Yes | | Address on which to listen |
@@ -359,7 +357,7 @@ __`httpproxy` `backendSettings` Object__
 | Property | Type | Required | Default | Description |
 |----------|------|----------|---------|-------------|
 | `baseUrls` | Array of strings | Yes | | Base URLs to use for the remote HTTP server(s). |
-| `baseHeaders` | Array of Objects | Yes | | Headers to add to every request to the remote server. |
+| `baseHeaders` | Array of Header Objects | Yes | | Headers to add to every request to the remote server. |
 | `timeout` | Number | Yes | | Number of milliseconds before calls to the remote server are cancelled with an error. |
 | `appendChannelName` | Boolean | No | `false` | Append the channel name to the URL path. |
 | `remoteInputFormat` | String | No | `json` | Format that the remote server accepts for writes. One of `plaintext` or `json`. |
@@ -398,6 +396,27 @@ __`fifo` `backendSettings` Object__
 | `timeout` | Number | Yes | | Number of milliseconds before requests are cancelled with an error. |
 | `healthTimeLimit` | Number | No | `5000` | Number of milliseconds before unanswered health calls are resolved as successful. This is useful when no consumers are currently listening. |
 | `socketSettings` | Object | No | | Low level, advanced ZMQ socket options. See `Socket Settings object`. |
+
+__`redis` `backendSettings` Object__
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `host` | String | Yes | | Address of the Redis server |
+| `port` | Integer | Yes | | Port of the Redis server |
+| `auth` | String | No | | Password of the Redis server |
+| `database` | Integer | No | | Setting for Redis' [select](https://redis.io/commands/select) command |
+| `connectionPoolSize` | Integer | No | 5 | Number of Redis connections to use. Shared across Backends having the same Redis host+port+auth. |
+
+__`redisPubsub` `backendSettings` Object__
+
+| Property | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `host` | String | Yes | | Address of the Redis server |
+| `port` | Integer | Yes | | Port of the Redis server |
+| `auth` | String | No | | Password of the Redis server |
+| `database` | Integer | No | | Setting for Redis' [select](https://redis.io/commands/select) command |
+| `connectionPoolSize` | Integer | No | 5 | Number of Redis connections to use. Shared across Backends having the same Redis host+port+auth. |
+| `broadcast` | String | Yes | | Name of the `redis channel` on which to [publish](https://redis.io/commands/publish). |
 
 __Read Settings Object__
 
@@ -438,13 +457,14 @@ __Lua Scripting Object__
 |----------|------|----------|---------|-------------|
 | `mappers` | Array of strings | Yes | | A list of all the scripts to execute, in order. Those files must be located in `/conf/scripts`. |
 
+
 ## HTTP
 
-Interacting with Newque over HTTP is the most flexible way. It offers good performance, but HTTP comes with a heavy overhead per request. If you find yourself making many small HTTP calls at a high rate, consider using ZMQ instead. However, HTTP is a lot easier to load balance and is usable directly on the command line with tools such as `curl`.
+Interacting with Newque over HTTP is the most flexible way. It offers good performance, but HTTP comes with a heavy overhead per request. If you find yourself making many small HTTP calls at a high rate, consider using ZMQ instead. However, HTTP is a lot easier to load balance and is usable directly on with tools such as Postman and `curl`.
 
 An important concept to grasp is that of the `httpFormat`. Each channel has its own `httpFormat`, one for Writing (`POST`) and one for Reading (`GET`). Valid formats are `json` (default) and `plaintext`.
 
-The formats, as well as every possible operation are defined in the [HTTP API Spec](https://newque.github.io/).
+The formats, as well as every operation are defined in the [HTTP API Spec](https://newque.github.io/).
 
 ## ZMQ
 
@@ -458,17 +478,21 @@ Then open a ZMQ socket in `dealer` mode and `connect` to a Newque ZMQ Listener u
 
 A complete Node.js example is available [here](https://github.com/newque/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/zmq.js).
 
-### Basic operations
+## Low level API
+
+This section is for users who want to directly interact with Newque instead of using a library and for library writers.
+
+### Basic operations using ZMQ directly
 
 #### Write
 
 Send [`UID`, `Input`, message1, message2, etc] on the ZMQ socket.
 
-`UID` must be a unique string. `Input` is a [Protobuf object](https://github.com/newque/newque/blob/master/specs/zmq_api.proto) with the `action` field set to `Write_Input`.
+`UID` must be a unique string. `Input` is an ['Input' Protobuf object](https://github.com/newque/newque/blob/master/specs/zmq_api.proto) with the `action` field set to `Write_Input`.
 
 Newque will return [`UID`, `Output`].
 
-`UID` will be the exact same string that was sent with the request. This is so that you can associate responses with their requests. `Output` is a [Protobuf object](https://github.com/newque/newque/blob/master/specs/zmq_api.proto) with the `action` field set to `Write_Output` or `Error_Output`.
+`UID` will be the exact same string that was sent with the request. This is so that you can associate responses with their requests. `Output` is an ['Output' Protobuf object](https://github.com/newque/newque/blob/master/specs/zmq_api.proto) with the `action` field set to `Write_Output` or `Error_Output`.
 
 #### Read
 
@@ -494,16 +518,38 @@ Send [`UID`, `Input`] on the ZMQ socket.
 
 Newque will return [`UID`, `Output`].
 
-### Backend integrations
+### Receiving data from Newque on a Pubsub endpoint
 
-This section describes how to accept requests from Newque and serve as a backend for a channel.
+To receive messages from a `pubsub` backend, open a ZMQ socket in `sub` mode and `connect` to the Channel using the ZMQ address `tcp://PubsubChannelHost:PubsubChannelPort` and finally `subscribe` to all messages.
+
+Newque will be sending data in the following format: [`Input`, message1, message2, etc].
+
+A full example is available [here](https://github.com/newque/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/pubsub.js).
+
+### Receiving data from Newque on a FIFO endpoint
+
+To receive messages from a `fifo` backend, open a ZMQ socket in `dealer` mode and `connect` to the Channel using the ZMQ address `tcp://FifoChannelHost:FifoChannelPort`.
+
+Newque will be sending data in the following format: [`UID`, `Input`, message1, message2, etc].
+
+`fifo` requires an Acknowledgement or else the client making a request to Newque will receive a timeout error. Using the same socket, send [`UID`, `Output`] back to Newque, where `UID` is the exact same string/buffer that was sent by Newque.
+
+A full example is available [here](https://github.com/newque/newque/blob/dd2174166a21030a66133b75904c7d40bb5898fd/test/examples/fifo.js).
+
+### Receiving data from Newque on a Redis Pubsub endpoint
+
+Connect to the Redis server and [subscribe](https://redis.io/commands/subscribe) to the Channel's broadcast name.
+
+_Incoming messages are binary buffers and must be handled with care! Trying to convert them to a text format such as UTF-8 can corrupt them._
+
+The binary buffer is a ['Many' Protobuf object](https://github.com/newque/newque/blob/master/specs/zmq_api.proto). After decoding, you'll be left with a list (or array) of binary buffers. The first one is an ['Input' Protobuf object](https://github.com/newque/newque/blob/master/specs/zmq_api.proto). The following ones are the messages sent by the client.
 
 ## Roadmap
 
 Planned features:
 
-- Redis integration
-- PostgreSQL integration
+- AMQP integration, to receive and forward data from/to RabbitMQ and other systems implementing this protocol
+- AWS Lambda integration, to pass messages to Lambdas. Lambdas can then pass them to other AWS services such as SES, SQS, S3, etc
 
 ## Contributing
 
