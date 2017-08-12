@@ -93,9 +93,10 @@ let handler http routing ((ch, _) as conn) req body =
         Server.respond_string ~headers ~status ~body ()
 
       | Ok (Some chan_name, `Read mode) ->
+        let limit = Util.header_name_to_int64_opt (Request.headers req) Header_names.limit in
         begin match Request.encoding req with
           | Transfer.Chunked ->
-            begin match%lwt routing.read_stream ~chan_name ~mode with
+            begin match%lwt routing.read_stream ~chan_name ~mode ~limit with
               | Error errors -> handle_errors 400 errors
               | Ok (stream, channel) ->
                 let status = Code.status_of_code 200 in
@@ -122,7 +123,6 @@ let handler http routing ((ch, _) as conn) req body =
                 return (response, body)
             end
           | Transfer.Unknown | Transfer.Fixed _ ->
-            let limit = Util.header_name_to_int64_opt (Request.headers req) Header_names.limit in
             begin match%lwt routing.read_slice ~chan_name ~mode ~limit with
               | Error errors -> handle_errors 400 errors
               | Ok (slice, channel) ->

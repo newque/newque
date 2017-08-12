@@ -85,6 +85,14 @@ module.exports = function (backend, backendSettings, raw) {
           .then(Fn.shouldHaveRead(['XYZ', 'ABCD'], '--'))
         })
 
+        it('Many, with limit', function () {
+          Scenarios.push('secondary', [['XYZ']])
+          Scenarios.set('secondary', 'last_id', 'something')
+          Scenarios.set('secondary', 'last_timens', 999)
+          return Fn.call('GET', 8000, '/v1/secondary', null, [[C.modeHeader, 'many 100'], [C.limitHeader, '1']].concat(transports[ii].headers))
+          .then(Fn.shouldHaveRead(['XYZ'], '--'))
+        })
+
         it('Many, empty channel', function () {
           Scenarios.push('empty', [[]])
           return Fn.call('GET', 8000, '/v1/empty', null, [[C.modeHeader, 'many 10']].concat(transports[ii].headers))

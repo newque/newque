@@ -52,6 +52,7 @@ val read_stream :
   listen_name:string ->
   chan_name:string ->
   mode:Mode.Read.t ->
+  limit:int64 option ->
   (string Lwt_stream.t * Channel.t, string list) Result.t Lwt.t
 
 val count :

@@ -28,6 +28,7 @@ type standard_routing = {
   read_stream: (
     chan_name:string ->
     mode:Mode.Read.t ->
+    limit:int64 option ->
     (string Lwt_stream.t * Channel.t, string list) Result.t Lwt.t);
   count: (
     chan_name:string ->

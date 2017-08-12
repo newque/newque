@@ -236,7 +236,7 @@ let push chan msgs ids = chan.push msgs ids
 
 let pull_slice chan ~mode ~limit = chan.pull_slice (Int64.min limit chan.max_read) ~mode
 
-let pull_stream chan ~mode = chan.pull_stream chan.max_read ~mode
+let pull_stream chan ~mode ~limit = chan.pull_stream (Int64.min limit chan.max_read) ~mode
 
 let size chan = chan.size ()
 

@@ -23,7 +23,7 @@ val push : t -> Message.t -> Id.t Collection.t -> int Lwt.t
 
 val pull_slice : t -> mode:Mode.Read.t -> limit:int64 -> only_once:bool -> Persistence.slice Lwt.t
 
-val pull_stream : t -> mode:Mode.Read.t -> only_once:bool -> string Lwt_stream.t Lwt.t
+val pull_stream : t -> mode:Mode.Read.t -> limit:int64 -> only_once:bool -> string Lwt_stream.t Lwt.t
 
 val size : t  -> int64 Lwt.t
 

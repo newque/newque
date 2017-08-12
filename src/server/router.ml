@@ -192,14 +192,20 @@ let read_slice router ~listen_name ~chan_name ~mode ~limit =
         return (Ok (slice, chan))
     end
 
-let read_stream router ~listen_name ~chan_name ~mode =
+let read_stream router ~listen_name ~chan_name ~mode ~limit =
   match find_chan router ~listen_name ~chan_name with
   | Error err -> return (Error [err])
   | Ok chan ->
     begin match chan.Channel.read with
       | None -> return (Error [sprintf "Channel [%s] doesn't support Reading from it" chan_name])
       | Some read ->
-        let%lwt stream = Channel.pull_stream chan ~mode ~only_once:read.Read_settings.only_once in
+        let limit = begin match limit with
+          | None -> Int64.max_value
+          | Some x when Int64.is_non_positive x -> Int64.max_value
+          | Some x -> x
+        end
+        in
+        let%lwt stream = Channel.pull_stream chan ~mode ~limit ~only_once:read.Read_settings.only_once in
         async (fun () ->
           Logger.debug_lazy (lazy (
             sprintf "Reading: [%s] (stream) from [%s]" chan_name listen_name
