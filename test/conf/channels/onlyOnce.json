@@ -4,6 +4,7 @@
   "backendSettings": {},
   "maxRead": 2,
   "readSettings": {
+    "streamSliceSize": 1,
     "onlyOnce": true
   },
   "writeSettings": {

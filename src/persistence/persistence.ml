@@ -188,19 +188,17 @@ module Make (Argument: Argument) : S = struct
       let raw_stream = Lwt_stream.from (fun () ->
           if !next_search.limit <= Int64.zero
           then return_none else
-          let%lwt (payloads, last_rowid, last_row_data) = Argument.IO.pull instance ~search:!next_search ~fetch_last:false in
-          let filter = match (last_rowid, last_row_data) with
-            | None, None -> None
-            | (Some rowid), _ -> Some (After_rowid rowid)
-            | _, Some (last_id, _) -> Some (After_id last_id)
-          in
+          let%lwt (payloads, last_rowid, _) = Argument.IO.pull instance ~search:!next_search ~fetch_last:false in
+          let cursor = Option.map last_rowid ~f:(fun rowid -> After_rowid rowid) in
+
           if Collection.is_empty payloads
           then return_none else
+
           let payloads_count = Int.to_int64 (Collection.length payloads) in
           left := Int64.(-) !left payloads_count;
-          next_search := begin match filter with
+          next_search := begin match cursor with
             | None ->
-              (* Without a filter we can't continue streaming *)
+              (* Without a cursor we can't continue streaming *)
               {
                 !next_search with
                 limit = Int64.zero;
@@ -209,7 +207,7 @@ module Make (Argument: Argument) : S = struct
               {
                 !next_search with
                 limit = Int64.min !left Argument.stream_slice_size;
-                after = filter;
+                after = cursor;
               }
           end;
           return_some payloads

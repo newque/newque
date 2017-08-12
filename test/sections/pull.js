@@ -224,6 +224,23 @@ module.exports = function (backend, backendSettings, raw) {
           Fn.assert(JSON.stringify(arr) === JSON.stringify(['ABC', 'DEF', 'GHI', 'JKL']))
         })
       })
+
+      if (backend.split(' ')[0] !== 'httpproxy') {
+        it('Should delete after reading (stream)', function () {
+          Scenarios.push('onlyOnce', [['abc', 'def'], ['ghi', 'jkl'], []])
+          Scenarios.set('onlyOnce', 'last_id', 'something', 3)
+          Scenarios.set('onlyOnce', 'last_timens', 999, 3)
+          var buf = Fn.makeJsonBuffer(['abc', 'def', 'ghi', 'jkl'])
+          return Fn.call('POST', 8000, '/v1/onlyOnce', buf, null)
+          .then(Fn.shouldHaveWritten(4))
+          .then(() => Fn.call('GET', 8000, '/v1/onlyOnce', null, [[C.modeHeader, 'Many 5'], ['Transfer-Encoding', 'chunked']]))
+          .then(Fn.shouldHaveRead(['abc', 'def'], '\n'))
+          .then(() => Fn.call('GET', 8000, '/v1/onlyOnce', null, [[C.modeHeader, 'Many 5'], ['Transfer-Encoding', 'chunked']]))
+          .then(Fn.shouldHaveRead(['ghi', 'jkl'], '\n'))
+          .then(() => Fn.call('GET', 8000, '/v1/onlyOnce', null, [[C.modeHeader, 'One'], ['Transfer-Encoding', 'chunked']]))
+          .then(Fn.shouldHaveRead([], '\n'))
+        })
+      }
     })
 
     after(function () {

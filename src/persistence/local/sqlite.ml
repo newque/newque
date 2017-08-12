@@ -15,6 +15,7 @@ type statements = {
   rollback_transaction: Sqlite3.stmt * string;
   truncate: Sqlite3.stmt * string;
   quick_check: Sqlite3.stmt * string;
+  dev_debug: Sqlite3.stmt * string;
 }
 type t = {
   db: Sqlite3.db;
@@ -204,10 +205,10 @@ let read_sql ~search =
 let add_tag_sql ~search =
   let open Search in
   if Option.is_some search.after then
-    sprintf "UPDATE MESSAGES SET tag = ? WHERE %s LIMIT %Ld;"
+    sprintf "UPDATE MESSAGES SET tag = ? WHERE ROWID IN (SELECT ROWID FROM MESSAGES WHERE %s LIMIT %Ld);"
       (make_filters (Option.value_exn search.after)) search.limit
   else
-    sprintf "UPDATE MESSAGES SET tag = ? LIMIT %Ld;" search.limit
+    sprintf "UPDATE MESSAGES SET tag = ? WHERE ROWID IN (SELECT ROWID FROM MESSAGES LIMIT %Ld);" search.limit
 
 let read_tag_sql = "SELECT raw, ROWID FROM MESSAGES INDEXED BY MESSAGES_TAG_IDX WHERE (tag = ?);"
 let delete_tag_sql = "DELETE FROM MESSAGES INDEXED BY MESSAGES_TAG_IDX WHERE (tag = ?);"
@@ -219,6 +220,7 @@ let commit_sql = "COMMIT;"
 let rollback_sql = "ROLLBACK;"
 let truncate_sql = "DELETE FROM MESSAGES;"
 let quick_check_sql = "PRAGMA quick_check;"
+let dev_debug_sql = "SELECT GROUP_CONCAT(ROWID) FROM (SELECT ROWID FROM MESSAGES LIMIT 5);"
 let insert_sql count =
   let arr = Array.create ~len:count "(?,?,?)" in
   sprintf "INSERT OR IGNORE INTO MESSAGES (uuid,timens,raw) VALUES %s;" (String.concat_array ~sep:"," arr)
@@ -244,8 +246,9 @@ let create file ~avg_read =
   let%lwt rollback_transaction = prepare db rollback_sql in
   let%lwt truncate = prepare db truncate_sql in
   let%lwt quick_check = prepare db quick_check_sql in
+  let%lwt dev_debug = prepare db dev_debug_sql in
 
-  let stmts = {last_row; count; begin_transaction; commit_transaction; rollback_transaction; truncate; quick_check} in
+  let stmts = {last_row; count; begin_transaction; commit_transaction; rollback_transaction; truncate; quick_check; dev_debug} in
   let instance = { db; file; avg_read; stmts; } in
   return instance
 
@@ -288,13 +291,18 @@ let push db ~msgs ~ids =
 let make_args ?tag ~after () =
   let open Search in
   let queue = Queue.create ~capacity:2 () in
+  let next_pos = match tag with
+    | Some tag ->
+      Queue.enqueue queue (1, Data.BLOB tag);
+      2
+    | None -> 1
+  in
   let () = match after with
     | None -> ()
-    | Some (After_id id) -> Queue.enqueue queue (1, Data.BLOB id)
-    | Some (After_ts ts) -> Queue.enqueue queue (1, Data.INT ts)
-    | Some (After_rowid rowid) -> Queue.enqueue queue (1, Data.INT rowid)
+    | Some (After_id id) -> Queue.enqueue queue (next_pos, Data.BLOB id)
+    | Some (After_ts ts) -> Queue.enqueue queue (next_pos, Data.INT ts)
+    | Some (After_rowid rowid) -> Queue.enqueue queue (next_pos, Data.INT rowid)
   in
-  Option.iter tag ~f:(fun tag_ -> Queue.enqueue queue (((Queue.length queue) + 1), Data.BLOB tag_));
   Queue.to_array queue
 
 let fetch_last_row db ~rowid =
