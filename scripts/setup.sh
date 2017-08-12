@@ -9,7 +9,7 @@ oasis setup
 ./configure
 
 # Remove ocaml-lua's test executable _tags file to avoid useless warnings
-rm newque-lua/_tags
+rm -f newque-lua/_tags
 
 # Keep a copy of the stubs
 cp tmp/libnewque_stubs.clib .

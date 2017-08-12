@@ -52,11 +52,11 @@ message Output {
   message Error_Output { }
 
   message Write_Output {
-    optional int32 saved = 1 [(ocaml_type) = int_t];
+    optional int32 saved = 1;
   }
 
   message Read_Output {
-    required int32 length = 1 [(ocaml_type) = int_t];
+    required int32 length = 1;
     optional bytes last_id = 2;
     optional int64 last_timens = 3;
   }
