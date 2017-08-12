@@ -255,9 +255,9 @@ let start main_env generic specific routing =
   let (instance_t, instance_w) = wait () in
   let conf = match routing with
     | Standard routing ->
-      Server.make ~callback:(handler instance_t routing) ()
+      Server.make ~callback:(handler instance_t routing) ~conn_closed:(conn_closed generic.name) ()
     | Admin routing ->
-      Server.make ~callback:(Admin.handler routing) ()
+      Server.make ~callback:(Admin.handler routing) ~conn_closed:(conn_closed generic.name) ()
   in
   let (stop_t, stop_w) = wait () in
   let thread = Server.create ~stop:stop_t ~ctx ~mode conf in
