@@ -234,8 +234,18 @@ let make_socket ~backlog host port =
   Lwt_unix.set_close_on_exec sock;
   return sock
 
-let conn_closed name conn =
-  async (fun () -> Logger.debug_lazy (lazy (sprintf "Connection closed on [%s]" name)))
+let conn_closed_handler name conn =
+  async (fun () -> Logger.debug_lazy (lazy (sprintf "Connection closed prematurely by client on [%s]" name)))
+
+let exn_handler name err =
+  match err with
+  | Unix.Unix_error (c, "read", _)
+    when Unix.Error.message c
+         |> String.lowercase
+         |> String.substr_index ~pattern:"connection reset"
+         |> Option.is_some ->
+    () (* Ignore this message, it's caught by the conn_closed handler *)
+  | _ -> async (fun () -> Logger.error (Exception.full err))
 
 let start main_env generic specific routing =
   let open Config_t in
@@ -252,15 +262,17 @@ let start main_env generic specific routing =
   let%lwt ctx = Conduit_lwt_unix.init () in
   let ctx = Cohttp_lwt_unix_net.init ~ctx () in
   let mode = `TCP (`Socket sock) in
+  let conn_closed = conn_closed_handler generic.name in
+  let on_exn = exn_handler generic.name in
   let (instance_t, instance_w) = wait () in
   let conf = match routing with
     | Standard routing ->
-      Server.make ~callback:(handler instance_t routing) ~conn_closed:(conn_closed generic.name) ()
+      Server.make ~callback:(handler instance_t routing) ~conn_closed ()
     | Admin routing ->
-      Server.make ~callback:(Admin.handler routing) ~conn_closed:(conn_closed generic.name) ()
+      Server.make ~callback:(Admin.handler routing) ~conn_closed ()
   in
   let (stop_t, stop_w) = wait () in
-  let thread = Server.create ~stop:stop_t ~ctx ~mode conf in
+  let thread = Server.create ~stop:stop_t ~ctx ~mode ~on_exn conf in
   let listener_env = Option.map ~f:Environment.create generic.listener_environment in
   let exception_filter = Exception.create_exception_filter ~section:generic.name ~main_env ~listener_env in
   let instance = {
