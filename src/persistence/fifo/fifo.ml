@@ -43,7 +43,10 @@ let unwrap_action : type a. output_action -> a action -> string -> a Lwt.t =
     | (Error_action, Error_output) -> return_unit
     | (Delete_action, Delete_output) -> return_unit
     | (Health_action, Health_output) -> return_unit
-    | (_, output) -> fail_with (sprintf "Upstream returned %s instead of %s" (get_name output) desired_name)
+    | (_, output) ->
+      fail (Exception.Upstream_error (
+          sprintf "Upstream returned %s instead of %s" (get_name output) desired_name
+        ))
 
 let handler instance input messages =
   let encoder = Pbrt.Encoder.create () in
